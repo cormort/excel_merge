@@ -392,7 +392,7 @@
                 <div id="drop-area-initial">
                     <h3>📁 拖放檔案到此處</h3>
                     <p>或點擊下方按鈕選擇檔案</p>
-                    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+                    <button class="btn-upload">
                         選擇 Excel 檔案
                     </button>
                 </div>
@@ -450,16 +450,16 @@
                         匯出 HTML (選取)
                     </button>
                     <button class="btn btn-success hidden" id="export-xlsx-btn">
-                        匯出全部為XLSX(按工作表分列)
+                        匯出 XLSX (全部)
                     </button>
                     <button class="btn btn-success hidden" id="export-selected-xlsx-btn">
-                        匯出選取列為XLSX(按工作表分列)
+                        匯出 XLSX (選取)
                     </button>
                     <button class="btn btn-success hidden" id="export-merged-xlsx-btn">
-                        合併所有表格為單一工作表
+                        合併所有表格)
                     </button>
                     <button class="btn btn-secondary hidden" id="reset-view-btn">
-                        還原初始狀態
+                        還原始初狀態
                     </button>
                 </div>
             </div>
@@ -563,7 +563,19 @@
 
             function setupDragAndDrop() {
                 elements.dropArea.addEventListener('click', e => {
-                    if (e.target.id !== 'file-input') elements.fileInput.click();
+                    // 如果點擊的是「清除」按鈕，就什麼都不做，讓它自己的監聽器去處理
+                    if (e.target.id === 'clear-files-btn') {
+                        return;
+                    }
+            
+                    // 如果點擊的是檔案輸入框本身，也什麼都不做
+                    if (e.target.id === 'file-input') {
+                        return;
+                    }
+                    
+                    // 對於其他所有點擊 (包含 .btn-upload 按鈕、文字、空白處)
+                    // 都觸發 fileInput 的點擊
+                    elements.fileInput.click();
                 });
 
                 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
