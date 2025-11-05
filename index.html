@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel 檢視器 - 多檔案整合工具</title>
     
-    <!-- 外部函式庫 -->
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- 連結到樣式表 -->
+    <!-- Link to Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,82 +19,64 @@
         </div>
 
         <div class="content">
-            <!-- 拖放上傳區 -->
+            <!-- Initial Upload Area -->
             <div id="drop-area">
                 <h3>📁 拖放檔案到此處</h3>
-                <p>或點擊下方按鈕選擇檔案 (支援多選)</p>
+                <p>或點擊下方按鈕選擇檔案</p>
                 <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
                 <button class="btn-upload" onclick="document.getElementById('file-input').click()">
                     選擇 Excel 檔案
                 </button>
             </div>
 
-            <!-- 控制面板 -->
+            <!-- Summary view shown after files are loaded -->
+            <div id="upload-summary" class="hidden">
+                <p>✅ 已成功載入 <span id="file-count">0</span> 個檔案。</p>
+                <button class="btn btn-secondary" id="clear-files-btn">
+                    清除檔案並重設
+                </button>
+            </div>
+
+            <!-- Control Panel -->
             <div class="controls hidden" id="control-panel">
-                <!-- 搜尋篩選 -->
                 <div class="control-group">
-                    <label for="search-input">🔍 即時搜尋篩選</label>
-                    <input type="text" id="search-input" placeholder="即時篩選 (空白 = AND)...">
+                    <label for="search-input">🔍 即時搜尋篩選 (空白 = AND)</label>
+                    <input type="text" id="search-input" placeholder="輸入關鍵字以篩選資料列...">
                 </div>
 
-                <!-- 關鍵字勾選 -->
-                <div class="control-group inline-group hidden" id="select-by-keyword-group">
+                <div class="control-group inline-group" id="select-by-keyword-group">
                     <label for="select-keyword-input">✅ 依關鍵字勾選</label>
-                    <input type="text" id="select-keyword-input" 
-                           placeholder="空白=AND, 逗號=OR, 或 Regex">
-                    <button class="btn btn-primary" id="select-by-keyword-btn">
-                        勾選
-                    </button>
+                    <input type="text" id="select-keyword-input" placeholder="空白=AND, 逗號=OR, 或 Regex">
+                    <button class="btn btn-primary" id="select-by-keyword-btn">勾選</button>
                     <label class="checkbox-label">
                         <input type="checkbox" id="select-keyword-regex">
                         使用 Regex
                     </label>
                 </div>
 
-                <!-- 按鈕組 -->
                 <div class="button-group">
-                    <button class="btn btn-primary hidden" id="select-empty-btn">
-                        勾選空白列
-                    </button>
-                    <button class="btn btn-warning hidden" id="invert-selection-btn">
-                        反向選取
-                    </button>
-                    <button class="btn btn-danger hidden" id="delete-selected-btn">
-                        刪除勾選列
-                    </button>
-                    <button class="btn btn-info hidden" id="show-hidden-btn">
-                        顯示隱藏的行列
-                    </button>
-                    <button class="btn btn-export-all hidden" id="export-html-btn">
-                        匯出 HTML (全部)
-                    </button>
-                    <button class="btn btn-export-selected hidden" id="export-selected-btn">
-                        匯出 HTML (選取)
-                    </button>
-                    <button class="btn btn-export-all hidden" id="export-xlsx-btn">
-                        匯出 XLSX (全部)
-                    </button>
-                    <button class="btn btn-export-selected hidden" id="export-selected-xlsx-btn">
-                        匯出 XLSX (選取)
-                    </button>
-                    <button class="btn btn-export-merged hidden" id="export-merged-xlsx-btn">
-                        匯出 XLSX (合併所有表格)
-                    </button>
-                    <button class="btn btn-secondary hidden" id="reset-view-btn">
-                        重設視圖
-                    </button>
+                    <button class="btn btn-primary" id="select-empty-btn">勾選空白列</button>
+                    <button class="btn btn-warning" id="invert-selection-btn">反向選取</button>
+                    <button class="btn btn-danger" id="delete-selected-btn">刪除勾選列</button>
+                    <button class="btn btn-info" id="show-hidden-btn">顯示隱藏的行列</button>
+                    <button class="btn btn-export-all" id="export-html-btn">匯出 HTML (全部)</button>
+                    <button class="btn btn-export-selected" id="export-selected-btn">匯出 HTML (選取)</button>
+                    <button class="btn btn-export-all" id="export-xlsx-btn">匯出 XLSX (全部)</button>
+                    <button class="btn btn-export-selected" id="export-selected-xlsx-btn">匯出 XLSX (選取)</button>
+                    <button class="btn btn-export-merged" id="export-merged-xlsx-btn">匯出 XLSX (合併)</button>
+                    <button class="btn btn-secondary" id="reset-view-btn">重設視圖</button>
                 </div>
             </div>
 
-            <!-- 狀態訊息 -->
+            <!-- Status Message Area -->
             <div class="status-message hidden" id="load-status-message"></div>
 
-            <!-- 表格顯示區 -->
+            <!-- Table Display Area -->
             <div id="excel-display-area"></div>
         </div>
     </div>
 
-    <!-- 連結到 JavaScript 檔案 -->
-    <script src="script.js"></script>
+    <!-- Link to JavaScript, 'defer' ensures HTML is parsed first -->
+    <script src="script.js" defer></script>
 </body>
 </html>
