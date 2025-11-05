@@ -388,10 +388,10 @@
         <div class="content">
             <!-- 拖放上傳區 -->
             <div id="drop-area">
+                <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
                 <div id="drop-area-initial">
                     <h3>📁 拖放檔案到此處</h3>
                     <p>或點擊下方按鈕選擇檔案</p>
-                    <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
                     <button class="btn-upload" onclick="document.getElementById('file-input').click()">
                         選擇 Excel 檔案
                     </button>
@@ -405,7 +405,6 @@
                         <button class="btn-clear" id="clear-files-btn">🗑️ 清除所有檔案</button>
                     </div>
                 </div>
-                <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
             </div>
 
             <!-- 控制面板 -->
@@ -451,16 +450,16 @@
                         匯出 HTML (選取)
                     </button>
                     <button class="btn btn-success hidden" id="export-xlsx-btn">
-                        匯出全部為XLSX(維持個別工作表)
+                        匯出全部為XLSX(按工作表分列)
                     </button>
                     <button class="btn btn-success hidden" id="export-selected-xlsx-btn">
-                        匯出選取列為XLSX(維持個別工作表)
+                        匯出選取列為XLSX(按工作表分列)
                     </button>
                     <button class="btn btn-success hidden" id="export-merged-xlsx-btn">
-                        合併為單一工作表XLSX
+                        合併所有表格為單一工作表
                     </button>
                     <button class="btn btn-secondary hidden" id="reset-view-btn">
-                        回到最初
+                        還原初始狀態
                     </button>
                 </div>
             </div>
