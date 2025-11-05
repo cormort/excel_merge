@@ -435,6 +435,9 @@
                     <button class="btn btn-primary hidden" id="select-empty-btn" title="自動勾選所有內容完全空白的資料列">
                         勾選空白列
                     </button>
+                    <button class="btn btn-primary hidden" id="select-all-btn" title="勾選所有目前可見的資料列">
+                        勾選全部
+                    </button>
                     <button class="btn btn-warning hidden" id="invert-selection-btn" title="反轉目前所有可見資料列的勾選狀態（已勾選的變未勾選，反之亦然）">
                         反向選取
                     </button>
@@ -504,7 +507,8 @@
                     'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn',
                     'exportMergedXlsxBtn', 'selectByKeywordGroup', 'selectKeywordInput',
                     'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel',
-                    'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 'clearFilesBtn'
+                    'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 'clearFilesBtn',
+                    'selectAllBtn'
                 ];
 
                 const mapping = {
@@ -533,6 +537,7 @@
                     'fileCount': 'file-count',
                     'fileNames': 'file-names',
                     'clearFilesBtn': 'clear-files-btn'
+                    'selectAllBtn': 'select-all-btn'
                 };
 
                 ids.forEach(id => {
@@ -547,6 +552,7 @@
                 
                 elements.selectEmptyBtn.addEventListener('click', selectEmptyRows);
                 elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
+                elements.selectAllBtn.addEventListener('click', selectAllRows); 
                 elements.invertSelectionBtn.addEventListener('click', invertSelection);
                 elements.resetViewBtn.addEventListener('click', resetView);
                 elements.selectByKeywordBtn.addEventListener('click', selectByKeyword);
@@ -880,7 +886,25 @@
                     uncheckAllSelectAllCheckboxes();
                 }
             }
-
+            function selectAllRows() {
+                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                let count = 0;
+                rows.forEach(row => {
+                    const cb = row.querySelector('.row-checkbox');
+                    if (cb) {
+                        cb.checked = true;
+                        count++;
+                    }
+                });
+                
+                if (count > 0) {
+                    // 同時勾選所有表格的「表頭全選框」
+                    elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]')
+                        .forEach(cb => cb.checked = true);
+                } else {
+                    alert('沒有可勾選的資料列。');
+                }
+            }
             function invertSelection() {
                 const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
                 rows.forEach(row => {
@@ -1194,6 +1218,7 @@
                         elements.selectByKeywordGroup, elements.selectByKeywordBtn,
                         elements.selectEmptyBtn, elements.deleteSelectedBtn,
                         elements.invertSelectionBtn, elements.exportHtmlBtn,
+                        elements.selectAllBtn,
                         elements.exportSelectedBtn, elements.exportXlsxBtn,
                         elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
                         elements.resetViewBtn, elements.showHiddenBtn,
@@ -1240,6 +1265,7 @@
                     elements.selectByKeywordGroup, elements.selectByKeywordBtn,
                     elements.selectEmptyBtn, elements.deleteSelectedBtn,
                     elements.invertSelectionBtn, elements.exportHtmlBtn,
+                    elements.selectAllBtn,
                     elements.exportSelectedBtn, elements.exportXlsxBtn,
                     elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
                     elements.resetViewBtn
