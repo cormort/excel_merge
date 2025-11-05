@@ -41,7 +41,7 @@ body {
     padding: 30px;
 }
 
-/* 拖放區域 */
+/* Upload Area Styles */
 #drop-area {
     border: 3px dashed #667eea;
     border-radius: 12px;
@@ -56,7 +56,6 @@ body {
 #drop-area:hover, #drop-area.highlight {
     background: #e9ecef;
     border-color: #764ba2;
-    transform: translateY(-2px);
 }
 
 #drop-area h3 {
@@ -90,7 +89,30 @@ body {
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
 }
 
-/* 控制面板 */
+/* NEW: Upload Summary Styles */
+#upload-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border: 3px solid #667eea;
+    border-radius: 12px;
+    background: #f8f9fa;
+    margin-bottom: 30px;
+}
+
+#upload-summary p {
+    font-size: 1.1rem;
+    color: #495057;
+    font-weight: 500;
+}
+
+#upload-summary .btn {
+    flex-shrink: 0;
+    margin-left: 20px;
+}
+
+/* Control Panel */
 .controls {
     background: #f8f9fa;
     padding: 20px;
@@ -150,7 +172,7 @@ body {
     cursor: pointer;
 }
 
-/* 按鈕組 */
+/* Button Styles */
 .button-group {
     display: flex;
     flex-wrap: wrap;
@@ -173,54 +195,20 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-.btn-primary {
-    background: #667eea;
-    color: white;
-}
-
-.btn-success {
-    background: #28a745;
-    color: white;
-}
-
-.btn-export-all {
-    background: #28a745; /* 綠色 */
-    color: white;
-}
-.btn-export-selected {
-    background: #208a38; /* 深綠色 */
-    color: white;
-}
-.btn-export-merged {
-    background: #1e7e34; /* 更深的綠色 */
-    color: white;
-}
-
-.btn-warning {
-    background: #ffc107;
-    color: #212529;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: white;
-}
-
-.btn-info {
-    background: #17a2b8;
-    color: white;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-}
+.btn-primary { background: #667eea; color: white; }
+.btn-success, .btn-export-all { background: #28a745; color: white; }
+.btn-export-selected { background: #208a38; color: white; }
+.btn-export-merged { background: #1e7e34; color: white; }
+.btn-warning { background: #ffc107; color: #212529; }
+.btn-danger { background: #dc3545; color: white; }
+.btn-info { background: #17a2b8; color: white; }
+.btn-secondary { background: #6c757d; color: white; }
 
 .hidden {
     display: none !important;
 }
 
-/* 狀態訊息 */
+/* Status Message */
 .status-message {
     background: #fff3cd;
     border-left: 4px solid #ffc107;
@@ -230,7 +218,7 @@ body {
     color: #856404;
 }
 
-/* 表格樣式 */
+/* Table Styles */
 #excel-display-area {
     overflow-x: auto;
 }
@@ -303,12 +291,8 @@ table tbody tr:hover .checkbox-cell {
 }
 
 table thead .filename-cell {
-     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-     color: white;
-     left: 50px; 
-}
-table tbody .filename-cell {
-    background-color: #e9ecef;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
 }
 table tbody tr:hover .filename-cell {
     background: #dee2e6;
@@ -318,30 +302,17 @@ table tbody tr:hover .filename-cell {
     display: none;
 }
 
-/* 響應式設計 */
+/* Responsive Design */
 @media (max-width: 768px) {
-    .header h1 {
-        font-size: 1.5rem;
-    }
-
-    .button-group {
-        flex-direction: column;
-    }
-
-    .btn {
-        width: 100%;
-    }
-
-    table {
-        font-size: 0.85rem;
-    }
-
-    table th, table td {
-        padding: 8px;
-    }
+    .header h1 { font-size: 1.5rem; }
+    .button-group { flex-direction: column; }
+    .btn { width: 100%; }
+    table { font-size: 0.85rem; }
+    table th, table td { padding: 8px; }
+    #upload-summary { flex-direction: column; gap: 15px; text-align: center; }
 }
 
-/* 載入動畫 */
+/* Loading Animation */
 .loading {
     text-align: center;
     padding: 40px;
