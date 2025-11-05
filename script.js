@@ -1,4 +1,4 @@
-// Excel Viewer - v11 - Refactored + XLSX Export
+// Excel Viewer - 重構優化版本 + XLSX 匯出功能 (包含合併所有表格)
 const ExcelViewer = (() => {
     'use strict';
 
@@ -17,7 +17,28 @@ const ExcelViewer = (() => {
     };
 
     // ==================== DOM 元素快取 ====================
-    const elements = {};
+    const elements = {
+        fileInput: null,
+        displayArea: null,
+        searchInput: null,
+        dropArea: null,
+        deleteSelectedBtn: null,
+        invertSelectionBtn: null,
+        resetViewBtn: null,
+        selectEmptyBtn: null,
+        exportHtmlBtn: null,
+        showHiddenBtn: null,
+        exportSelectedBtn: null,
+        exportXlsxBtn: null,
+        exportSelectedXlsxBtn: null,
+        exportMergedXlsxBtn: null,
+        selectByKeywordGroup: null,
+        selectKeywordInput: null,
+        selectByKeywordBtn: null,
+        selectKeywordRegex: null,
+        loadStatusMessage: null,
+        controlPanel: null
+    };
 
     // ==================== 初始化 ====================
     function init() {
@@ -39,6 +60,7 @@ const ExcelViewer = (() => {
         elements.exportSelectedBtn = document.getElementById('export-selected-btn');
         elements.exportXlsxBtn = document.getElementById('export-xlsx-btn');
         elements.exportSelectedXlsxBtn = document.getElementById('export-selected-xlsx-btn');
+        elements.exportMergedXlsxBtn = document.getElementById('export-merged-xlsx-btn');
         elements.selectByKeywordGroup = document.getElementById('select-by-keyword-group');
         elements.selectKeywordInput = document.getElementById('select-keyword-input');
         elements.selectByKeywordBtn = document.getElementById('select-by-keyword-btn');
@@ -49,16 +71,9 @@ const ExcelViewer = (() => {
 
     // ==================== 事件綁定 ====================
     function bindEvents() {
-        // 檔案上傳相關
         elements.fileInput.addEventListener('change', (e) => processFiles(e.target.files));
-        
-        // 拖放區域
         setupDragAndDrop();
-        
-        // 事件委派 - 處理動態生成的全選 checkbox
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
-        
-        // 按鈕事件
         elements.selectEmptyBtn.addEventListener('click', selectEmptyRows);
         elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         elements.invertSelectionBtn.addEventListener('click', invertSelection);
@@ -68,36 +83,26 @@ const ExcelViewer = (() => {
         elements.exportSelectedBtn.addEventListener('click', () => exportHtml('selected'));
         elements.exportXlsxBtn.addEventListener('click', () => exportXlsx('all'));
         elements.exportSelectedXlsxBtn.addEventListener('click', () => exportXlsx('selected'));
+        elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
         elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
-        
-        // 搜尋輸入 (使用 Debounce)
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
     }
 
     function setupDragAndDrop() {
         elements.dropArea.addEventListener('click', (e) => {
-            // 確保點擊按鈕時不會觸發 dropArea 的點擊
             if (e.target.tagName !== 'BUTTON' && e.target.id !== 'file-input') {
                 elements.fileInput.click();
             }
         });
-
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             elements.dropArea.addEventListener(eventName, preventDefaults);
         });
-
         ['dragenter', 'dragover'].forEach(eventName => {
-            elements.dropArea.addEventListener(eventName, () => {
-                elements.dropArea.classList.add('highlight');
-            });
+            elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.add('highlight'));
         });
-
         ['dragleave', 'drop'].forEach(eventName => {
-            elements.dropArea.addEventListener(eventName, () => {
-                elements.dropArea.classList.remove('highlight');
-            });
+            elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.remove('highlight'));
         });
-
         elements.dropArea.addEventListener('drop', (e) => {
             processFiles(e.dataTransfer.files);
         });
@@ -151,7 +156,6 @@ const ExcelViewer = (() => {
 
     function getDataCellsText(row, toLowerCase = true) {
         let text = '';
-        // 從 DATA_START_INDEX (預設為 2) 開始，跳過 勾選框 和 檔名
         for (let i = CONSTANTS.DATA_START_INDEX; i < row.cells.length; i++) {
             const cellContent = row.cells[i].textContent;
             text += toLowerCase ? cellContent.toLowerCase() : cellContent;
@@ -196,8 +200,8 @@ const ExcelViewer = (() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-
-    // ==================== 檔案處理 (v10 邏輯) ====================
+    
+    // ==================== 檔案處理 ====================
     function validateFiles(fileList) {
         if (!fileList || fileList.length === 0) {
             return { valid: false, error: '沒有選擇檔案' };
@@ -221,28 +225,22 @@ const ExcelViewer = (() => {
             alert(`錯誤：${validation.error}`);
             return;
         }
-
         if (state.isProcessing) {
             alert('正在處理檔案，請稍候...');
             return;
         }
-
         state.isProcessing = true;
         elements.displayArea.innerHTML = '<div class="loading">讀取中，請稍候</div>';
         resetControls(true);
-
         const tablesToRender = [];
-
         try {
             for (let index = 0; index < validation.files.length; index++) {
                 const file = validation.files[index];
                 elements.displayArea.innerHTML = 
                     `<div class="loading">讀取中，請稍候 (${index + 1}/${validation.files.length}): ${file.name}</div>`;
-
                 const binaryData = await readFileAsBinary(file);
                 const workbook = XLSX.read(binaryData, { type: 'binary' });
                 const selectedSheets = await selectWorksheets(file.name, workbook.SheetNames);
-
                 for (const sheetName of selectedSheets) {
                     const sheet = workbook.Sheets[sheetName];
                     const htmlString = XLSX.utils.sheet_to_html(sheet);
@@ -273,7 +271,6 @@ const ExcelViewer = (() => {
             '\n\n請輸入您要匯入的工作表編號(可多選，用逗號分隔)，例如: 1,3\n(留白則跳過此檔案)';
         
         const choices = prompt(promptMessage);
-        
         if (!choices) return [];
         return choices.split(',')
             .map(s => sheetNames[parseInt(s.trim()) - 1])
@@ -297,20 +294,16 @@ const ExcelViewer = (() => {
         }
         elements.displayArea.innerHTML = '';
         elements.displayArea.appendChild(fragment);
-        
         state.originalHtmlString = elements.displayArea.innerHTML;
-        
         injectCheckboxes();
-        
         const hiddenCount = detectHiddenElements();
         showControls(hiddenCount);
     }
 
-    // ==================== 表格操作 (v10 邏輯) ====================
+    // ==================== 表格操作 ====================
     function injectFilenameColumn(tableElement, filename) {
         const th = createElementWithText('th', 'Source File', 'filename-cell');
         tableElement.querySelector('thead tr')?.prepend(th);
-
         const rows = tableElement.querySelectorAll('tbody tr');
         rows.forEach(row => {
             const td = createElementWithText('td', filename, 'filename-cell');
@@ -322,9 +315,8 @@ const ExcelViewer = (() => {
         const headRows = elements.displayArea.querySelectorAll('thead tr');
         headRows.forEach((headRow, index) => {
             const selectAllTh = document.createElement('th');
-            const selectAllId = `select-all-checkbox-${index}`;
             selectAllTh.innerHTML = 
-                `<input type="checkbox" id="${selectAllId}" title="全選/全不選 (此表格)">`;
+                `<input type="checkbox" id="select-all-checkbox-${index}" title="全選/全不選 (此表格)">`;
             selectAllTh.classList.add('checkbox-cell');
             headRow.prepend(selectAllTh);
         });
@@ -346,7 +338,7 @@ const ExcelViewer = (() => {
         });
     }
 
-    // ==================== 隱藏元素處理 (v10 邏輯) ====================
+    // ==================== 隱藏元素處理 ====================
     function detectHiddenElements() {
         const selector = 'tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]';
         return elements.displayArea.querySelectorAll(selector).length;
@@ -362,12 +354,11 @@ const ExcelViewer = (() => {
         }
         hiddenElements.forEach(el => el.style.display = '');
         alert(`已顯示 ${hiddenElements.length} 個隱藏的行列。`);
-        
         elements.showHiddenBtn.classList.add('hidden');
         elements.loadStatusMessage.classList.add('hidden');
     }
 
-    // ==================== 選取功能 (v10 邏輯) ====================
+    // ==================== 選取功能 ====================
     function selectByKeyword() {
         const keywordInput = elements.selectKeywordInput.value.trim();
         const isRegex = elements.selectKeywordRegex.checked;
@@ -382,13 +373,11 @@ const ExcelViewer = (() => {
                 matchLogic = (cellText) => regex.test(cellText);
             } else if (keywordInput.includes(',')) {
                 const keywords = keywordInput.split(',')
-                    .map(k => k.trim().toLowerCase())
-                    .filter(k => k.length > 0);
+                    .map(k => k.trim().toLowerCase()).filter(Boolean);
                 matchLogic = (cellText) => keywords.some(k => cellText.includes(k));
             } else {
                 const keywords = keywordInput.split(/\s+/)
-                    .map(k => k.trim().toLowerCase())
-                    .filter(k => k.length > 0);
+                    .map(k => k.trim().toLowerCase()).filter(Boolean);
                 matchLogic = (cellText) => keywords.every(k => cellText.includes(k));
             }
         } catch (e) {
@@ -420,8 +409,7 @@ const ExcelViewer = (() => {
         const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
         let count = 0;
         rows.forEach(row => {
-            const dataCellText = getDataCellsText(row).trim();
-            if (dataCellText === '') {
+            if (getDataCellsText(row).trim() === '') {
                 const cb = row.querySelector('.row-checkbox');
                 if (cb) {
                     cb.checked = true;
@@ -445,15 +433,13 @@ const ExcelViewer = (() => {
         uncheckAllSelectAllCheckboxes();
     }
 
-    // ==================== 刪除/篩選 (User's v11 函式) ====================
+    // ==================== 刪除/篩選 ====================
     function deleteSelectedRows() {
         const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
-        
         if (selectedCheckboxes.length === 0) {
             alert('請先勾選要刪除的資料列。');
             return;
         }
-
         if (confirm(`確定要永久刪除 ${selectedCheckboxes.length} 筆勾選的資料列嗎？`)) {
             selectedCheckboxes.forEach(cb => cb.closest('tr').remove());
             uncheckAllSelectAllCheckboxes();
@@ -462,79 +448,60 @@ const ExcelViewer = (() => {
 
     function filterTable() {
         const searchTerm = elements.searchInput.value.toLowerCase().trim();
-        const keywords = searchTerm.split(/\s+/).filter(k => k.length > 0);
+        const keywords = searchTerm.split(/\s+/).filter(Boolean);
         const rows = elements.displayArea.querySelectorAll('tbody tr');
-
         rows.forEach(row => {
             const cellText = getDataCellsText(row, true);
             const matchesAll = keywords.every(k => cellText.includes(k));
-            
             row.classList.toggle('row-hidden-search', !matchesAll);
         });
-
         uncheckAllSelectAllCheckboxes();
     }
 
-    // ==================== 匯出 HTML (User's v11 函式) ====================
+    // ==================== 匯出 HTML ====================
     function exportHtml(mode) {
         const tables = elements.displayArea.querySelectorAll('table');
-        
         if (tables.length === 0) {
             alert('沒有可匯出的表格。');
             return;
         }
-
         let combinedCleanedHtml = '';
-
         if (mode === 'all') {
-            combinedCleanedHtml = exportAllTables(tables);
+            combinedCleanedHtml = exportAllTablesHtml(tables);
         } else if (mode === 'selected') {
-            const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
-            
-            if (selectedCheckboxes.length === 0) {
+            if (elements.displayArea.querySelectorAll('.row-checkbox:checked').length === 0) {
                 alert('請先勾選要匯出的資料列。');
                 return;
             }
-            
-            combinedCleanedHtml = exportSelectedTables(tables);
+            combinedCleanedHtml = exportSelectedTablesHtml(tables);
         }
-
         if (combinedCleanedHtml === '') {
             alert('沒有找到可匯出的內容。');
             return;
         }
-
         const title = mode === 'all' ? '匯出報表 (全部)' : '匯出報表 (選取項目)';
         const filename = `report_${mode}_${getCurrentDateString()}.html`;
-        const htmlContent = generateExportHtml(combinedCleanedHtml, title);
-        
-        downloadHtml(htmlContent, filename);
+        downloadHtml(generateExportHtml(combinedCleanedHtml, title), filename);
     }
 
-    function exportAllTables(tables) {
+    function exportAllTablesHtml(tables) {
         let html = '';
-        
         tables.forEach(table => {
             const tableClone = table.cloneNode(true);
             tableClone.querySelectorAll('.checkbox-cell').forEach(cell => cell.remove());
-            tableClone.querySelectorAll('tr.row-hidden-search')
-                .forEach(row => row.classList.remove('row-hidden-search'));
+            tableClone.querySelectorAll('.row-hidden-search').forEach(row => row.classList.remove('row-hidden-search'));
             html += tableClone.outerHTML + '<br><hr><br>';
         });
-        
         return html;
     }
 
-    function exportSelectedTables(tables) {
+    function exportSelectedTablesHtml(tables) {
         let html = '';
-        
         tables.forEach(table => {
             const selectedRows = table.querySelectorAll('tbody .row-checkbox:checked');
-            
             if (selectedRows.length > 0) {
                 const headerClone = table.querySelector('thead').cloneNode(true);
                 headerClone.querySelector('.checkbox-cell')?.remove();
-                
                 let selectedRowsHtml = '';
                 selectedRows.forEach(cb => {
                     const rowClone = cb.closest('tr').cloneNode(true);
@@ -542,173 +509,164 @@ const ExcelViewer = (() => {
                     rowClone.classList.remove('row-hidden-search');
                     selectedRowsHtml += rowClone.outerHTML;
                 });
-                
-                html += '<table>' + headerClone.outerHTML + 
-                        '<tbody>' + selectedRowsHtml + '</tbody></table><br><hr><br>';
+                html += '<table>' + headerClone.outerHTML + '<tbody>' + selectedRowsHtml + '</tbody></table><br><hr><br>';
             }
         });
-        
         return html;
     }
 
-
-    // ==================== 匯出 XLSX (User's v11 函式) ====================
+    // ==================== 匯出 XLSX ====================
     function exportXlsx(mode) {
         const tables = elements.displayArea.querySelectorAll('table');
-        
         if (tables.length === 0) {
             alert('沒有可匯出的表格。');
             return;
         }
-
-        if (mode === 'selected') {
-            const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
-            if (selectedCheckboxes.length === 0) {
-                alert('請先勾選要匯出的資料列。');
-                return;
-            }
+        if (mode === 'selected' && elements.displayArea.querySelectorAll('.row-checkbox:checked').length === 0) {
+            alert('請先勾選要匯出的資料列。');
+            return;
         }
-
         try {
             const workbook = XLSX.utils.book_new();
             let sheetIndex = 1;
-
-            tables.forEach((table, tableIndex) => {
-                let dataToExport = [];
-
-                if (mode === 'all') {
-                    dataToExport = extractTableData(table, false);
-                } else if (mode === 'selected') {
-                    dataToExport = extractTableData(table, true);
-                }
-
-                if (dataToExport.length > 0) {
+            tables.forEach(table => {
+                const dataToExport = extractTableData(table, mode === 'selected');
+                if (dataToExport.length > 1) { // 至少要有表頭+一筆資料
                     const worksheet = XLSX.utils.aoa_to_sheet(dataToExport);
-                    
-                    // 自動調整欄寬
-                    const colWidths = calculateColumnWidths(dataToExport);
-                    worksheet['!cols'] = colWidths;
-                    
-                    // 試著從原始檔名中獲取工作表名
+                    worksheet['!cols'] = calculateColumnWidths(dataToExport);
                     let sheetName = `Sheet${sheetIndex}`;
                     try {
                         const firstRow = table.querySelector('tbody tr .filename-cell');
                         if (firstRow) {
-                            // 從 "filename.xlsx (SheetName)" 中提取 "SheetName"
                             const match = firstRow.textContent.match(/\(([^)]+)\)$/);
-                            if(match && match[1]) {
-                                // 確保工作表名稱不重複且在31字元內
+                            if (match && match[1]) {
                                 sheetName = match[1].substring(0, 27) + `_${sheetIndex}`;
                             }
                         }
-                    } catch (e) { /* 忽略錯誤，使用預設工作表名 */ }
-
+                    } catch (e) { /* 忽略錯誤 */ }
                     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
                     sheetIndex++;
                 }
             });
-
             if (workbook.SheetNames.length === 0) {
                 alert('沒有資料可以匯出。');
                 return;
             }
-
-            const filename = `report_${mode}_${getCurrentDateString()}.xlsx`;
-            XLSX.writeFile(workbook, filename);
-            
+            XLSX.writeFile(workbook, `report_${mode}_${getCurrentDateString()}.xlsx`);
         } catch (err) {
             console.error('匯出 XLSX 時發生錯誤:', err);
             alert('匯出 XLSX 時發生錯誤：' + (err.message || '未知錯誤'));
         }
     }
 
+    // ==================== 匯出合併 XLSX (新功能) ====================
+    function exportMergedXlsx() {
+        const tables = elements.displayArea.querySelectorAll('table');
+        if (tables.length === 0) {
+            alert('沒有可匯出的表格。');
+            return;
+        }
+        try {
+            const allData = [];
+            let isFirstTable = true;
+            let headerRow = null;
+
+            tables.forEach((table, tableIndex) => {
+                // 合併時，總是匯出所有可見的資料 (非選取)
+                const tableData = extractTableData(table, false);
+                if (tableData.length > 1) { // 至少有表頭+一筆資料
+                    if (isFirstTable) {
+                        headerRow = tableData[0];
+                        allData.push(...tableData);
+                        isFirstTable = false;
+                    } else {
+                        // 檢查表頭是否相符，不符則警告
+                        if (JSON.stringify(headerRow) !== JSON.stringify(tableData[0])) {
+                            console.warn(`警告: 表格 ${tableIndex + 1} 的欄位與第一個表格不符，可能導致合併結果錯位。`);
+                        }
+                        allData.push(...tableData.slice(1)); // 只加入資料列
+                    }
+                }
+            });
+
+            if (allData.length <= 1) {
+                alert('沒有足夠的資料可以合併匯出。');
+                return;
+            }
+
+            const worksheet = XLSX.utils.aoa_to_sheet(allData);
+            worksheet['!cols'] = calculateColumnWidths(allData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Merged_Data');
+            XLSX.writeFile(workbook, `report_merged_${getCurrentDateString()}.xlsx`);
+            alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料（不含表頭）`);
+        } catch (err) {
+            console.error('匯出合併 XLSX 時發生錯誤:', err);
+            alert('匯出合併 XLSX 時發生錯誤：' + (err.message || '未知錯誤'));
+        }
+    }
+
     function extractTableData(table, onlySelected) {
         const data = [];
-        
-        // 提取表頭
         const headerRow = table.querySelector('thead tr');
         if (headerRow) {
             const headerData = [];
-            headerRow.querySelectorAll('th').forEach(th => {
-                if (!th.classList.contains('checkbox-cell')) {
-                    headerData.push(th.textContent.trim());
-                }
+            headerRow.querySelectorAll('th:not(.checkbox-cell)').forEach(th => {
+                headerData.push(th.textContent.trim());
             });
             data.push(headerData);
         }
 
-        // 提取資料列
-        let rows;
-        if (onlySelected) {
-            rows = table.querySelectorAll('tbody .row-checkbox:checked');
-            rows = Array.from(rows).map(cb => cb.closest('tr'));
-        } else {
-            rows = table.querySelectorAll('tbody tr:not(.row-hidden-search)');
-        }
+        const rows = onlySelected 
+            ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'))
+            : table.querySelectorAll('tbody tr:not(.row-hidden-search)');
 
         rows.forEach(row => {
             const rowData = [];
-            row.querySelectorAll('td').forEach(td => {
-                if (!td.classList.contains('checkbox-cell')) {
-                    // 試著將純數字字串轉回數字，以便 Excel 格式化
-                    const text = td.textContent.trim();
-                    const num = Number(text.replace(/,/g, ''));
-                    if (text !== '' && !isNaN(num) && text.search(/[^0-9.,-]/) === -1) {
-                        rowData.push(num);
-                    } else {
-                        rowData.push(text);
-                    }
+            row.querySelectorAll('td:not(.checkbox-cell)').forEach(td => {
+                const text = td.textContent.trim();
+                const num = Number(text.replace(/,/g, ''));
+                if (text !== '' && !isNaN(num) && text.search(/[^0-9.,-]/) === -1) {
+                    rowData.push(num); // 作為數字儲存
+                } else {
+                    rowData.push(text); // 作為文字儲存
                 }
             });
             data.push(rowData);
         });
-
         return data;
     }
 
     function calculateColumnWidths(data) {
         if (data.length === 0) return [];
-        
-        const colCount = data[0].length;
         const widths = [];
-
-        for (let col = 0; col < colCount; col++) {
+        data[0].forEach((_, colIndex) => {
             let maxWidth = 10; // 最小寬度
-            
             data.forEach(row => {
-                if (row[col]) {
-                    // 計算字元寬度 (全形字算2, 半形算1)
+                if (row[colIndex]) {
                     let cellLength = 0;
-                    String(row[col]).split('').forEach(char => {
-                        cellLength += char.match(/[^\x00-\xff]/) ? 2 : 1;
+                    String(row[colIndex]).split('').forEach(char => {
+                        cellLength += char.match(/[^\x00-\xff]/) ? 2 : 1; // 全形算2, 半形算1
                     });
                     maxWidth = Math.max(maxWidth, cellLength);
                 }
             });
-            
-            // 限制最大寬度為 50
-            widths.push({ wch: Math.min(maxWidth + 2, 50) });
-        }
-
+            widths.push({ wch: Math.min(maxWidth + 2, 50) }); // 限制最大寬度
+        });
         return widths;
     }
 
-    // ==================== 重設功能 (User's v11 函式) ====================
+    // ==================== 重設/UI控制 ====================
     function resetView() {
         if (!state.originalHtmlString) return;
-
         elements.displayArea.innerHTML = state.originalHtmlString;
         injectCheckboxes();
-        
         elements.searchInput.value = '';
         elements.selectKeywordInput.value = '';
         elements.selectKeywordRegex.checked = false;
-        
         filterTable();
-
         elements.loadStatusMessage.classList.add('hidden');
         elements.showHiddenBtn.classList.add('hidden');
-
         const hiddenCount = detectHiddenElements();
         if (hiddenCount > 0) {
             elements.loadStatusMessage.textContent = 
@@ -724,45 +682,25 @@ const ExcelViewer = (() => {
             elements.searchInput.value = '';
             elements.selectKeywordInput.value = '';
             elements.selectKeywordRegex.checked = false;
-
             elements.controlPanel.classList.add('hidden');
-
-            const controlElements = [
-                elements.selectByKeywordGroup,
-                elements.selectByKeywordBtn,
-                elements.selectEmptyBtn,
-                elements.deleteSelectedBtn,
-                elements.invertSelectionBtn,
-                elements.exportHtmlBtn,
-                elements.exportSelectedBtn,
-                elements.exportXlsxBtn,
-                elements.exportSelectedXlsxBtn,
-                elements.resetViewBtn,
-                elements.showHiddenBtn,
-                elements.loadStatusMessage
-            ];
-
-            controlElements.forEach(el => el?.classList.add('hidden'));
+            Object.values(elements).forEach(el => {
+                if (el && el.id !== 'control-panel' && el.id !== 'file-input' && el.id !== 'drop-area') {
+                    el.classList?.add('hidden');
+                }
+            });
         }
     }
 
     function showControls(hiddenCount) {
         elements.controlPanel.classList.remove('hidden');
-
-        const controlsToShow = [
-            elements.selectByKeywordGroup,
-            elements.selectByKeywordBtn,
-            elements.selectEmptyBtn,
-            elements.deleteSelectedBtn,
-            elements.invertSelectionBtn,
-            elements.exportHtmlBtn,
-            elements.exportSelectedBtn,
-            elements.exportXlsxBtn,
-            elements.exportSelectedXlsxBtn,
+        [
+            elements.selectByKeywordGroup, elements.selectByKeywordBtn,
+            elements.selectEmptyBtn, elements.deleteSelectedBtn,
+            elements.invertSelectionBtn, elements.exportHtmlBtn,
+            elements.exportSelectedBtn, elements.exportXlsxBtn,
+            elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
             elements.resetViewBtn
-        ];
-
-        controlsToShow.forEach(el => el?.classList.remove('hidden'));
+        ].forEach(el => el?.classList.remove('hidden'));
 
         if (hiddenCount > 0) {
             elements.loadStatusMessage.textContent = 
@@ -779,4 +717,4 @@ const ExcelViewer = (() => {
 })();
 
 // 初始化應用程式
-ExcelViewer.init();
+document.addEventListener('DOMContentLoaded', ExcelViewer.init);
