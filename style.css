@@ -113,7 +113,6 @@ body {
     color: #495057;
 }
 
-/* ▼▼▼ 修正：讓關鍵字勾選區的 input 和 button 在同一行 ▼▼▼ */
 .control-group.inline-group {
     display: flex;
     flex-wrap: wrap;
@@ -124,8 +123,6 @@ body {
     flex-grow: 1;
     min-width: 250px;
 }
-/* ▲▲▲ 修正結束 ▲▲▲ */
-
 
 .control-group input[type="text"] {
     width: 100%;
@@ -186,7 +183,6 @@ body {
     color: white;
 }
 
-/* ▼▼▼ 修正：讓匯出按鈕有不同顏色 ▼▼▼ */
 .btn-export-all {
     background: #28a745; /* 綠色 */
     color: white;
@@ -195,7 +191,10 @@ body {
     background: #208a38; /* 深綠色 */
     color: white;
 }
-/* ▲▲▲ 修正結束 ▲▲▲ */
+.btn-export-merged {
+    background: #1e7e34; /* 更深的綠色 */
+    color: white;
+}
 
 .btn-warning {
     background: #ffc107;
@@ -274,10 +273,9 @@ table tbody tr:hover {
     text-align: center;
     position: sticky;
     left: 0;
-    z-index: 11; /* 必須比 .filename-cell 高 */
+    z-index: 11;
 }
 
-/* ▼▼▼ 修正：讓表頭/表身的 checkbox 背景色正確 ▼▼▼ */
 table thead .checkbox-cell {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -287,8 +285,6 @@ table tbody .checkbox-cell {
 table tbody tr:hover .checkbox-cell {
     background: #f8f9fa;
 }
-/* ▲▲▲ 修正結束 ▲▲▲ */
-
 
 .checkbox-cell input[type="checkbox"] {
     cursor: pointer;
@@ -302,15 +298,13 @@ table tbody tr:hover .checkbox-cell {
     color: #495057;
     font-weight: 500;
     position: sticky;
-    left: 50px; /* 寬度等於 .checkbox-cell */
+    left: 50px;
     z-index: 10;
 }
 
-/* ▼▼▼ 修正：讓表頭/表身的檔名欄位背景色正確 ▼▼▼ */
 table thead .filename-cell {
      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
      color: white;
-     /* 確保表頭的檔名欄位在 checkbox 之後 */
      left: 50px; 
 }
 table tbody .filename-cell {
@@ -319,8 +313,6 @@ table tbody .filename-cell {
 table tbody tr:hover .filename-cell {
     background: #dee2e6;
 }
-/* ▲▲▲ 修正結束 ▲▲▲ */
-
 
 .row-hidden-search {
     display: none;
