@@ -5,11 +5,320 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel 檢視器 - 多檔案整合工具</title>
     
-    <!-- External Libraries -->
+    <!-- SheetJS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Link to Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        /* 拖放區域 */
+        #drop-area {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 60px 20px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        #drop-area:hover, #drop-area.highlight {
+            background: #e9ecef;
+            border-color: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        #drop-area h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        #drop-area p {
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 控制面板 */
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .control-group input[type="text"] {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .control-group input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: normal;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        /* 按鈕組 */
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 狀態訊息 */
+        .status-message {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #856404;
+        }
+
+        /* 表格樣式 */
+        #excel-display-area {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        table th {
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .checkbox-cell {
+            width: 50px;
+            text-align: center;
+        }
+
+        .checkbox-cell input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+
+        .filename-cell {
+            background-color: #e9ecef;
+            font-size: 0.9em;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .row-hidden-search {
+            display: none;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            table th, table td {
+                padding: 8px;
+            }
+        }
+
+        /* 載入動畫 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -19,7 +328,7 @@
         </div>
 
         <div class="content">
-            <!-- Initial Upload Area -->
+            <!-- 拖放上傳區 -->
             <div id="drop-area">
                 <h3>📁 拖放檔案到此處</h3>
                 <p>或點擊下方按鈕選擇檔案</p>
@@ -29,54 +338,802 @@
                 </button>
             </div>
 
-            <!-- Summary view shown after files are loaded -->
-            <div id="upload-summary" class="hidden">
-                <p>✅ 已成功載入 <span id="file-count">0</span> 個檔案。</p>
-                <button class="btn btn-secondary" id="clear-files-btn">
-                    清除檔案並重設
-                </button>
-            </div>
-
-            <!-- Control Panel -->
+            <!-- 控制面板 -->
             <div class="controls hidden" id="control-panel">
+                <!-- 搜尋篩選 -->
                 <div class="control-group">
-                    <label for="search-input">🔍 即時搜尋篩選 (空白 = AND)</label>
+                    <label for="search-input">🔍 即時搜尋篩選（支援多關鍵字 AND 搜尋）</label>
                     <input type="text" id="search-input" placeholder="輸入關鍵字以篩選資料列...">
                 </div>
 
-                <div class="control-group inline-group" id="select-by-keyword-group">
-                    <label for="select-keyword-input">✅ 依關鍵字勾選</label>
-                    <input type="text" id="select-keyword-input" placeholder="空白=AND, 逗號=OR, 或 Regex">
-                    <button class="btn btn-primary" id="select-by-keyword-btn">勾選</button>
+                <!-- 關鍵字勾選 -->
+                <div class="control-group hidden" id="select-by-keyword-group">
+                    <label for="select-keyword-input">✅ 依關鍵字勾選資料列</label>
+                    <input type="text" id="select-keyword-input" 
+                           placeholder="多關鍵字用空格(AND)或逗號(OR)分隔，或使用 Regex">
                     <label class="checkbox-label">
                         <input type="checkbox" id="select-keyword-regex">
-                        使用 Regex
+                        使用正規表示式 (Regex)
                     </label>
                 </div>
 
+                <!-- 按鈕組 -->
                 <div class="button-group">
-                    <button class="btn btn-primary" id="select-empty-btn">勾選空白列</button>
-                    <button class="btn btn-warning" id="invert-selection-btn">反向選取</button>
-                    <button class="btn btn-danger" id="delete-selected-btn">刪除勾選列</button>
-                    <button class="btn btn-info" id="show-hidden-btn">顯示隱藏的行列</button>
-                    <button class="btn btn-export-all" id="export-html-btn">匯出 HTML (全部)</button>
-                    <button class="btn btn-export-selected" id="export-selected-btn">匯出 HTML (選取)</button>
-                    <button class="btn btn-export-all" id="export-xlsx-btn">匯出 XLSX (全部)</button>
-                    <button class="btn btn-export-selected" id="export-selected-xlsx-btn">匯出 XLSX (選取)</button>
-                    <button class="btn btn-export-merged" id="export-merged-xlsx-btn">匯出 XLSX (合併)</button>
-                    <button class="btn btn-secondary" id="reset-view-btn">重設視圖</button>
+                    <button class="btn btn-primary hidden" id="select-by-keyword-btn">
+                        依關鍵字勾選
+                    </button>
+                    <button class="btn btn-primary hidden" id="select-empty-btn">
+                        勾選空白列
+                    </button>
+                    <button class="btn btn-warning hidden" id="invert-selection-btn">
+                        反向選取
+                    </button>
+                    <button class="btn btn-danger hidden" id="delete-selected-btn">
+                        刪除勾選列
+                    </button>
+                    <button class="btn btn-info hidden" id="show-hidden-btn">
+                        顯示隱藏的行列
+                    </button>
+                    <button class="btn btn-success hidden" id="export-html-btn">
+                        匯出 HTML (全部)
+                    </button>
+                    <button class="btn btn-success hidden" id="export-selected-btn">
+                        匯出 HTML (選取)
+                    </button>
+                    <button class="btn btn-success hidden" id="export-xlsx-btn">
+                        匯出 XLSX (全部)
+                    </button>
+                    <button class="btn btn-success hidden" id="export-selected-xlsx-btn">
+                        匯出 XLSX (選取)
+                    </button>
+                    <button class="btn btn-success hidden" id="export-merged-xlsx-btn">
+                        匯出 XLSX (合併所有表格)
+                    </button>
+                    <button class="btn btn-secondary hidden" id="reset-view-btn">
+                        重設視圖
+                    </button>
                 </div>
             </div>
 
-            <!-- Status Message Area -->
+            <!-- 狀態訊息 -->
             <div class="status-message hidden" id="load-status-message"></div>
 
-            <!-- Table Display Area -->
+            <!-- 表格顯示區 -->
             <div id="excel-display-area"></div>
         </div>
     </div>
 
-    <!-- Link to JavaScript, 'defer' ensures HTML is parsed first -->
-    <script src="script.js" defer></script>
+    <script>
+        const ExcelViewer = (() => {
+            'use strict';
+
+            const CONSTANTS = {
+                CHECKBOX_COLUMN_INDEX: 0,
+                FILENAME_COLUMN_INDEX: 1,
+                DATA_START_INDEX: 2,
+                VALID_FILE_EXTENSIONS: ['.xls', '.xlsx']
+            };
+
+            const state = {
+                originalHtmlString: '',
+                isProcessing: false
+            };
+
+            const elements = {};
+
+            function init() {
+                cacheElements();
+                bindEvents();
+            }
+
+            function cacheElements() {
+                const ids = [
+                    'fileInput', 'displayArea', 'searchInput', 'dropArea',
+                    'deleteSelectedBtn', 'invertSelectionBtn', 'resetViewBtn',
+                    'selectEmptyBtn', 'exportHtmlBtn', 'showHiddenBtn',
+                    'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn',
+                    'exportMergedXlsxBtn', 'selectByKeywordGroup', 'selectKeywordInput',
+                    'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel'
+                ];
+
+                const mapping = {
+                    'fileInput': 'file-input',
+                    'displayArea': 'excel-display-area',
+                    'searchInput': 'search-input',
+                    'dropArea': 'drop-area',
+                    'deleteSelectedBtn': 'delete-selected-btn',
+                    'invertSelectionBtn': 'invert-selection-btn',
+                    'resetViewBtn': 'reset-view-btn',
+                    'selectEmptyBtn': 'select-empty-btn',
+                    'exportHtmlBtn': 'export-html-btn',
+                    'showHiddenBtn': 'show-hidden-btn',
+                    'exportSelectedBtn': 'export-selected-btn',
+                    'exportXlsxBtn': 'export-xlsx-btn',
+                    'exportSelectedXlsxBtn': 'export-selected-xlsx-btn',
+                    'exportMergedXlsxBtn': 'export-merged-xlsx-btn',
+                    'selectByKeywordGroup': 'select-by-keyword-group',
+                    'selectKeywordInput': 'select-keyword-input',
+                    'selectByKeywordBtn': 'select-by-keyword-btn',
+                    'selectKeywordRegex': 'select-keyword-regex',
+                    'loadStatusMessage': 'load-status-message',
+                    'controlPanel': 'control-panel'
+                };
+
+                ids.forEach(id => {
+                    elements[id] = document.getElementById(mapping[id]);
+                });
+            }
+
+            function bindEvents() {
+                elements.fileInput.addEventListener('change', e => processFiles(e.target.files));
+                setupDragAndDrop();
+                elements.displayArea.addEventListener('change', handleDisplayAreaChange);
+                
+                elements.selectEmptyBtn.addEventListener('click', selectEmptyRows);
+                elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
+                elements.invertSelectionBtn.addEventListener('click', invertSelection);
+                elements.resetViewBtn.addEventListener('click', resetView);
+                elements.selectByKeywordBtn.addEventListener('click', selectByKeyword);
+                elements.exportHtmlBtn.addEventListener('click', () => exportHtml('all'));
+                elements.exportSelectedBtn.addEventListener('click', () => exportHtml('selected'));
+                elements.exportXlsxBtn.addEventListener('click', () => exportXlsx('all'));
+                elements.exportSelectedXlsxBtn.addEventListener('click', () => exportXlsx('selected'));
+                elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
+                elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
+                elements.searchInput.addEventListener('input', debounce(filterTable, 300));
+            }
+
+            function setupDragAndDrop() {
+                elements.dropArea.addEventListener('click', e => {
+                    if (e.target.id !== 'file-input') elements.fileInput.click();
+                });
+
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    elements.dropArea.addEventListener(eventName, e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    elements.dropArea.addEventListener(eventName, () => {
+                        elements.dropArea.classList.add('highlight');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    elements.dropArea.addEventListener(eventName, () => {
+                        elements.dropArea.classList.remove('highlight');
+                    });
+                });
+
+                elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
+            }
+
+            function handleDisplayAreaChange(e) {
+                if (e.target.matches('[id^="select-all-checkbox"]')) {
+                    const table = e.target.closest('table');
+                    toggleSelectAll(e.target.checked, table);
+                }
+            }
+
+            function debounce(func, wait) {
+                let timeout;
+                return function(...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func(...args), wait);
+                };
+            }
+
+            function readFileAsBinary(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsBinaryString(file);
+                });
+            }
+
+            function uncheckAllSelectAllCheckboxes() {
+                elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]')
+                    .forEach(cb => cb.checked = false);
+            }
+
+            function getDataCellsText(row, toLowerCase = true) {
+                let text = '';
+                for (let i = CONSTANTS.DATA_START_INDEX; i < row.cells.length; i++) {
+                    text += toLowerCase ? row.cells[i].textContent.toLowerCase() : row.cells[i].textContent;
+                }
+                return text;
+            }
+
+            function getCurrentDateString() {
+                return new Date().toISOString().slice(0, 10);
+            }
+
+            function validateFiles(fileList) {
+                if (!fileList || fileList.length === 0) {
+                    return { valid: false, error: '沒有選擇檔案' };
+                }
+
+                const validFiles = Array.from(fileList).filter(file => {
+                    const fileName = file.name.toLowerCase();
+                    return CONSTANTS.VALID_FILE_EXTENSIONS.some(ext => fileName.endsWith(ext));
+                });
+
+                if (validFiles.length === 0) {
+                    return { valid: false, error: '請上傳 .xls 或 .xlsx 格式的 Excel 檔案！' };
+                }
+
+                return { valid: true, files: validFiles };
+            }
+
+            async function processFiles(fileList) {
+                const validation = validateFiles(fileList);
+                if (!validation.valid) {
+                    alert(`錯誤：${validation.error}`);
+                    return;
+                }
+
+                if (state.isProcessing) {
+                    alert('正在處理檔案，請稍候...');
+                    return;
+                }
+
+                state.isProcessing = true;
+                elements.displayArea.innerHTML = '<div class="loading">讀取中，請稍候</div>';
+                resetControls(true);
+
+                const tablesToRender = [];
+
+                try {
+                    for (let index = 0; index < validation.files.length; index++) {
+                        const file = validation.files[index];
+                        elements.displayArea.innerHTML = 
+                            `<div class="loading">讀取中，請稍候 (${index + 1}/${validation.files.length})</div>`;
+
+                        const binaryData = await readFileAsBinary(file);
+                        const workbook = XLSX.read(binaryData, { type: 'binary' });
+                        const selectedSheets = await selectWorksheets(file.name, workbook.SheetNames);
+
+                        for (const sheetName of selectedSheets) {
+                            const sheet = workbook.Sheets[sheetName];
+                            const htmlString = XLSX.utils.sheet_to_html(sheet);
+                            tablesToRender.push({
+                                html: htmlString,
+                                filename: `${file.name} (${sheetName})`
+                            });
+                        }
+                    }
+
+                    renderTables(tablesToRender);
+                } catch (err) {
+                    console.error("處理檔案時發生錯誤:", err);
+                    elements.displayArea.innerHTML = 
+                        `<p style="color: red;">處理檔案時發生錯誤：${err.message || '未知錯誤'}</p>`;
+                    resetControls(true);
+                } finally {
+                    state.isProcessing = false;
+                }
+            }
+
+            async function selectWorksheets(filename, sheetNames) {
+                if (sheetNames.length === 1) return [sheetNames[0]];
+
+                const promptMessage = 
+                    `檔案 "${filename}" 包含多個工作表：\n\n` +
+                    sheetNames.map((name, i) => `${i + 1}: ${name}`).join('\n') +
+                    '\n\n請輸入您要匯入的工作表編號(可多選，用逗號分隔)，例如: 1,3\n(留白則跳過此檔案)';
+                
+                const choices = prompt(promptMessage);
+                if (!choices) return [];
+
+                return choices.split(',')
+                    .map(s => sheetNames[parseInt(s.trim()) - 1])
+                    .filter(Boolean);
+            }
+
+            function renderTables(tablesToRender) {
+                if (tablesToRender.length === 0) {
+                    elements.displayArea.innerHTML = '<p>沒有選擇任何工作表，請重新上傳檔案。</p>';
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+                for (const tableData of tablesToRender) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = tableData.html;
+                    const table = tempDiv.querySelector('table');
+                    if (table) {
+                        injectFilenameColumn(table, tableData.filename);
+                        fragment.appendChild(table);
+                    }
+                }
+
+                elements.displayArea.innerHTML = '';
+                elements.displayArea.appendChild(fragment);
+                state.originalHtmlString = elements.displayArea.innerHTML;
+                injectCheckboxes();
+                
+                const hiddenCount = detectHiddenElements();
+                showControls(hiddenCount);
+            }
+
+            function injectFilenameColumn(tableElement, filename) {
+                const th = document.createElement('th');
+                th.textContent = 'Source File';
+                th.classList.add('filename-cell');
+                tableElement.querySelector('thead tr')?.prepend(th);
+
+                const rows = tableElement.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const td = document.createElement('td');
+                    td.textContent = filename;
+                    td.classList.add('filename-cell');
+                    row.prepend(td);
+                });
+            }
+
+            function injectCheckboxes() {
+                const headRows = elements.displayArea.querySelectorAll('thead tr');
+                headRows.forEach((headRow, index) => {
+                    const selectAllTh = document.createElement('th');
+                    selectAllTh.innerHTML = 
+                        `<input type="checkbox" id="select-all-checkbox-${index}" title="全選/全不選">`;
+                    selectAllTh.classList.add('checkbox-cell');
+                    headRow.prepend(selectAllTh);
+                });
+
+                const bodyRows = elements.displayArea.querySelectorAll('tbody tr');
+                bodyRows.forEach(row => {
+                    const checkCell = document.createElement('td');
+                    checkCell.innerHTML = '<input type="checkbox" class="row-checkbox">';
+                    checkCell.classList.add('checkbox-cell');
+                    row.prepend(checkCell);
+                });
+            }
+
+            function toggleSelectAll(isChecked, table) {
+                if (!table) return;
+                const visibleRows = table.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                visibleRows.forEach(row => {
+                    const checkbox = row.querySelector('.row-checkbox');
+                    if (checkbox) checkbox.checked = isChecked;
+                });
+            }
+
+            function detectHiddenElements() {
+                const selector = 'tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]';
+                return elements.displayArea.querySelectorAll(selector).length;
+            }
+
+            function showAllHiddenElements() {
+                const selector = 'tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]';
+                const hiddenElements = elements.displayArea.querySelectorAll(selector);
+                if (hiddenElements.length === 0) {
+                    alert('沒有需要顯示的隱藏行列。');
+                    return;
+                }
+                hiddenElements.forEach(el => el.style.display = '');
+                alert(`已顯示 ${hiddenElements.length} 個隱藏的行列。`);
+                elements.showHiddenBtn.classList.add('hidden');
+                elements.loadStatusMessage.classList.add('hidden');
+            }
+
+            function selectByKeyword() {
+                const keywordInput = elements.selectKeywordInput.value.trim();
+                const isRegex = elements.selectKeywordRegex.checked;
+
+                if (keywordInput === '') {
+                    alert('請先輸入要勾選的關鍵字。');
+                    return;
+                }
+
+                let matchLogic;
+                try {
+                    if (isRegex) {
+                        const regex = new RegExp(keywordInput, 'i');
+                        matchLogic = cellText => regex.test(cellText);
+                    } else if (keywordInput.includes(',')) {
+                        const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(k => k);
+                        matchLogic = cellText => keywords.some(k => cellText.includes(k));
+                    } else {
+                        const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(k => k);
+                        matchLogic = cellText => keywords.every(k => cellText.includes(k));
+                    }
+                } catch (e) {
+                    alert('無效的 Regex 表示式：\n' + e.message);
+                    return;
+                }
+
+                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                let count = 0;
+                rows.forEach(row => {
+                    const cellText = getDataCellsText(row, !isRegex);
+                    if (matchLogic(cellText)) {
+                        const cb = row.querySelector('.row-checkbox');
+                        if (cb) {
+                            cb.checked = true;
+                            count++;
+                        }
+                    }
+                });
+
+                if (count === 0) {
+                    alert(`在可見的資料列中，沒有找到符合 "${keywordInput}" 的列。`);
+                } else {
+                    alert(`已勾選 ${count} 個符合 "${keywordInput}" 的資料列。`);
+                    uncheckAllSelectAllCheckboxes();
+                }
+            }
+
+            function selectEmptyRows() {
+                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                let count = 0;
+                rows.forEach(row => {
+                    const dataCellText = getDataCellsText(row).trim();
+                    if (dataCellText === '') {
+                        const cb = row.querySelector('.row-checkbox');
+                        if (cb) {
+                            cb.checked = true;
+                            count++;
+                        }
+                    }
+                });
+
+                if (count === 0) {
+                    alert('在可見的資料列中，沒有找到完全空白的列。');
+                } else {
+                    uncheckAllSelectAllCheckboxes();
+                }
+            }
+
+            function invertSelection() {
+                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                rows.forEach(row => {
+                    const cb = row.querySelector('.row-checkbox');
+                    if (cb) cb.checked = !cb.checked;
+                });
+                uncheckAllSelectAllCheckboxes();
+            }
+
+            function deleteSelectedRows() {
+                const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    alert('請先勾選要刪除的資料列。');
+                    return;
+                }
+                if (confirm(`確定要永久刪除 ${selectedCheckboxes.length} 筆勾選的資料列嗎？`)) {
+                    selectedCheckboxes.forEach(cb => cb.closest('tr').remove());
+                    uncheckAllSelectAllCheckboxes();
+                }
+            }
+
+            function filterTable() {
+                const searchTerm = elements.searchInput.value.toLowerCase().trim();
+                const keywords = searchTerm.split(/\s+/).filter(k => k.length > 0);
+                const rows = elements.displayArea.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const cellText = getDataCellsText(row, true);
+                    const matchesAll = keywords.every(k => cellText.includes(k));
+                    row.classList.toggle('row-hidden-search', !matchesAll);
+                });
+                uncheckAllSelectAllCheckboxes();
+            }
+
+            function exportHtml(mode) {
+                const tables = elements.displayArea.querySelectorAll('table');
+                if (tables.length === 0) {
+                    alert('沒有可匯出的表格。');
+                    return;
+                }
+
+                let combinedCleanedHtml = '';
+                if (mode === 'all') {
+                    combinedCleanedHtml = exportAllTables(tables);
+                } else if (mode === 'selected') {
+                    const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
+                    if (selectedCheckboxes.length === 0) {
+                        alert('請先勾選要匯出的資料列。');
+                        return;
+                    }
+                    combinedCleanedHtml = exportSelectedTables(tables);
+                }
+
+                if (combinedCleanedHtml === '') {
+                    alert('沒有找到可匯出的內容。');
+                    return;
+                }
+
+                const title = mode === 'all' ? '匯出報表 (全部)' : '匯出報表 (選取項目)';
+                const filename = `report_${mode}_${getCurrentDateString()}.html`;
+                const htmlContent = generateExportHtml(combinedCleanedHtml, title);
+                downloadHtml(htmlContent, filename);
+            }
+
+            function exportAllTables(tables) {
+                let html = '';
+                tables.forEach(table => {
+                    const tableClone = table.cloneNode(true);
+                    tableClone.querySelectorAll('.checkbox-cell').forEach(cell => cell.remove());
+                    tableClone.querySelectorAll('tr.row-hidden-search')
+                        .forEach(row => row.classList.remove('row-hidden-search'));
+                    html += tableClone.outerHTML + '<br><hr><br>';
+                });
+                return html;
+            }
+
+            function exportSelectedTables(tables) {
+                let html = '';
+                tables.forEach(table => {
+                    const selectedRows = table.querySelectorAll('tbody .row-checkbox:checked');
+                    if (selectedRows.length > 0) {
+                        const headerClone = table.querySelector('thead').cloneNode(true);
+                        headerClone.querySelector('.checkbox-cell')?.remove();
+                        let selectedRowsHtml = '';
+                        selectedRows.forEach(cb => {
+                            const rowClone = cb.closest('tr').cloneNode(true);
+                            rowClone.querySelector('.checkbox-cell')?.remove();
+                            rowClone.classList.remove('row-hidden-search');
+                            selectedRowsHtml += rowClone.outerHTML;
+                        });
+                        html += '<table>' + headerClone.outerHTML + 
+                                '<tbody>' + selectedRowsHtml + '</tbody></table><br><hr><br>';
+                    }
+                });
+                return html;
+            }
+
+            function generateExportHtml(htmlContent, title) {
+                return `<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>匯出報表 - ${new Date().toLocaleString()}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        table { border-collapse: collapse; width: 100%; border: 1px solid #ccc; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .filename-cell { background-color: #f8f9f9; font-size: 0.9em; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>${title}</h1>
+    <p>產生時間: ${new Date().toLocaleString()}</p>
+    ${htmlContent}
+</body>
+</html>`;
+            }
+
+            function downloadHtml(content, filename) {
+                const blob = new Blob([content], { type: 'text/html;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.download = filename;
+                a.href = url;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            function exportXlsx(mode) {
+                const tables = elements.displayArea.querySelectorAll('table');
+                if (tables.length === 0) {
+                    alert('沒有可匯出的表格。');
+                    return;
+                }
+
+                if (mode === 'selected') {
+                    const selectedCheckboxes = elements.displayArea.querySelectorAll('.row-checkbox:checked');
+                    if (selectedCheckboxes.length === 0) {
+                        alert('請先勾選要匯出的資料列。');
+                        return;
+                    }
+                }
+
+                try {
+                    const workbook = XLSX.utils.book_new();
+                    let sheetIndex = 1;
+
+                    tables.forEach(table => {
+                        let dataToExport = [];
+                        if (mode === 'all') {
+                            dataToExport = extractTableData(table, false);
+                        } else if (mode === 'selected') {
+                            dataToExport = extractTableData(table, true);
+                        }
+
+                        if (dataToExport.length > 0) {
+                            const worksheet = XLSX.utils.aoa_to_sheet(dataToExport);
+                            const colWidths = calculateColumnWidths(dataToExport);
+                            worksheet['!cols'] = colWidths;
+                            const sheetName = `Sheet${sheetIndex}`;
+                            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+                            sheetIndex++;
+                        }
+                    });
+
+                    if (workbook.SheetNames.length === 0) {
+                        alert('沒有資料可以匯出。');
+                        return;
+                    }
+
+                    const filename = `report_${mode}_${getCurrentDateString()}.xlsx`;
+                    XLSX.writeFile(workbook, filename);
+                } catch (err) {
+                    console.error('匯出 XLSX 時發生錯誤:', err);
+                    alert('匯出 XLSX 時發生錯誤：' + (err.message || '未知錯誤'));
+                }
+            }
+
+            function exportMergedXlsx() {
+                const tables = elements.displayArea.querySelectorAll('table');
+                if (tables.length === 0) {
+                    alert('沒有可匯出的表格。');
+                    return;
+                }
+
+                try {
+                    const workbook = XLSX.utils.book_new();
+                    const allData = [];
+                    let headerRow = null;
+                    let isFirstTable = true;
+
+                    tables.forEach((table, tableIndex) => {
+                        const tableData = extractTableData(table, false);
+                        if (tableData.length > 0) {
+                            if (isFirstTable) {
+                                headerRow = tableData[0];
+                                allData.push(...tableData);
+                                isFirstTable = false;
+                            } else {
+                                const currentHeader = tableData[0];
+                                const headersMatch = JSON.stringify(headerRow) === JSON.stringify(currentHeader);
+                                if (!headersMatch) {
+                                    console.warn(`警告：表格 ${tableIndex + 1} 的表頭格式與第一個表格不同`);
+                                }
+                                allData.push(...tableData.slice(1));
+                            }
+                        }
+                    });
+
+                    if (allData.length <= 1) {
+                        alert('沒有足夠的資料可以匯出。');
+                        return;
+                    }
+
+                    const worksheet = XLSX.utils.aoa_to_sheet(allData);
+                    const colWidths = calculateColumnWidths(allData);
+                    worksheet['!cols'] = colWidths;
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Merged Data');
+
+                    const filename = `report_merged_${getCurrentDateString()}.xlsx`;
+                    XLSX.writeFile(workbook, filename);
+                    alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料（不含表頭）`);
+                } catch (err) {
+                    console.error('匯出合併 XLSX 時發生錯誤:', err);
+                    alert('匯出合併 XLSX 時發生錯誤：' + (err.message || '未知錯誤'));
+                }
+            }
+
+            function extractTableData(table, onlySelected) {
+                const data = [];
+                const headerRow = table.querySelector('thead tr');
+                if (headerRow) {
+                    const headerData = [];
+                    headerRow.querySelectorAll('th').forEach(th => {
+                        if (!th.classList.contains('checkbox-cell')) {
+                            headerData.push(th.textContent.trim());
+                        }
+                    });
+                    data.push(headerData);
+                }
+
+                let rows;
+                if (onlySelected) {
+                    rows = table.querySelectorAll('tbody .row-checkbox:checked');
+                    rows = Array.from(rows).map(cb => cb.closest('tr'));
+                } else {
+                    rows = table.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                }
+
+                rows.forEach(row => {
+                    const rowData = [];
+                    row.querySelectorAll('td').forEach(td => {
+                        if (!td.classList.contains('checkbox-cell')) {
+                            rowData.push(td.textContent.trim());
+                        }
+                    });
+                    data.push(rowData);
+                });
+
+                return data;
+            }
+
+            function calculateColumnWidths(data) {
+                if (data.length === 0) return [];
+                const colCount = data[0].length;
+                const widths = [];
+
+                for (let col = 0; col < colCount; col++) {
+                    let maxWidth = 10;
+                    data.forEach(row => {
+                        if (row[col]) {
+                            const cellLength = String(row[col]).length;
+                            maxWidth = Math.max(maxWidth, cellLength);
+                        }
+                    });
+                    widths.push({ wch: Math.min(maxWidth + 2, 50) });
+                }
+
+                return widths;
+            }
+
+            function resetView() {
+                if (!state.originalHtmlString) return;
+                elements.displayArea.innerHTML = state.originalHtmlString;
+                injectCheckboxes();
+                elements.searchInput.value = '';
+                elements.selectKeywordInput.value = '';
+                elements.selectKeywordRegex.checked = false;
+                filterTable();
+                elements.loadStatusMessage.classList.add('hidden');
+                elements.showHiddenBtn.classList.add('hidden');
+
+                const hiddenCount = detectHiddenElements();
+                if (hiddenCount > 0) {
+                    elements.loadStatusMessage.textContent = 
+                        `注意：已重設表格，${hiddenCount} 個隱藏的行列已還原為隱藏狀態。`;
+                    elements.loadStatusMessage.classList.remove('hidden');
+                    elements.showHiddenBtn.classList.remove('hidden');
+                }
+            }
+
+            function resetControls(isNewFile = false) {
+                if (isNewFile) {
+                    state.originalHtmlString = '';
+                    elements.searchInput.value = '';
+                    elements.selectKeywordInput.value = '';
+                    elements.selectKeywordRegex.checked = false;
+                    elements.controlPanel.classList.add('hidden');
+
+                    const controlElements = [
+                        elements.selectByKeywordGroup, elements.selectByKeywordBtn,
+                        elements.selectEmptyBtn, elements.deleteSelectedBtn,
+                        elements.invertSelectionBtn, elements.exportHtmlBtn,
+                        elements.exportSelectedBtn, elements.exportXlsxBtn,
+                        elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
+                        elements.resetViewBtn, elements.showHiddenBtn,
+                        elements.loadStatusMessage
+                    ];
+                    controlElements.forEach(el => el?.classList.add('hidden'));
+                }
+            }
+
+            function showControls(hiddenCount) {
+                elements.controlPanel.classList.remove('hidden');
+                const controlsToShow = [
+                    elements.selectByKeywordGroup, elements.selectByKeywordBtn,
+                    elements.selectEmptyBtn, elements.deleteSelectedBtn,
+                    elements.invertSelectionBtn, elements.exportHtmlBtn,
+                    elements.exportSelectedBtn, elements.exportXlsxBtn,
+                    elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
+                    elements.resetViewBtn
+                ];
+                controlsToShow.forEach(el => el?.classList.remove('hidden'));
+
+                if (hiddenCount > 0) {
+                    elements.loadStatusMessage.textContent = 
+                        `注意：載入的檔案中包含 ${hiddenCount} 個被 Excel 隱藏的行列。您可以使用「顯示隱藏的行列」按鈕來查看它們。`;
+                    elements.loadStatusMessage.classList.remove('hidden');
+                    elements.showHiddenBtn.classList.remove('hidden');
+                }
+            }
+
+            return { init };
+        })();
+
+        ExcelViewer.init();
+    </script>
 </body>
 </html>
