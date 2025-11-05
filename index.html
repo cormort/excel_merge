@@ -288,6 +288,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
+            table-layout: fixed;/*固定表格寬度*/
         }
 
         table thead {
@@ -329,6 +330,10 @@
             font-size: 0.7em;
             color: #495057;
             font-weight: 500;
+            /* --- 調整檔名欄寬度 --- */
+            width: 250px;           /* 設定一個固定的寬度 (您可以自行調整 250px) */
+            white-space: normal;    /* 確保允許換行 */
+            overflow-wrap: break-word; /* 允許長單字(檔名)在任意點換行 */
         }
 
         .row-hidden-search {
