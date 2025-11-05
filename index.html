@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel 檢視器 - 多檔案整合工具</title>
     
-    <!-- SheetJS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
@@ -275,6 +274,32 @@
             color: #856404;
         }
 
+        /* --- 說明區塊 --- */
+        .info-box {
+            background: #e6f7ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px; /* 與按鈕組分開 */
+            color: #0056b3;
+            font-size: 0.9rem;
+        }
+        .info-box h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #004085;
+        }
+        .info-box ul {
+            margin-left: 20px;
+            padding-left: 0;
+        }
+        .info-box li {
+            margin-bottom: 5px;
+        }
+        .info-box li ul {
+            margin-top: 5px;
+        }
+
         /* 表格樣式 */
         #excel-display-area {
             overflow-x: auto;
@@ -288,7 +313,7 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
-            table-layout: fixed;/*固定表格寬度*/
+            table-layout: fixed; /*固定表格寬度*/
         }
 
         table thead {
@@ -327,11 +352,11 @@
 
         .filename-cell {
             background-color: #e9ecef;
-            font-size: 0.7em;
+            font-size: 0.8em; /* 調整字體大小 */
             color: #495057;
             font-weight: 500;
             /* --- 調整檔名欄寬度 --- */
-            width: 150px;           /* 設定一個固定的寬度 (您可以自行調整 250px) */
+            width: 250px;           /* 設定一個固定的寬度 */
             white-space: normal;    /* 確保允許換行 */
             overflow-wrap: break-word; /* 允許長單字(檔名)在任意點換行 */
         }
@@ -453,7 +478,6 @@
                     <button class="btn btn-success hidden" id="export-selected-btn" title="僅將目前已勾選的資料列匯出為一個 HTML 檔案">
                         匯出 HTML (選取)
                     </button>
-                    
                     <button class="btn btn-success hidden" id="export-xlsx-btn" title="將目前可見的資料（不包含被搜尋篩選隱藏的列）匯出為新的 XLSX 檔案（每個表格一個工作表）">
                         匯出 XLSX (全部)
                     </button>
@@ -467,12 +491,24 @@
                         還原始初狀態
                     </button>
                 </div>
-            </div>
-
-            <div class="status-message hidden" id="load-status-message"></div>
+                
+                <div class="info-box hidden" id="export-info-box">
+                    <h4>💡 匯出功能說明</h4>
+                    <ul>
+                        <li><strong>刪除 (Delete)：</strong>使用「刪除勾選列」按鈕後，資料將<strong>永久移除</strong>，<strong>任何匯出 (HTML/XLSX) 都不會</strong>包含這些被刪除的列。</li>
+                        <li><strong>篩選 (Filter)：</strong>使用「即時搜尋」功能會暫時隱藏資料列。
+                            <ul>
+                                <li><code>匯出 XLSX</code> 和 <code>合併表格</code>：<strong>不會</strong>包含被篩選隱藏的列。</li>
+                                <li><code>匯出 HTML</code>：<strong>會</strong>包含被篩選隱藏的列 (程式會自動還原)。</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+                </div> <div class="status-message hidden" id="load-status-message"></div>
 
             <div id="excel-display-area"></div>
         </div>
+    </div>
 
     <script>
         const ExcelViewer = (() => {
@@ -508,7 +544,8 @@
                     'exportMergedXlsxBtn', 'selectByKeywordGroup', 'selectKeywordInput',
                     'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel',
                     'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 'clearFilesBtn',
-                    'selectAllBtn'
+                    'selectAllBtn',
+                    'exportInfoBox'
                 ];
 
                 const mapping = {
@@ -537,7 +574,8 @@
                     'fileCount': 'file-count',
                     'fileNames': 'file-names',
                     'clearFilesBtn': 'clear-files-btn',
-                    'selectAllBtn': 'select-all-btn'
+                    'selectAllBtn': 'select-all-btn',
+                    'exportInfoBox': 'export-info-box'
                 };
 
                 ids.forEach(id => {
@@ -886,25 +924,27 @@
                     uncheckAllSelectAllCheckboxes();
                 }
             }
+
             function selectAllRows() {
-                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
-                let count = 0;
-                rows.forEach(row => {
-                    const cb = row.querySelector('.row-checkbox');
-                    if (cb) {
-                        cb.checked = true;
-                        count++;
-                    }
-                });
+                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
+                let count = 0;
+                rows.forEach(row => {
+                    const cb = row.querySelector('.row-checkbox');
+                    if (cb) {
+                        cb.checked = true;
+                        count++;
+                    }
+                });
                 
-                if (count > 0) {
-                    // 同時勾選所有表格的「表頭全選框」
-                    elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]')
-                        .forEach(cb => cb.checked = true);
-                } else {
-                    alert('沒有可勾選的資料列。');
-                }
-            }
+                if (count > 0) {
+                    // 同時勾選所有表格的「表頭全選框」
+                    elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]')
+                        .forEach(cb => cb.checked = true);
+                } else {
+                    alert('沒有可勾選的資料列。');
+                }
+            }
+
             function invertSelection() {
                 const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
                 rows.forEach(row => {
@@ -1222,7 +1262,8 @@
                         elements.exportSelectedBtn, elements.exportXlsxBtn,
                         elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
                         elements.resetViewBtn, elements.showHiddenBtn,
-                        elements.loadStatusMessage
+                        elements.loadStatusMessage,
+                        elements.exportInfoBox
                     ];
                     controlElements.forEach(el => el?.classList.add('hidden'));
                 }
@@ -1268,7 +1309,8 @@
                     elements.selectAllBtn,
                     elements.exportSelectedBtn, elements.exportXlsxBtn,
                     elements.exportSelectedXlsxBtn, elements.exportMergedXlsxBtn,
-                    elements.resetViewBtn
+                    elements.resetViewBtn,
+                    elements.exportInfoBox
                 ];
                 controlsToShow.forEach(el => el?.classList.remove('hidden'));
 
