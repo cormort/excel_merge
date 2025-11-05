@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel 檢視器 - 多檔案整合工具</title>
     
-    <link rel="stylesheet" href="style.css">
+    <!-- 外部函式庫 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- 連結到樣式表 -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
@@ -16,6 +19,7 @@
         </div>
 
         <div class="content">
+            <!-- 拖放上傳區 -->
             <div id="drop-area">
                 <h3>📁 拖放檔案到此處</h3>
                 <p>或點擊下方按鈕選擇檔案 (支援多選)</p>
@@ -25,12 +29,15 @@
                 </button>
             </div>
 
+            <!-- 控制面板 -->
             <div class="controls hidden" id="control-panel">
+                <!-- 搜尋篩選 -->
                 <div class="control-group">
                     <label for="search-input">🔍 即時搜尋篩選</label>
                     <input type="text" id="search-input" placeholder="即時篩選 (空白 = AND)...">
                 </div>
 
+                <!-- 關鍵字勾選 -->
                 <div class="control-group inline-group hidden" id="select-by-keyword-group">
                     <label for="select-keyword-input">✅ 依關鍵字勾選</label>
                     <input type="text" id="select-keyword-input" 
@@ -43,6 +50,8 @@
                         使用 Regex
                     </label>
                 </div>
+
+                <!-- 按鈕組 -->
                 <div class="button-group">
                     <button class="btn btn-primary hidden" id="select-empty-btn">
                         勾選空白列
@@ -57,16 +66,19 @@
                         顯示隱藏的行列
                     </button>
                     <button class="btn btn-export-all hidden" id="export-html-btn">
-                        全部匯出為HTML
+                        匯出 HTML (全部)
                     </button>
                     <button class="btn btn-export-selected hidden" id="export-selected-btn">
-                        匯出選取列為HTML
+                        匯出 HTML (選取)
                     </button>
                     <button class="btn btn-export-all hidden" id="export-xlsx-btn">
-                        全部匯出為XLSX 
+                        匯出 XLSX (全部)
                     </button>
                     <button class="btn btn-export-selected hidden" id="export-selected-xlsx-btn">
-                        匯出選取列為XLSX
+                        匯出 XLSX (選取)
+                    </button>
+                    <button class="btn btn-export-merged hidden" id="export-merged-xlsx-btn">
+                        匯出 XLSX (合併所有表格)
                     </button>
                     <button class="btn btn-secondary hidden" id="reset-view-btn">
                         重設視圖
@@ -74,12 +86,15 @@
                 </div>
             </div>
 
+            <!-- 狀態訊息 -->
             <div class="status-message hidden" id="load-status-message"></div>
 
+            <!-- 表格顯示區 -->
             <div id="excel-display-area"></div>
         </div>
     </div>
 
+    <!-- 連結到 JavaScript 檔案 -->
     <script src="script.js"></script>
 </body>
 </html>
