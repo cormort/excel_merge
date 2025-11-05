@@ -52,7 +52,7 @@
             padding: 30px;
         }
 
-        /* 拖放區域 */
+        /* 拖放區域 - 初始狀態 */
         #drop-area {
             border: 3px dashed #667eea;
             border-radius: 12px;
@@ -62,6 +62,14 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-bottom: 30px;
+        }
+
+        #drop-area.compact {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
         }
 
         #drop-area:hover, #drop-area.highlight {
@@ -76,9 +84,19 @@
             font-size: 1.5rem;
         }
 
+        #drop-area.compact h3 {
+            margin-bottom: 0;
+            font-size: 1.1rem;
+        }
+
         #drop-area p {
             color: #6c757d;
             margin-bottom: 20px;
+        }
+
+        #drop-area.compact p {
+            margin-bottom: 0;
+            font-size: 0.9rem;
         }
 
         #file-input {
@@ -99,6 +117,46 @@
         .btn-upload:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 檔案資訊區 */
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .file-info-text {
+            flex: 1;
+        }
+
+        .file-count {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .btn-clear {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn-clear:hover {
+            background: #c82333;
+            transform: translateY(-1px);
         }
 
         /* 控制面板 */
@@ -330,12 +388,24 @@
         <div class="content">
             <!-- 拖放上傳區 -->
             <div id="drop-area">
-                <h3>📁 拖放檔案到此處</h3>
-                <p>或點擊下方按鈕選擇檔案</p>
+                <div id="drop-area-initial">
+                    <h3>📁 拖放檔案到此處</h3>
+                    <p>或點擊下方按鈕選擇檔案</p>
+                    <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
+                    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+                        選擇 Excel 檔案
+                    </button>
+                </div>
+                <div id="drop-area-loaded" class="hidden">
+                    <div class="file-info">
+                        <div class="file-info-text">
+                            <h3>📊 已載入檔案 <span class="file-count" id="file-count">0</span></h3>
+                            <p id="file-names">-</p>
+                        </div>
+                        <button class="btn-clear" id="clear-files-btn">🗑️ 清除所有檔案</button>
+                    </div>
+                </div>
                 <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
-                <button class="btn-upload" onclick="document.getElementById('file-input').click()">
-                    選擇 Excel 檔案
-                </button>
             </div>
 
             <!-- 控制面板 -->
@@ -416,7 +486,9 @@
 
             const state = {
                 originalHtmlString: '',
-                isProcessing: false
+                isProcessing: false,
+                loadedFiles: [],
+                loadedTables: 0
             };
 
             const elements = {};
@@ -433,7 +505,8 @@
                     'selectEmptyBtn', 'exportHtmlBtn', 'showHiddenBtn',
                     'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn',
                     'exportMergedXlsxBtn', 'selectByKeywordGroup', 'selectKeywordInput',
-                    'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel'
+                    'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel',
+                    'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 'clearFilesBtn'
                 ];
 
                 const mapping = {
@@ -456,7 +529,12 @@
                     'selectByKeywordBtn': 'select-by-keyword-btn',
                     'selectKeywordRegex': 'select-keyword-regex',
                     'loadStatusMessage': 'load-status-message',
-                    'controlPanel': 'control-panel'
+                    'controlPanel': 'control-panel',
+                    'dropAreaInitial': 'drop-area-initial',
+                    'dropAreaLoaded': 'drop-area-loaded',
+                    'fileCount': 'file-count',
+                    'fileNames': 'file-names',
+                    'clearFilesBtn': 'clear-files-btn'
                 };
 
                 ids.forEach(id => {
@@ -480,6 +558,7 @@
                 elements.exportSelectedXlsxBtn.addEventListener('click', () => exportXlsx('selected'));
                 elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
                 elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
+                elements.clearFilesBtn.addEventListener('click', clearAllFiles);
                 elements.searchInput.addEventListener('input', debounce(filterTable, 300));
             }
 
@@ -585,6 +664,7 @@
                 resetControls(true);
 
                 const tablesToRender = [];
+                state.loadedFiles = [];
 
                 try {
                     for (let index = 0; index < validation.files.length; index++) {
@@ -603,10 +683,13 @@
                                 html: htmlString,
                                 filename: `${file.name} (${sheetName})`
                             });
+                            state.loadedFiles.push(`${file.name} (${sheetName})`);
                         }
                     }
 
+                    state.loadedTables = tablesToRender.length;
                     renderTables(tablesToRender);
+                    updateDropAreaDisplay();
                 } catch (err) {
                     console.error("處理檔案時發生錯誤:", err);
                     elements.displayArea.innerHTML = 
@@ -1108,6 +1191,37 @@
                     ];
                     controlElements.forEach(el => el?.classList.add('hidden'));
                 }
+            }
+
+            function updateDropAreaDisplay() {
+                if (state.loadedTables > 0) {
+                    elements.dropArea.classList.add('compact');
+                    elements.dropAreaInitial.classList.add('hidden');
+                    elements.dropAreaLoaded.classList.remove('hidden');
+                    elements.fileCount.textContent = state.loadedTables;
+                    
+                    // 顯示檔案名稱（最多顯示3個）
+                    const displayNames = state.loadedFiles.slice(0, 3).join(', ');
+                    const moreText = state.loadedFiles.length > 3 ? ` 及其他 ${state.loadedFiles.length - 3} 個...` : '';
+                    elements.fileNames.textContent = displayNames + moreText;
+                } else {
+                    elements.dropArea.classList.remove('compact');
+                    elements.dropAreaInitial.classList.remove('hidden');
+                    elements.dropAreaLoaded.classList.add('hidden');
+                }
+            }
+
+            function clearAllFiles() {
+                if (!confirm('確定要清除所有已載入的檔案嗎？')) return;
+                
+                state.originalHtmlString = '';
+                state.loadedFiles = [];
+                state.loadedTables = 0;
+                elements.displayArea.innerHTML = '';
+                elements.fileInput.value = '';
+                
+                updateDropAreaDisplay();
+                resetControls(true);
             }
 
             function showControls(hiddenCount) {
