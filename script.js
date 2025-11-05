@@ -1,4 +1,4 @@
-// Excel Viewer - v13 - UI Enhancement with Upload Summary
+// Excel Viewer - v13.1 - Bug Fix for getCurrentDateString
 const ExcelViewer = (() => {
     'use strict';
 
@@ -38,7 +38,6 @@ const ExcelViewer = (() => {
             selectByKeywordGroup: 'select-by-keyword-group', selectKeywordInput: 'select-keyword-input',
             selectByKeywordBtn: 'select-by-keyword-btn', selectKeywordRegex: 'select-keyword-regex',
             loadStatusMessage: 'load-status-message', controlPanel: 'control-panel',
-            // 新增的 UI 元素
             uploadSummary: 'upload-summary', fileCount: 'file-count', clearFilesBtn: 'clear-files-btn'
         };
         for (const key in ids) {
@@ -54,8 +53,7 @@ const ExcelViewer = (() => {
         setupDragAndDrop();
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
         
-        // 按鈕事件綁定
-        elements.clearFilesBtn.addEventListener('click', fullReset); // 新增：完全重設按鈕
+        elements.clearFilesBtn.addEventListener('click', fullReset);
         elements.selectEmptyBtn.addEventListener('click', selectEmptyRows);
         elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         elements.invertSelectionBtn.addEventListener('click', invertSelection);
@@ -101,7 +99,7 @@ const ExcelViewer = (() => {
         if (state.isProcessing) return alert('正在處理檔案，請稍候...');
 
         state.isProcessing = true;
-        fullReset(); // 每次新上傳都從乾淨的狀態開始
+        fullReset();
         elements.displayArea.innerHTML = '<div class="loading">讀取中，請稍候</div>';
 
         const tablesToRender = [];
@@ -122,7 +120,7 @@ const ExcelViewer = (() => {
         } catch (err) {
             console.error("處理檔案時發生錯誤:", err);
             elements.displayArea.innerHTML = `<p style="color: red;">處理檔案時發生錯誤：${err.message || '未知錯誤'}</p>`;
-            fullReset(); // 發生錯誤時也重設回初始狀態
+            fullReset();
         } finally {
             state.isProcessing = false;
         }
@@ -159,16 +157,13 @@ const ExcelViewer = (() => {
         const headRow = tableElement.querySelector('thead tr');
         if (!headRow) return;
 
-        // 注入勾選框表頭
         const selectAllTh = document.createElement('th');
         selectAllTh.innerHTML = `<input type="checkbox" id="select-all-checkbox-${Date.now()}" title="全選/全不選">`;
         selectAllTh.classList.add('checkbox-cell');
         headRow.prepend(selectAllTh);
 
-        // 注入檔名表頭
         headRow.children[1].insertAdjacentElement('beforebegin', createElementWithText('th', 'Source File', 'filename-cell'));
 
-        // 注入表格內容的勾選框與檔名欄位
         tableElement.querySelectorAll('tbody tr').forEach(row => {
             const checkCell = document.createElement('td');
             checkCell.innerHTML = '<input type="checkbox" class="row-checkbox">';
@@ -184,13 +179,12 @@ const ExcelViewer = (() => {
         state.isProcessing = false;
         state.loadedFileCount = 0;
         
-        elements.fileInput.value = ''; // 允許重新上傳相同檔案
+        elements.fileInput.value = '';
         elements.displayArea.innerHTML = '';
         elements.searchInput.value = '';
         elements.selectKeywordInput.value = '';
         elements.selectKeywordRegex.checked = false;
 
-        // 隱藏所有控制項，只顯示初始上傳區
         elements.controlPanel.classList.add('hidden');
         elements.loadStatusMessage.classList.add('hidden');
         elements.uploadSummary.classList.add('hidden');
@@ -199,22 +193,20 @@ const ExcelViewer = (() => {
     
     function resetView() {
         if (!state.originalHtmlString) return;
-        elements.displayArea.innerHTML = state.originalHtmlString; // 重設表格內容和勾選框
+        elements.displayArea.innerHTML = state.originalHtmlString;
         elements.searchInput.value = '';
         elements.selectKeywordInput.value = '';
         elements.selectKeywordRegex.checked = false;
-        filterTable(); // 套用空篩選以顯示所有列
+        filterTable();
         updateUIVisibility(detectHiddenElements(), state.loadedFileCount);
     }
 
     function updateUIVisibility(hiddenCount, fileCount) {
-        // 切換主佈局：隱藏大上傳區，顯示小總結面板和控制區
         elements.dropArea.classList.add('hidden');
         elements.uploadSummary.classList.remove('hidden');
         elements.fileCount.textContent = fileCount;
         elements.controlPanel.classList.remove('hidden');
         
-        // 根據是否存在隱藏元素，決定是否顯示提示訊息和按鈕
         const hasHidden = hiddenCount > 0;
         elements.loadStatusMessage.classList.toggle('hidden', !hasHidden);
         elements.showHiddenBtn.classList.toggle('hidden', !hasHidden);
@@ -323,7 +315,7 @@ const ExcelViewer = (() => {
             const workbook = XLSX.utils.book_new();
             elements.displayArea.querySelectorAll('table').forEach((table, index) => {
                 const data = extractTableData(table, mode === 'selected');
-                if (data.length > 1) { // 必須有表頭 + 至少一筆資料
+                if (data.length > 1) {
                     const ws = XLSX.utils.aoa_to_sheet(data);
                     ws['!cols'] = calculateColumnWidths(data);
                     XLSX.utils.book_append_sheet(workbook, ws, `Sheet${index + 1}`);
@@ -346,7 +338,7 @@ const ExcelViewer = (() => {
             let processedTableCount = 0;
 
             tables.forEach((table, index) => {
-                const tableData = extractTableData(table, false); // 合併模式永遠使用所有可見資料
+                const tableData = extractTableData(table, false);
                 if (tableData.length > 1) {
                     processedTableCount++;
                     if (!masterHeader) {
@@ -356,7 +348,7 @@ const ExcelViewer = (() => {
                         if (JSON.stringify(masterHeader) !== JSON.stringify(tableData[0])) {
                             console.warn(`警告: 表格 ${index + 1} 的欄位與第一個表格不符。`);
                         }
-                        allData.push(...tableData.slice(1)); // 只加入資料列
+                        allData.push(...tableData.slice(1));
                     }
                 }
             });
@@ -373,8 +365,15 @@ const ExcelViewer = (() => {
             alert('匯出合併 XLSX 時發生錯誤：' + (err.message || '未知錯誤'));
         }
     }
-    
+
     // --- 輔助函數 ---
+
+    // ***** ▼▼▼ BUG FIX: 重新加入此函數 ▼▼▼ *****
+    function getCurrentDateString() {
+        return new Date().toISOString().slice(0, 10);
+    }
+    // ***** ▲▲▲ BUG FIX END ▲▲▲ *****
+
     function extractTableData(table, onlySelected) {
         const data = [];
         const headerCells = table.querySelectorAll('thead th:not(.checkbox-cell)');
@@ -448,9 +447,24 @@ const ExcelViewer = (() => {
         return el;
     }
 
+    function uncheckAllSelectAllCheckboxes() {
+        elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]')
+             .forEach(cb => cb.checked = false);
+    }
+    
+    function getDataCellsText(row, toLowerCase = true) {
+        let text = '';
+        const cells = row.cells;
+        for (let i = CONSTANTS.DATA_START_INDEX; i < cells.length; i++) {
+            const cellText = cells[i].textContent;
+            text += toLowerCase ? cellText.toLowerCase() : cellText;
+        }
+        return text;
+    }
+
     // --- 匯出公開 API ---
     return { init };
 })();
 
 // 啟動應用程式
-ExcelViewer.init();
+document.addEventListener('DOMContentLoaded', ExcelViewer.init);
