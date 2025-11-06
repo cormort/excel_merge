@@ -171,7 +171,9 @@ body.no-scroll {
 #grid-scale-control label { margin-bottom: 0; white-space: nowrap; }
 #grid-scale-slider { width: 100%; }
 
-.table-wrapper.is-zoomed {
+/* --- START OF FIX --- */
+/* Increased specificity by adding the parent ID to override grid-view styles */
+#excel-display-area .table-wrapper.is-zoomed {
     position: fixed; 
     top: 0;
     left: 0;
@@ -187,27 +189,30 @@ body.no-scroll {
     flex-direction: column;
     margin: 0;
     max-width: none;
+    max-height: none; /* This now correctly overrides the 300px max-height */
     background: white;
 }
-.table-wrapper.is-zoomed .table-header { 
+#excel-display-area .table-wrapper.is-zoomed .table-header { 
     justify-content: space-between;
     flex-shrink: 0;
 }
-.table-wrapper.is-zoomed .header-actions { display: flex; }
-.table-wrapper.is-zoomed .table-content {
+#excel-display-area .table-wrapper.is-zoomed .header-actions { display: flex; }
+#excel-display-area .table-wrapper.is-zoomed .table-content {
     flex: 1;
     min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
     height: 100%;
 }
+#excel-display-area .table-wrapper.is-zoomed .close-zoom { display: block; }
+/* --- END OF FIX --- */
+
 .header-actions { display: none; align-items: center; gap: 10px; }
 .btn-sm { padding: 5px 10px; font-size: 0.85rem; }
 .close-zoom {
     display: none; font-size: 1.8rem; font-weight: bold; line-height: 1;
     padding: 0 10px; cursor: pointer; border: none; background: none;
 }
-.table-wrapper.is-zoomed .close-zoom { display: block; }
 
 table { width: 100%; border-collapse: collapse; }
 table thead { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
