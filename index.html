@@ -179,7 +179,7 @@ body.no-scroll {
     bottom: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 9999;  /* 改為更高的值 */
+    z-index: 9999;
     border-radius: 0; 
     border: none;
     cursor: default;
@@ -252,6 +252,10 @@ body::-webkit-scrollbar-thumb:hover, .table-content::-webkit-scrollbar-thumb:hov
 .loading { text-align: center; padding: 40px; color: #667eea; font-size: 1.2rem; }
 .loading::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
 @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+
+body.no-scroll .controls {
+    display: none !important;
+}
 
     </style>
 </head>
