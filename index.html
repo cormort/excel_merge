@@ -67,7 +67,14 @@ body.no-scroll {
     justify-content: center;
     align-items: center;
 }
-#drop-area.compact { padding: 10px; display: flex; align-items: center; justify-content: space-between; text-align: left; }
+#drop-area.compact { 
+    padding: 10px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    text-align: left; 
+    min-height: auto; /* <-- 在這裡加入這一行 */
+}
 #drop-area:hover, #drop-area.highlight {
     background: #e9ecef; border-color: #764ba2; transform: translateY(-2px);
 }
