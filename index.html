@@ -52,14 +52,20 @@ body.no-scroll {
 
 #drop-area {
     border: 3px dashed #667eea;
-    border-radius: 8px;
-    padding: 20px 10px;
+    border-radius: 12px;
+    padding: 60px 40px; /* 這裡加大內距 */
+    min-height: 220px;   /* 設定最小高度，讓拖曳框變高 */
+    font-size: 1.2rem;   /* 讓文字也更大 */
     text-align: center;
     background: #f8f9fa;
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 #drop-area.compact { padding: 10px; display: flex; align-items: center; justify-content: space-between; text-align: left; }
 #drop-area:hover, #drop-area.highlight {
