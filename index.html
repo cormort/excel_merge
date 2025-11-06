@@ -9,6 +9,7 @@
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -80,7 +81,15 @@
             transition: all 0.3s ease; white-space: nowrap;
         }
         .btn-clear:hover { background: #c82333; transform: translateY(-1px); }
-        .controls { background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
+        .controls { 
+            background: #f8f9fa; padding: 20px; border-radius: 12px; 
+            margin-bottom: 30px; transition: box-shadow 0.3s ease;
+        }
+        .controls:not(.hidden) {
+            position: -webkit-sticky; position: sticky;
+            top: 0; z-index: 500; border-bottom: 1px solid #ddd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
         .control-group { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #e9ecef; }
         .control-group:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
         .control-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #495057; }
@@ -97,6 +106,7 @@
             cursor: pointer; transition: all 0.3s ease; font-weight: 500;
         }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn.active { background: #343a40; color: white; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
         .btn-primary { background: #667eea; color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; color: #212529; }
@@ -112,13 +122,8 @@
             background-color: #e6f7ff; border: 1px solid #b3e0ff;
             border-radius: 8px; padding: 12px 15px; margin-top: 15px;
         }
-        .info-feedback-box h5 {
-            margin: 0 0 8px 0; color: #004085; font-size: 0.9rem;
-        }
-        .info-feedback-box p {
-            font-size: 0.85rem; color: #0056b3; margin: 0;
-            max-height: 60px; overflow-y: auto;
-        }
+        .info-feedback-box h5 { margin: 0 0 8px 0; color: #004085; font-size: 0.9rem; }
+        .info-feedback-box p { font-size: 0.85rem; color: #0056b3; margin: 0; max-height: 60px; overflow-y: auto; }
         .info-box {
             background: #e6f7ff; border-left: 4px solid #007bff; padding: 15px;
             border-radius: 8px; margin-top: 20px; color: #0056b3; font-size: 0.9rem;
@@ -140,7 +145,20 @@
             margin: 0; font-size: 1rem; font-weight: 600; color: #495057;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        #excel-display-area { overflow-x: auto; }
+        #excel-display-area { transition: all 0.3s ease; }
+        #excel-display-area.grid-view {
+            -webkit-column-count: 3; -moz-column-count: 3; column-count: 3;
+            -webkit-column-gap: 20px; -moz-column-gap: 20px; column-gap: 20px;
+        }
+        #excel-display-area.grid-view .table-wrapper {
+            display: inline-block; 
+            width: 100%;
+            margin-bottom: 20px;
+            -webkit-column-break-inside: avoid; page-break-inside: avoid; break-inside: avoid;
+        }
+        #excel-display-area.grid-view table th {
+            position: static;
+        }
         table { width: 100%; border-collapse: collapse; margin-bottom: 0; box-shadow: none; border-radius: 0; }
         table thead { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         table th { padding: 15px 12px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; }
@@ -149,8 +167,8 @@
         .checkbox-cell { width: 50px; text-align: center; }
         .checkbox-cell input[type="checkbox"] { cursor: pointer; width: 18px; height: 18px; }
         .filename-cell {
-            background-color: #e9ecef; font-size: 0.7em; color: #495057;
-            font-weight: 500; width: 150px; white-space: normal; overflow-wrap: break-word;
+            background-color: #e9ecef; font-size: 0.8em; color: #495057;
+            font-weight: 500; width: 250px; white-space: normal; overflow-wrap: break-word;
         }
         .row-hidden-search { display: none; }
         .modal-overlay {
@@ -174,12 +192,30 @@
         .sheet-item input[type="checkbox"] { margin-right: 12px; width: 18px; height: 18px; cursor: pointer; }
         .modal-quick-actions { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e9ecef; display: flex; gap: 10px; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+        
+        #back-to-top-btn {
+            position: fixed; bottom: 30px; right: 30px; width: 50px; height: 50px;
+            border-radius: 50%; background: #667eea; color: white; border: none;
+            font-size: 24px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+            z-index: 1000;
+        }
+        #back-to-top-btn.visible { opacity: 1; visibility: visible; }
+        #back-to-top-btn:hover { transform: translateY(-3px); background: #5a6fd8; }
+        
+        @media (max-width: 1200px) {
+            #excel-display-area.grid-view { column-count: 2; }
+        }
         @media (max-width: 768px) {
             .header h1 { font-size: 1.5rem; }
             .button-group { flex-direction: column; }
             .btn { width: 100%; }
             table { font-size: 0.85rem; }
             table th, table td { padding: 8px; }
+            #excel-display-area.grid-view { column-count: 1; }
+            #back-to-top-btn { bottom: 20px; right: 20px; width: 45px; height: 45px; font-size: 20px; }
         }
         .loading { text-align: center; padding: 40px; color: #667eea; font-size: 1.2rem; }
         .loading::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
@@ -208,12 +244,19 @@
                 <div id="drop-area-loaded" class="hidden"><div class="file-info"><div class="file-info-text"><h3>📊 已載入檔案 <span class="file-count" id="file-count">0</span></h3><p id="file-names">-</p></div><button class="btn-clear" id="clear-files-btn">🗑️ 清除所有檔案</button></div></div>
             </div>
             <div class="controls hidden" id="control-panel">
+                <div class="control-group">
+                    <label>👁️ 檢視選項</label>
+                    <div class="button-group">
+                        <button class="btn btn-secondary active" id="list-view-btn">列表檢視</button>
+                        <button class="btn btn-secondary" id="grid-view-btn">網格檢視</button>
+                    </div>
+                </div>
                 <div class="control-group" id="table-level-controls">
                     <label>📋 表格層級操作</label>
                     <div class="button-group">
-                        <button class="btn btn-primary" id="select-all-tables-btn" title="勾選所有已載入的表格">勾選所有表格</button>
-                        <button class="btn btn-secondary" id="unselect-all-tables-btn" title="取消勾選所有表格">取消勾選所有表格</button>
-                        <button class="btn btn-danger" id="delete-selected-tables-btn" title="永久刪除所有已勾選的表格">刪除選定表格</button>
+                        <button class="btn btn-primary" id="select-all-tables-btn">勾選所有表格</button>
+                        <button class="btn btn-secondary" id="unselect-all-tables-btn">取消勾選</button>
+                        <button class="btn btn-danger" id="delete-selected-tables-btn">刪除選定表格</button>
                     </div>
                     <div id="selected-tables-info" class="info-feedback-box hidden">
                         <h5>目前選取的表格：</h5>
@@ -226,7 +269,7 @@
                 </div>
                 <div class="control-group hidden" id="select-by-keyword-group">
                     <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔，或使用 Regex">
-                    <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex"> 使用正規表示式 (Regex)</label>
+                    <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex"> 使用正規表示式</label>
                 </div>
                 <div class="button-group">
                     <button class="btn btn-primary hidden" id="select-by-keyword-btn">依關鍵字勾選</button>
@@ -238,7 +281,7 @@
                 <div class="control-group">
                      <label>🔄 全局與匯出</label>
                      <div class="button-group">
-                        <button class="btn btn-info hidden" id="show-hidden-btn">顯示隱藏的行列</button>
+                        <button class="btn btn-info hidden" id="show-hidden-btn">顯示隱藏行列</button>
                         <button class="btn btn-success hidden" id="export-html-btn">匯出 HTML (全部)</button>
                         <button class="btn btn-success hidden" id="export-selected-btn">匯出 HTML (選取)</button>
                         <button class="btn btn-success hidden" id="export-xlsx-btn">匯出 XLSX (全部)</button>
@@ -247,17 +290,18 @@
                         <button class="btn btn-secondary hidden" id="reset-view-btn">還原始初狀態</button>
                     </div>
                 </div>
-                <div class="info-box hidden" id="export-info-box"><h4>💡 匯出功能說明</h4><ul><li><strong>刪除 (Delete)：</strong>使用「刪除勾選列」或「刪除選定表格」按鈕後，資料將<strong>永久移除</strong>。</li><li><strong>篩選 (Filter)：</strong>使用「即時搜尋」功能會暫時隱藏資料列。<ul><li><code>匯出 XLSX</code> 和 <code>合併表格</code>：<strong>不會</strong>包含被篩選隱藏的列。</li><li><code>匯出 HTML</code>：<strong>會</strong>包含被篩選隱藏的列。</li></ul></li></ul></div>
+                <div class="info-box hidden" id="export-info-box"><h4>💡 匯出功能說明</h4><ul><li><strong>刪除:</strong> 使用「刪除勾選列」或「刪除選定表格」按鈕後，資料將<strong>永久移除</strong>。</li><li><strong>篩選:</strong> 使用「即時搜尋」功能會暫時隱藏資料列。<ul><li><code>匯出 XLSX</code> 和 <code>合併表格</code>：<strong>不會</strong>包含被篩選隱藏的列。</li><li><code>匯出 HTML</code>：<strong>會</strong>包含被篩選隱藏的列。</li></ul></li></ul></div>
             </div>
             <div class="status-message hidden" id="load-status-message"></div>
             <div id="excel-display-area"></div>
         </div>
     </div>
+    
+    <button id="back-to-top-btn" title="回到工具列">↑</button>
 
     <script>
         const ExcelViewer = (() => {
             'use strict';
-
             const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
             const state = { originalHtmlString: '', isProcessing: false, loadedFiles: [], loadedTables: 0 };
             const elements = {};
@@ -268,36 +312,8 @@
             }
 
             function cacheElements() {
-                const ids = [
-                    'fileInput', 'displayArea', 'searchInput', 'dropArea', 'deleteSelectedBtn', 'invertSelectionBtn', 
-                    'resetViewBtn', 'selectEmptyBtn', 'exportHtmlBtn', 'showHiddenBtn', 'exportSelectedBtn', 
-                    'exportXlsxBtn', 'exportSelectedXlsxBtn', 'exportMergedXlsxBtn', 'selectByKeywordGroup', 
-                    'selectKeywordInput', 'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 
-                    'controlPanel', 'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 
-                    'clearFilesBtn', 'selectAllBtn', 'exportInfoBox', 'importOptionsContainer', 
-                    'specificSheetNameGroup', 'specificSheetNameInput', 'specificSheetPositionGroup', 
-                    'specificSheetPositionInput', 'selectAllTablesBtn', 'unselectAllTablesBtn', 
-                    'deleteSelectedTablesBtn', 'tableLevelControls', 'selectedTablesInfo', 'selectedTablesList'
-                ];
-                const mapping = {
-                    'fileInput': 'file-input', 'displayArea': 'excel-display-area', 'searchInput': 'search-input',
-                    'dropArea': 'drop-area', 'deleteSelectedBtn': 'delete-selected-btn', 'invertSelectionBtn': 'invert-selection-btn',
-                    'resetViewBtn': 'reset-view-btn', 'selectEmptyBtn': 'select-empty-btn', 'exportHtmlBtn': 'export-html-btn',
-                    'showHiddenBtn': 'show-hidden-btn', 'exportSelectedBtn': 'export-selected-btn', 'exportXlsxBtn': 'export-xlsx-btn',
-                    'exportSelectedXlsxBtn': 'export-selected-xlsx-btn', 'exportMergedXlsxBtn': 'export-merged-xlsx-btn',
-                    'selectByKeywordGroup': 'select-by-keyword-group', 'selectKeywordInput': 'select-keyword-input',
-                    'selectByKeywordBtn': 'select-by-keyword-btn', 'selectKeywordRegex': 'select-keyword-regex',
-                    'loadStatusMessage': 'load-status-message', 'controlPanel': 'control-panel',
-                    'dropAreaInitial': 'drop-area-initial', 'dropAreaLoaded': 'drop-area-loaded',
-                    'fileCount': 'file-count', 'fileNames': 'file-names', 'clearFilesBtn': 'clear-files-btn',
-                    'selectAllBtn': 'select-all-btn', 'exportInfoBox': 'export-info-box',
-                    'importOptionsContainer': 'import-options-container', 'specificSheetNameGroup': 'specific-sheet-name-group',
-                    'specificSheetNameInput': 'specific-sheet-name-input', 'specificSheetPositionGroup': 'specific-sheet-position-group',
-                    'specificSheetPositionInput': 'specific-sheet-position-input', 'selectAllTablesBtn': 'select-all-tables-btn',
-                    'unselectAllTablesBtn': 'unselect-all-tables-btn', 'deleteSelectedTablesBtn': 'delete-selected-tables-btn',
-                    'tableLevelControls': 'table-level-controls', 'selectedTablesInfo': 'selected-tables-info',
-                    'selectedTablesList': 'selected-tables-list'
-                };
+                const ids = [ 'fileInput', 'displayArea', 'searchInput', 'dropArea', 'deleteSelectedBtn', 'invertSelectionBtn', 'resetViewBtn', 'selectEmptyBtn', 'exportHtmlBtn', 'showHiddenBtn', 'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn', 'exportMergedXlsxBtn', 'selectByKeywordGroup', 'selectKeywordInput', 'selectByKeywordBtn', 'selectKeywordRegex', 'loadStatusMessage', 'controlPanel', 'dropAreaInitial', 'dropAreaLoaded', 'fileCount', 'fileNames', 'clearFilesBtn', 'selectAllBtn', 'exportInfoBox', 'importOptionsContainer', 'specificSheetNameGroup', 'specificSheetNameInput', 'specificSheetPositionGroup', 'specificSheetPositionInput', 'selectAllTablesBtn', 'unselectAllTablesBtn', 'deleteSelectedTablesBtn', 'tableLevelControls', 'selectedTablesInfo', 'selectedTablesList', 'listViewBtn', 'gridViewBtn', 'backToTopBtn' ];
+                const mapping = { 'fileInput': 'file-input', 'displayArea': 'excel-display-area', 'searchInput': 'search-input', 'dropArea': 'drop-area', 'deleteSelectedBtn': 'delete-selected-btn', 'invertSelectionBtn': 'invert-selection-btn', 'resetViewBtn': 'reset-view-btn', 'selectEmptyBtn': 'select-empty-btn', 'exportHtmlBtn': 'export-html-btn', 'showHiddenBtn': 'show-hidden-btn', 'exportSelectedBtn': 'export-selected-btn', 'exportXlsxBtn': 'export-xlsx-btn', 'exportSelectedXlsxBtn': 'export-selected-xlsx-btn', 'exportMergedXlsxBtn': 'export-merged-xlsx-btn', 'selectByKeywordGroup': 'select-by-keyword-group', 'selectKeywordInput': 'select-keyword-input', 'selectByKeywordBtn': 'select-by-keyword-btn', 'selectKeywordRegex': 'select-keyword-regex', 'loadStatusMessage': 'load-status-message', 'controlPanel': 'control-panel', 'dropAreaInitial': 'drop-area-initial', 'dropAreaLoaded': 'drop-area-loaded', 'fileCount': 'file-count', 'fileNames': 'file-names', 'clearFilesBtn': 'clear-files-btn', 'selectAllBtn': 'select-all-btn', 'exportInfoBox': 'export-info-box', 'importOptionsContainer': 'import-options-container', 'specificSheetNameGroup': 'specific-sheet-name-group', 'specificSheetNameInput': 'specific-sheet-name-input', 'specificSheetPositionGroup': 'specific-sheet-position-group', 'specificSheetPositionInput': 'specific-sheet-position-input', 'selectAllTablesBtn': 'select-all-tables-btn', 'unselectAllTablesBtn': 'unselect-all-tables-btn', 'deleteSelectedTablesBtn': 'delete-selected-tables-btn', 'tableLevelControls': 'table-level-controls', 'selectedTablesInfo': 'selected-tables-info', 'selectedTablesList': 'selected-tables-list', 'listViewBtn': 'list-view-btn', 'gridViewBtn': 'grid-view-btn', 'backToTopBtn': 'back-to-top-btn' };
                 ids.forEach(id => { elements[id] = document.getElementById(mapping[id]); });
             }
 
@@ -305,7 +321,6 @@
                 elements.fileInput.addEventListener('change', e => processFiles(e.target.files));
                 setupDragAndDrop();
                 elements.displayArea.addEventListener('change', handleDisplayAreaChange);
-                
                 elements.importOptionsContainer.addEventListener('change', e => {
                     if (e.target.name === 'import-mode') {
                         const selectedMode = e.target.value;
@@ -313,11 +328,11 @@
                         elements.specificSheetPositionGroup.classList.toggle('hidden', selectedMode !== 'position');
                     }
                 });
-                
+                elements.listViewBtn.addEventListener('click', () => setViewMode('list'));
+                elements.gridViewBtn.addEventListener('click', () => setViewMode('grid'));
                 elements.selectAllTablesBtn.addEventListener('click', () => { selectAllTables(true); updateSelectionInfo(); });
                 elements.unselectAllTablesBtn.addEventListener('click', () => { selectAllTables(false); updateSelectionInfo(); });
                 elements.deleteSelectedTablesBtn.addEventListener('click', deleteSelectedTables);
-
                 const rowSelectionButtons = [elements.selectEmptyBtn, elements.deleteSelectedBtn, elements.selectAllBtn, elements.invertSelectionBtn, elements.selectByKeywordBtn];
                 rowSelectionButtons.forEach(btn => btn.addEventListener('click', () => {
                     setTimeout(() => {
@@ -325,7 +340,6 @@
                         updateSelectionInfo();
                     }, 0);
                 }));
-                
                 elements.resetViewBtn.addEventListener('click', resetView);
                 elements.exportHtmlBtn.addEventListener('click', () => exportHtml('all'));
                 elements.exportSelectedBtn.addEventListener('click', () => exportHtml('selected'));
@@ -335,451 +349,64 @@
                 elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
                 elements.clearFilesBtn.addEventListener('click', () => clearAllFiles(false));
                 elements.searchInput.addEventListener('input', debounce(filterTable, 300));
+                elements.backToTopBtn.addEventListener('click', scrollToTop);
+                window.addEventListener('scroll', handleScroll);
             }
 
-            function handleDisplayAreaChange(e) {
-                const target = e.target;
-                if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return;
-
-                let table;
-                if (target.matches('.table-select-checkbox')) {
-                    const wrapper = target.closest('.table-wrapper');
-                    table = wrapper ? wrapper.querySelector('table') : null;
-                    if (table) {
-                        toggleSelectAll(target.checked, table);
-                    }
-                } else {
-                    table = target.closest('table');
-                }
-                
-                if (table) {
-                    syncTableCheckboxState(table);
-                }
-                updateSelectionInfo();
-            }
-
-            function syncTableCheckboxState(table) {
-                const wrapper = table.closest('.table-wrapper');
-                if (!wrapper) return;
-                const headerCheckbox = wrapper.querySelector('.table-select-checkbox');
-                const rowCheckboxes = table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox');
-                
-                if (rowCheckboxes.length === 0) {
-                    headerCheckbox.checked = false;
-                    headerCheckbox.indeterminate = false;
-                    return;
-                }
-
-                const checkedCount = Array.from(rowCheckboxes).filter(cb => cb.checked).length;
-                
-                if (checkedCount === 0) {
-                    headerCheckbox.checked = false;
-                    headerCheckbox.indeterminate = false;
-                } else if (checkedCount === rowCheckboxes.length) {
-                    headerCheckbox.checked = true;
-                    headerCheckbox.indeterminate = false;
-                } else {
-                    headerCheckbox.checked = false;
-                    headerCheckbox.indeterminate = true;
-                }
-            }
-
-            function updateSelectionInfo() {
-                const selectedCheckboxes = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
-                
-                if (selectedCheckboxes.length > 0) {
-                    const names = Array.from(selectedCheckboxes)
-                        .map(cb => cb.closest('.table-header').querySelector('h4').textContent);
-                    elements.selectedTablesList.textContent = names.join('; ');
-                    elements.selectedTablesInfo.classList.remove('hidden');
-                } else {
-                    elements.selectedTablesInfo.classList.add('hidden');
-                }
-            }
-
-            function setupDragAndDrop() {
-                elements.dropArea.addEventListener('click', e => {
-                    if (e.target.id === 'clear-files-btn' || e.target.id === 'file-input') return;
-                    elements.fileInput.click();
-                });
-                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                    elements.dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
-                });
-                ['dragenter', 'dragover'].forEach(eventName => {
-                    elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.add('highlight'));
-                });
-                ['dragleave', 'drop'].forEach(eventName => {
-                    elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.remove('highlight'));
-                });
-                elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
-            }
-            
-            async function processFiles(fileList) {
-                const validation = validateFiles(fileList);
-                if (!validation.valid) { alert(`錯誤：${validation.error}`); return; }
-                if (state.isProcessing) { alert('正在處理檔案，請稍候...'); return; }
-
-                const importMode = document.querySelector('input[name="import-mode"]:checked').value;
-                const specificSheetName = elements.specificSheetNameInput.value.trim();
-                const specificSheetPosition = elements.specificSheetPositionInput.value.trim();
-
-                if (importMode === 'specific' && !specificSheetName) { alert('請輸入您要匯入的指定工作表名稱！'); return; }
-                if (importMode === 'position' && !specificSheetPosition) { alert('請輸入您要匯入的指定工作表位置！'); return; }
-
-                state.isProcessing = true;
-                elements.displayArea.innerHTML = '<div class="loading">讀取中，請稍候</div>';
-                resetControls(true);
-
-                // ===== BUG FIX: Correct variable declaration =====
-                const tablesToRender = [];
-                const missedFiles = [];
-                state.loadedFiles = []; 
-                
-                try {
-                    for (let index = 0; index < validation.files.length; index++) {
-                        const file = validation.files[index];
-                        elements.displayArea.innerHTML = `<div class="loading">讀取中，請稍候 (${index + 1}/${validation.files.length})</div>`;
-                        const binaryData = await readFileAsBinary(file);
-                        const workbook = XLSX.read(binaryData, { type: 'binary' });
-                        const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition });
-
-                        if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) {
-                            missedFiles.push(file.name);
-                        }
-                        
-                        for (const sheetName of sheetNames) {
-                            const sheet = workbook.Sheets[sheetName];
-                            const htmlString = XLSX.utils.sheet_to_html(sheet);
-                            tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` });
-                            state.loadedFiles.push(`${file.name} (${sheetName})`);
-                        }
-                    }
-
-                    if (missedFiles.length > 0) {
-                        const criteria = importMode === 'specific' ? `名稱包含 "${specificSheetName}"` : `位置符合 "${specificSheetPosition}"`;
-                        alert(`以下檔案找不到 ${criteria} 的工作表，已被跳過：\n\n- ${missedFiles.join('\n- ')}`);
-                    }
-
-                    state.loadedTables = tablesToRender.length;
-                    renderTables(tablesToRender);
-                    updateDropAreaDisplay();
-                } catch (err) {
-                    console.error("處理檔案時發生錯誤:", err);
-                    elements.displayArea.innerHTML = `<p style="color: red;">處理檔案時發生錯誤：${err.message || '未知錯誤'}</p>`;
-                    resetControls(true);
-                } finally {
-                    state.isProcessing = false;
-                }
-            }
-
-            function readFileAsBinary(file) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = e => resolve(e.target.result);
-                    reader.onerror = reject;
-                    reader.readAsBinaryString(file);
-                });
-            }
-
-            function parsePositionString(str) {
-                const indices = new Set();
-                const parts = str.split(',').map(p => p.trim()).filter(Boolean);
-                for (const part of parts) {
-                    if (part.includes('-')) {
-                        const [start, end] = part.split('-').map(Number);
-                        if (!isNaN(start) && !isNaN(end) && start <= end) {
-                            for (let i = start; i <= end; i++) indices.add(i - 1);
-                        }
-                    } else {
-                        const num = Number(part);
-                        if (!isNaN(num)) indices.add(num - 1);
-                    }
-                }
-                return Array.from(indices).sort((a, b) => a - b);
-            }
-            
-            async function getSelectedSheetNames(filename, workbook, mode, criteria) {
-                const sheetNames = workbook.SheetNames;
-                if (sheetNames.length === 0) return [];
-                switch (mode) {
-                    case 'all': return sheetNames;
-                    case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : [];
-                    case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase()));
-                    case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean);
-                    case 'manual': return await showWorksheetSelectionModal(filename, sheetNames);
-                    default: return [];
-                }
-            }
-            
-            function showWorksheetSelectionModal(filename, sheetNames) {
-                return new Promise(resolve => {
-                    if (sheetNames.length <= 1) { resolve(sheetNames); return; }
-                    const overlay = document.createElement('div');
-                    overlay.className = 'modal-overlay';
-                    const dialog = document.createElement('div');
-                    dialog.className = 'modal-dialog';
-                    dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-quick-actions"><button class="btn btn-primary btn-sm" id="modal-select-all">全選</button><button class="btn btn-secondary btn-sm" id="modal-select-none">全不選</button></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`;
-                    overlay.appendChild(dialog);
-                    document.body.appendChild(overlay);
-                    const checkboxes = dialog.querySelectorAll('.sheet-checkbox');
-                    const closeModal = () => document.body.removeChild(overlay);
-                    dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); });
-                    dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); });
-                    dialog.querySelector('#modal-select-all').addEventListener('click', () => checkboxes.forEach(cb => cb.checked = true));
-                    dialog.querySelector('#modal-select-none').addEventListener('click', () => checkboxes.forEach(cb => cb.checked = false));
-                });
-            }
-
-            function renderTables(tablesToRender) {
-                if (tablesToRender.length === 0) {
-                    elements.displayArea.innerHTML = `<p>沒有找到符合條件的工作表。</p>`;
-                    return;
-                }
-                const fragment = document.createDocumentFragment();
-                tablesToRender.forEach(({ html, filename }) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'table-wrapper';
-                    const header = document.createElement('div');
-                    header.className = 'table-header';
-                    header.innerHTML = `<input type="checkbox" class="table-select-checkbox" title="選取此表格"><h4>${filename}</h4>`;
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = html;
-                    const table = tempDiv.querySelector('table');
-                    if (table) {
-                        injectFilenameColumn(table, filename);
-                        wrapper.appendChild(header);
-                        wrapper.appendChild(table);
-                        fragment.appendChild(wrapper);
-                    }
-                });
-                elements.displayArea.innerHTML = '';
-                elements.displayArea.appendChild(fragment);
-                state.originalHtmlString = elements.displayArea.innerHTML;
-                injectCheckboxes();
-                showControls(detectHiddenElements());
-            }
-
-            function injectFilenameColumn(table, filename) {
-                const th = document.createElement('th');
-                th.textContent = 'Source File';
-                th.classList.add('filename-cell');
-                table.querySelector('thead tr')?.prepend(th);
-                table.querySelectorAll('tbody tr').forEach(row => {
-                    const td = document.createElement('td');
-                    td.textContent = filename;
-                    td.classList.add('filename-cell');
-                    row.prepend(td);
-                });
-            }
-
-            function injectCheckboxes() {
-                elements.displayArea.querySelectorAll('thead tr').forEach((headRow, index) => {
-                    const th = document.createElement('th');
-                    th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${index}" title="全選/全不選">`;
-                    th.classList.add('checkbox-cell');
-                    headRow.prepend(th);
-                });
-                elements.displayArea.querySelectorAll('tbody tr').forEach(row => {
-                    const td = document.createElement('td');
-                    td.innerHTML = '<input type="checkbox" class="row-checkbox">';
-                    td.classList.add('checkbox-cell');
-                    row.prepend(td);
-                });
-            }
-
-            function toggleSelectAll(isChecked, table) {
-                if (!table) return;
-                table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked);
-            }
-
-            function detectHiddenElements() {
-                return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length;
-            }
-
-            function showAllHiddenElements() {
-                const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
-                if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; }
-                hidden.forEach(el => el.style.display = '');
-                alert(`已顯示 ${hidden.length} 個隱藏的行列。`);
-                elements.showHiddenBtn.classList.add('hidden');
-                elements.loadStatusMessage.classList.add('hidden');
-            }
-
-            function selectAllTables(isChecked) {
-                elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => {
-                    if (cb.checked !== isChecked) {
-                        cb.click();
-                    }
-                });
-            }
-
-            function deleteSelectedTables() {
-                const selectedWrappers = Array.from(elements.displayArea.querySelectorAll('.table-select-checkbox:checked')).map(cb => cb.closest('.table-wrapper'));
-                if (selectedWrappers.length === 0) { alert('請先勾選要刪除的表格。'); return; }
-                if (confirm(`確定要永久刪除 ${selectedWrappers.length} 個選定的表格嗎？`)) {
-                    selectedWrappers.forEach(wrapper => wrapper.remove());
-                    updateFileStateAfterDeletion();
-                }
-            }
-            
-            function updateFileStateAfterDeletion() {
-                const remainingWrappers = elements.displayArea.querySelectorAll('.table-wrapper');
-                state.loadedTables = remainingWrappers.length;
-                state.loadedFiles = Array.from(remainingWrappers).map(w => w.querySelector('h4').textContent);
-                if (state.loadedTables === 0) {
-                    clearAllFiles(true);
-                } else {
-                    updateDropAreaDisplay();
-                }
-            }
-
-            function selectByKeyword() {
-                const keywordInput = elements.selectKeywordInput.value.trim();
-                const isRegex = elements.selectKeywordRegex.checked;
-                if (!keywordInput) { alert('請先輸入關鍵字'); return; }
-                let matchLogic;
-                try {
-                    if (isRegex) { const regex = new RegExp(keywordInput, 'i'); matchLogic = text => regex.test(text); }
-                    else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); }
-                    else { const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); }
-                } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; }
-                let count = 0;
-                elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-                    if (matchLogic(Array.from(row.cells).slice(2).map(c => c.textContent).join(' '))) {
-                        row.querySelector('.row-checkbox').checked = true;
-                        count++;
-                    }
-                });
-                alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`);
-            }
-
-            function selectEmptyRows() {
-                let count = 0;
-                elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-                    if (Array.from(row.cells).slice(2).every(c => c.textContent.trim() === '')) {
-                        row.querySelector('.row-checkbox').checked = true;
-                        count++;
-                    }
-                });
-                if (count === 0) alert('未找到空白列');
-            }
-
-            function selectAllRows() {
-                const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)');
-                if (rows.length === 0) { alert('沒有可勾選的列'); return; }
-                rows.forEach(row => row.querySelector('.row-checkbox').checked = true);
-                elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]').forEach(cb => cb.checked = true);
-            }
-
-            function invertSelection() {
-                elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = !cb.checked);
-            }
-
-            function deleteSelectedRows() {
-                const selected = elements.displayArea.querySelectorAll('.row-checkbox:checked');
-                if (selected.length === 0) { alert('請先勾選要刪除的列'); return; }
-                if (confirm(`確定要刪除 ${selected.length} 筆資料列嗎？`)) {
-                    selected.forEach(cb => cb.closest('tr').remove());
-                }
-            }
-
-            function filterTable() {
-                const keywords = elements.searchInput.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
-                elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => {
-                    let visibleRowCount = 0;
-                    wrapper.querySelectorAll('tbody tr').forEach(row => {
-                        const text = Array.from(row.cells).slice(2).map(c => c.textContent).join(' ').toLowerCase();
-                        const isVisible = keywords.every(k => text.includes(k));
-                        row.classList.toggle('row-hidden-search', !isVisible);
-                        if (isVisible) visibleRowCount++;
-                    });
-                    wrapper.style.display = visibleRowCount > 0 ? '' : 'none';
-                });
-                elements.displayArea.querySelectorAll('table').forEach(syncTableCheckboxState);
-                updateSelectionInfo();
-            }
-
-            function resetView() {
-                if (!state.originalHtmlString) return;
-                elements.displayArea.innerHTML = state.originalHtmlString;
-                injectCheckboxes();
-                ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = '');
-                elements.selectKeywordRegex.checked = false;
-                filterTable();
-                elements.loadStatusMessage.classList.add('hidden');
-                const hiddenCount = detectHiddenElements();
-                if (hiddenCount > 0) {
-                    elements.loadStatusMessage.textContent = `注意：已重設表格，${hiddenCount} 個隱藏的行列已還原。`;
-                    elements.loadStatusMessage.classList.remove('hidden');
-                    elements.showHiddenBtn.classList.remove('hidden');
-                }
-                updateSelectionInfo();
-            }
-
-            function resetControls(isNewFile) {
-                if (!isNewFile) return;
-                state.originalHtmlString = '';
-                ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = '');
-                elements.selectKeywordRegex.checked = false;
-                elements.controlPanel.classList.add('hidden');
-                updateSelectionInfo();
-            }
-
-            function updateDropAreaDisplay() {
-                const hasFiles = state.loadedTables > 0;
-                elements.dropArea.classList.toggle('compact', hasFiles);
-                elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
-                elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
-                elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
-                if (hasFiles) {
-                    elements.fileCount.textContent = state.loadedTables;
-                    const names = state.loadedFiles.slice(0, 3).join(', ');
-                    const more = state.loadedFiles.length > 3 ? ` 及其他 ${state.loadedFiles.length - 3} 個...` : '';
-                    elements.fileNames.textContent = names + more;
-                }
-            }
-
-            function clearAllFiles(silent = false) {
-                if (!silent && !confirm('確定要清除所有已載入的檔案嗎？')) return;
-                state.originalHtmlString = '';
-                state.loadedFiles = [];
-                state.loadedTables = 0;
-                elements.displayArea.innerHTML = '';
-                elements.fileInput.value = '';
-                ['specificSheetNameInput', 'specificSheetPositionInput'].forEach(id => elements[id].value = '');
-                updateDropAreaDisplay();
-                resetControls(true);
-            }
-
+            function handleDisplayAreaChange(e) { const target = e.target; if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return; let table; if (target.matches('.table-select-checkbox')) { const wrapper = target.closest('.table-wrapper'); table = wrapper ? wrapper.querySelector('table') : null; if (table) { toggleSelectAll(target.checked, table); } } else if (target.matches('[id^="select-all-checkbox"]')) { table = target.closest('table'); toggleSelectAll(target.checked, table); } else { table = target.closest('table'); } if (table) { syncTableCheckboxState(table); } updateSelectionInfo(); }
+            function syncTableCheckboxState(table) { const wrapper = table.closest('.table-wrapper'); if (!wrapper) return; const headerCheckbox = wrapper.querySelector('.table-select-checkbox'); const rowCheckboxes = table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox'); if (rowCheckboxes.length === 0) { headerCheckbox.checked = false; headerCheckbox.indeterminate = false; return; } const checkedCount = Array.from(rowCheckboxes).filter(cb => cb.checked).length; if (checkedCount === 0) { headerCheckbox.checked = false; headerCheckbox.indeterminate = false; } else if (checkedCount === rowCheckboxes.length) { headerCheckbox.checked = true; headerCheckbox.indeterminate = false; } else { headerCheckbox.checked = false; headerCheckbox.indeterminate = true; } }
+            function updateSelectionInfo() { const selectedCheckboxes = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate'); if (selectedCheckboxes.length > 0) { const names = Array.from(selectedCheckboxes).map(cb => cb.closest('.table-header').querySelector('h4').textContent); elements.selectedTablesList.textContent = names.join('; '); elements.selectedTablesInfo.classList.remove('hidden'); } else { elements.selectedTablesInfo.classList.add('hidden'); } }
+            function setupDragAndDrop() { elements.dropArea.addEventListener('click', e => { if (e.target.id === 'clear-files-btn' || e.target.id === 'file-input') return; elements.fileInput.click(); }); ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { elements.dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }); }); ['dragenter', 'dragover'].forEach(eventName => { elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.add('highlight')); }); ['dragleave', 'drop'].forEach(eventName => { elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.remove('highlight')); }); elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files)); }
+            async function processFiles(fileList) { const validation = validateFiles(fileList); if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } if (state.isProcessing) { alert('正在處理檔案...'); return; } const importMode = document.querySelector('input[name="import-mode"]:checked').value; const specificSheetName = elements.specificSheetNameInput.value.trim(); const specificSheetPosition = elements.specificSheetPositionInput.value.trim(); if (importMode === 'specific' && !specificSheetName) { alert('請輸入工作表名稱！'); return; } if (importMode === 'position' && !specificSheetPosition) { alert('請輸入工作表位置！'); return; } state.isProcessing = true; elements.displayArea.innerHTML = '<div class="loading">讀取中...</div>'; resetControls(true); const tablesToRender = []; const missedFiles = []; state.loadedFiles = []; try { for (let index = 0; index < validation.files.length; index++) { const file = validation.files[index]; elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; const binaryData = await readFileAsBinary(file); const workbook = XLSX.read(binaryData, { type: 'binary' }); const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) { missedFiles.push(file.name); } for (const sheetName of sheetNames) { const sheet = workbook.Sheets[sheetName]; const htmlString = XLSX.utils.sheet_to_html(sheet); tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); state.loadedFiles.push(`${file.name} (${sheetName})`); } } if (missedFiles.length > 0) { const criteria = importMode === 'specific' ? `名稱包含 "${specificSheetName}"` : `位置符合 "${specificSheetPosition}"`; alert(`以下檔案找不到 ${criteria} 的工作表：\n\n- ${missedFiles.join('\n- ')}`); } state.loadedTables = tablesToRender.length; renderTables(tablesToRender); updateDropAreaDisplay(); } catch (err) { console.error("處理檔案時發生錯誤:", err); elements.displayArea.innerHTML = `<p style="color: red;">處理檔案錯誤：${err.message || '未知錯誤'}</p>`; resetControls(true); } finally { state.isProcessing = false; } }
+            function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
+            function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
+            async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
+            function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-quick-actions"><button class="btn btn-primary btn-sm" id="modal-select-all">全選</button><button class="btn btn-secondary btn-sm" id="modal-select-none">全不選</button></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const checkboxes = dialog.querySelectorAll('.sheet-checkbox'); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); dialog.querySelector('#modal-select-all').addEventListener('click', () => checkboxes.forEach(cb => cb.checked = true)); dialog.querySelector('#modal-select-none').addEventListener('click', () => checkboxes.forEach(cb => cb.checked = false)); }); }
+            function renderTables(tablesToRender) { if (tablesToRender.length === 0) { elements.displayArea.innerHTML = `<p>沒有找到符合條件的工作表。</p>`; return; } const fragment = document.createDocumentFragment(); tablesToRender.forEach(({ html, filename }) => { const wrapper = document.createElement('div'); wrapper.className = 'table-wrapper'; const header = document.createElement('div'); header.className = 'table-header'; header.innerHTML = `<input type="checkbox" class="table-select-checkbox" title="選取此表格"><h4>${filename}</h4>`; const tempDiv = document.createElement('div'); tempDiv.innerHTML = html; const table = tempDiv.querySelector('table'); if (table) { injectFilenameColumn(table, filename); wrapper.appendChild(header); wrapper.appendChild(table); fragment.appendChild(wrapper); } }); elements.displayArea.innerHTML = ''; elements.displayArea.appendChild(fragment); state.originalHtmlString = elements.displayArea.innerHTML; injectCheckboxes(); showControls(detectHiddenElements()); }
+            function injectFilenameColumn(table, filename) { const th = document.createElement('th'); th.textContent = 'Source File'; th.classList.add('filename-cell'); table.querySelector('thead tr')?.prepend(th); table.querySelectorAll('tbody tr').forEach(row => { const td = document.createElement('td'); td.textContent = filename; td.classList.add('filename-cell'); row.prepend(td); }); }
+            function injectCheckboxes() { elements.displayArea.querySelectorAll('thead tr').forEach((headRow, index) => { const th = document.createElement('th'); th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${index}" title="全選/全不選">`; th.classList.add('checkbox-cell'); headRow.prepend(th); }); elements.displayArea.querySelectorAll('tbody tr').forEach(row => { const td = document.createElement('td'); td.innerHTML = '<input type="checkbox" class="row-checkbox">'; td.classList.add('checkbox-cell'); row.prepend(td); }); }
+            function toggleSelectAll(isChecked, table) { if (!table) return; table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked); }
+            function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
+            function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
+            function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
+            function deleteSelectedTables() { const selectedWrappers = Array.from(elements.displayArea.querySelectorAll('.table-select-checkbox:checked')).map(cb => cb.closest('.table-wrapper')); if (selectedWrappers.length === 0) { alert('請先勾選要刪除的表格。'); return; } if (confirm(`確定要永久刪除 ${selectedWrappers.length} 個選定的表格嗎？`)) { selectedWrappers.forEach(wrapper => wrapper.remove()); updateFileStateAfterDeletion(); } }
+            function updateFileStateAfterDeletion() { const remainingWrappers = elements.displayArea.querySelectorAll('.table-wrapper'); state.loadedTables = remainingWrappers.length; state.loadedFiles = Array.from(remainingWrappers).map(w => w.querySelector('h4').textContent); if (state.loadedTables === 0) { clearAllFiles(true); } else { updateDropAreaDisplay(); } }
+            function selectByKeyword() { const keywordInput = elements.selectKeywordInput.value.trim(); const isRegex = elements.selectKeywordRegex.checked; if (!keywordInput) { alert('請先輸入關鍵字'); return; } let matchLogic; try { if (isRegex) { const regex = new RegExp(keywordInput, 'i'); matchLogic = text => regex.test(text); } else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); } else { const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); } } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; } let count = 0; elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (matchLogic(Array.from(row.cells).slice(2).map(c => c.textContent).join(' '))) { row.querySelector('.row-checkbox').checked = true; count++; } }); alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); }
+            function selectEmptyRows() { let count = 0; elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (Array.from(row.cells).slice(2).every(c => c.textContent.trim() === '')) { row.querySelector('.row-checkbox').checked = true; count++; } }); if (count === 0) alert('未找到空白列'); }
+            function selectAllRows() { const rows = elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)'); if (rows.length === 0) { alert('沒有可勾選的列'); return; } rows.forEach(row => row.querySelector('.row-checkbox').checked = true); elements.displayArea.querySelectorAll('[id^="select-all-checkbox"]').forEach(cb => cb.checked = true); }
+            function invertSelection() { elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = !cb.checked); }
+            function deleteSelectedRows() { const selected = elements.displayArea.querySelectorAll('.row-checkbox:checked'); if (selected.length === 0) { alert('請先勾選要刪除的列'); return; } if (confirm(`確定要刪除 ${selected.length} 筆資料列嗎？`)) { selected.forEach(cb => cb.closest('tr').remove()); } }
+            function filterTable() { const keywords = elements.searchInput.value.toLowerCase().trim().split(/\s+/).filter(Boolean); elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => { let visibleRowCount = 0; wrapper.querySelectorAll('tbody tr').forEach(row => { const text = Array.from(row.cells).slice(2).map(c => c.textContent).join(' ').toLowerCase(); const isVisible = keywords.every(k => text.includes(k)); row.classList.toggle('row-hidden-search', !isVisible); if (isVisible) visibleRowCount++; }); wrapper.style.display = visibleRowCount > 0 ? '' : 'none'; }); elements.displayArea.querySelectorAll('table').forEach(syncTableCheckboxState); updateSelectionInfo(); }
+            function exportHtml(mode) { alert('HTML 匯出功能待實現'); }
+            function exportXlsx(mode) { alert('XLSX 匯出功能待實現'); }
+            function exportMergedXlsx() { alert('合併匯出 XLSX 功能待實現'); }
+            function resetView() { if (!state.originalHtmlString) return; elements.displayArea.innerHTML = state.originalHtmlString; injectCheckboxes(); ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = ''); elements.selectKeywordRegex.checked = false; filterTable(); elements.loadStatusMessage.classList.add('hidden'); const hiddenCount = detectHiddenElements(); if (hiddenCount > 0) { elements.loadStatusMessage.textContent = `注意：已重設表格，${hiddenCount} 個隱藏的行列已還原。`; elements.loadStatusMessage.classList.remove('hidden'); elements.showHiddenBtn.classList.remove('hidden'); } updateSelectionInfo(); setViewMode('list'); }
+            function resetControls(isNewFile) { if (!isNewFile) return; state.originalHtmlString = ''; ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = ''); elements.selectKeywordRegex.checked = false; elements.controlPanel.classList.add('hidden'); updateSelectionInfo(); }
+            function updateDropAreaDisplay() { const hasFiles = state.loadedTables > 0; elements.dropArea.classList.toggle('compact', hasFiles); elements.dropAreaInitial.classList.toggle('hidden', hasFiles); elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles); elements.importOptionsContainer.classList.toggle('hidden', hasFiles); if (hasFiles) { elements.fileCount.textContent = state.loadedTables; const names = state.loadedFiles.slice(0, 3).join(', '); const more = state.loadedFiles.length > 3 ? ` 及其他 ${state.loadedFiles.length - 3} 個...` : ''; elements.fileNames.textContent = names + more; } }
+            function clearAllFiles(silent = false) { if (!silent && !confirm('確定要清除所有已載入的檔案嗎？')) return; state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; elements.displayArea.innerHTML = ''; elements.fileInput.value = ''; ['specificSheetNameInput', 'specificSheetPositionInput'].forEach(id => elements[id].value = ''); updateDropAreaDisplay(); resetControls(true); setViewMode('list'); }
             function showControls(hiddenCount) {
                 elements.controlPanel.classList.remove('hidden');
-                ['selectByKeywordGroup', 'selectByKeywordBtn', 'selectEmptyBtn', 'deleteSelectedBtn', 'invertSelectionBtn', 
-                 'exportHtmlBtn', 'selectAllBtn', 'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn', 
-                 'exportMergedXlsxBtn', 'resetViewBtn', 'exportInfoBox', 'tableLevelControls']
-                .forEach(id => elements[id]?.classList.remove('hidden'));
-                
+                ['selectByKeywordGroup', 'selectByKeywordBtn', 'selectEmptyBtn', 'deleteSelectedBtn', 'invertSelectionBtn', 'exportHtmlBtn', 'selectAllBtn', 'exportSelectedBtn', 'exportXlsxBtn', 'exportSelectedXlsxBtn', 'exportMergedXlsxBtn', 'resetViewBtn', 'exportInfoBox', 'tableLevelControls', 'listViewBtn', 'gridViewBtn'].forEach(id => elements[id]?.classList.remove('hidden'));
                 if (hiddenCount > 0) {
                     elements.loadStatusMessage.textContent = `注意：檔案中包含 ${hiddenCount} 個被隱藏的行列。`;
                     elements.loadStatusMessage.classList.remove('hidden');
                     elements.showHiddenBtn.classList.remove('hidden');
                 }
+                requestAnimationFrame(() => {
+                    const controlPanelHeight = elements.controlPanel.offsetHeight;
+                    document.querySelectorAll('#excel-display-area table th').forEach(th => {
+                        th.style.top = `${controlPanelHeight}px`;
+                    });
+                });
             }
-            
-            function validateFiles(fileList) {
-                if (!fileList || fileList.length === 0) return { valid: false, error: '沒有選擇檔案' };
-                const validFiles = Array.from(fileList).filter(file => CONSTANTS.VALID_FILE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)));
-                if (validFiles.length === 0) return { valid: false, error: '請上傳 .xls 或 .xlsx 格式的檔案' };
-                return { valid: true, files: validFiles };
-            }
-
-            // Dummy export functions to avoid breaking the code, you can fill them with your actual implementation
-            function exportHtml(mode) { console.log('Exporting HTML:', mode); alert('HTML 匯出功能待實現。'); }
-            function exportXlsx(mode) { console.log('Exporting XLSX:', mode); alert('XLSX 匯出功能待實現。'); }
-            function exportMergedXlsx() { console.log('Exporting Merged XLSX'); alert('合併匯出 XLSX 功能待實現。'); }
+            function setViewMode(mode) { if (mode === 'grid') { elements.displayArea.classList.add('grid-view'); elements.gridViewBtn.classList.add('active'); elements.listViewBtn.classList.remove('active'); } else { elements.displayArea.classList.remove('grid-view'); elements.listViewBtn.classList.add('active'); elements.gridViewBtn.classList.remove('active'); } }
+            function validateFiles(fileList) { if (!fileList || fileList.length === 0) return { valid: false, error: '沒有選擇檔案' }; const validFiles = Array.from(fileList).filter(file => CONSTANTS.VALID_FILE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext))); if (validFiles.length === 0) return { valid: false, error: '請上傳 .xls 或 .xlsx 格式的檔案' }; return { valid: true, files: validFiles }; }
+            function debounce(func, wait) { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), wait); }; }
+            function handleScroll() { if (window.scrollY > window.innerHeight / 2) { elements.backToTopBtn.classList.add('visible'); } else { elements.backToTopBtn.classList.remove('visible'); } }
+            function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
             return { init };
         })();
-
         ExcelViewer.init();
     </script>
 </body>
