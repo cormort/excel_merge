@@ -399,3 +399,24 @@ body.no-scroll .controls { display: none !important; }
 #column-checklist input {
     margin-right: 8px; width: 16px; height: 16px;
 }
+
+
+/* --- ▼▼▼ NEW: Style for keyword input + regex checkbox ▼▼▼ --- */
+.input-with-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.input-with-checkbox-group input[type="text"] {
+    flex-grow: 1; /* Input takes up available space */
+    width: auto; /* Override default 100% width */
+}
+
+.input-with-checkbox-group .checkbox-label {
+    flex-shrink: 0;   /* Don't shrink the checkbox label */
+    white-space: nowrap; /* Keep "使用正規表示式" on one line */
+    margin-bottom: 0; /* Override any default margins */
+}
+/* --- ▲▲▲ END NEW ▲▲▲ --- */
