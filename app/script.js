@@ -222,7 +222,6 @@ const ExcelViewer = (() => {
     
     // --- Merged View and Column Operations ---
 
-    // ▼▼▼ NEW UNIFIED FUNCTION ▼▼▼
     /**
      * Creates the merged view modal based on selected tables and mode.
      * @param {string} mode - 'all' (all visible rows) or 'checked' (only checked rows)
@@ -286,6 +285,11 @@ const ExcelViewer = (() => {
             const headers = tableHeaderMap.get(table); // Get cached headers
             if (!headers) return; // Should not happen
 
+            // ▼▼▼ MODIFICATION: Get the filename HERE ▼▼▼
+            const wrapper = table.closest('.table-wrapper');
+            const filename = wrapper?.querySelector('h4')?.textContent || '未知來源';
+            // ▲▲▲ END MODIFICATION ▲▲▲
+
             // Select which rows to process based on 'mode'
             let rowsToProcess;
             if (mode === 'all') {
@@ -299,6 +303,11 @@ const ExcelViewer = (() => {
             // Map the data from *only* the selected rows
             rowsToProcess.forEach(row => {
                 const rowData = {};
+                
+                // ▼▼▼ MODIFICATION: Add the source file property ▼▼▼
+                rowData._sourceFile = filename;
+                // ▲▲▲ END MODIFICATION ▲▲▲
+
                 Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
                     if (headers[i]) { // Use the correct header for this column index
                         rowData[headers[i]] = td.textContent;
@@ -319,7 +328,6 @@ const ExcelViewer = (() => {
         elements.mergeViewModal.classList.remove('hidden');
         document.body.classList.add('no-scroll');
     }
-    // ▲▲▲ NEW UNIFIED FUNCTION ▲▲▲
 
     function closeMergeView() {
         if (state.isEditing && !confirm("您有未儲存的編輯，確定要關閉並捨棄變更嗎？")) {
@@ -358,6 +366,13 @@ const ExcelViewer = (() => {
         state.mergedData.forEach((rowData, index) => {
             const tr = tbody.insertRow();
             tr.dataset.rowIndex = index;
+            
+            // ▼▼▼ MODIFICATION: Add the title attribute for hover ▼▼▼
+            if (rowData._sourceFile) {
+                tr.title = `來源: ${rowData._sourceFile}`;
+            }
+            // ▲▲▲ END MODIFICATION ▲▲▲
+
             if (rowData._isNew) tr.classList.add('new-row-highlight');
             
             state.mergedHeaders.forEach(header => {
@@ -643,7 +658,7 @@ const ExcelViewer = (() => {
         }
     }
     function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
-    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
+    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style**="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
     function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
