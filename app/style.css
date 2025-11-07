@@ -250,7 +250,11 @@ body::-webkit-scrollbar-thumb:hover, .table-content::-webkit-scrollbar-thumb:hov
 .loading::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
 @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
 
+/* ▼▼▼ MODIFIED: Commented out this rule to keep controls visible ▼▼▼ */
+/*
 body.no-scroll .controls { display: none !important; }
+*/
+/* ▲▲▲ MODIFIED ▲▲▲ */
 
 * {
     -webkit-font-smoothing: antialiased;
@@ -395,4 +399,3 @@ body.no-scroll .controls { display: none !important; }
 #column-checklist input {
     margin-right: 8px; width: 16px; height: 16px;
 }
-
