@@ -286,6 +286,23 @@ body.no-scroll .controls { display: none !important; }
     display: none;
 }
 
+/* --- Styles for Edit Mode --- */
+#merged-display-area td[contenteditable="true"] {
+    background-color: #fffde7;
+    outline: 1px dashed #fbc02d;
+}
+.new-row-highlight td {
+    background-color: #e8f5e9 !important;
+    animation: flash 1.5s ease-out;
+}
+@keyframes flash {
+    0% { background-color: #a5d6a7; }
+    100% { background-color: #e8f5e9; }
+}
+#merged-display-area.is-editing .row-checkbox {
+    cursor: not-allowed;
+}
+
 /* Modal Styles */
 .modal-overlay {
     position: fixed;
