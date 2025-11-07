@@ -112,9 +112,9 @@ const ExcelViewer = (() => {
         
         // --- Merge View Modal Events ---
         
-        // ▼▼▼ MODIFIED: Renamed function and bound new function ▼▼▼
-        elements.mergeViewBtn.addEventListener('click', createMergedView_All); 
-        elements.viewCheckedCombinedBtn.addEventListener('click', createMergedView_Checked);
+        // ▼▼▼ MODIFIED: Pointing both buttons to the new unified function ▼▼▼
+        elements.mergeViewBtn.addEventListener('click', () => createMergedView('all')); 
+        elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
         // ▲▲▲ MODIFIED ▲▲▲
 
         elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
@@ -222,111 +222,93 @@ const ExcelViewer = (() => {
     
     // --- Merged View and Column Operations ---
 
-    // ▼▼▼ RENAMED: from createMergedView to createMergedView_All ▼▼▼
-    function createMergedView_All() {
-        const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
-        if (tables.length === 0) { alert('沒有可合併的表格。'); return; }
-
-        const allHeaders = new Set();
-        const tableData = tables.map(table => {
-            // 1. 嘗試從 <thead> 讀取標頭 (包含 "空白標頭" 修復)
-            let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
-                .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
-            
-            const dataRows = Array.from(table.querySelectorAll('tbody tr'));
-
-            // 2. 【關鍵修復】如果 <thead> 沒找到標頭，且 <tbody> 有資料
-            if (headers.length === 0 && dataRows.length > 0) {
-                // 檢查資料列，找出最大欄位數
-                let maxCols = 0;
-                dataRows.slice(0, 10).forEach(row => { // 抽樣檢查前10列來決定最大欄寬
-                    const colCount = row.querySelectorAll('td:not(.checkbox-cell)').length;
-                    if (colCount > maxCols) maxCols = colCount;
-                });
-
-                // 產生預設標頭
-                headers = []; // 清空 (雖然它本來就是空的)
-                for (let i = 0; i < maxCols; i++) {
-                    headers.push(`(欄位 ${i + 1})`);
-                }
-            }
-
-            // 3. 將標頭 (無論是讀取到的還是產生的) 加入
-            headers.forEach(h => allHeaders.add(h));
-
-            // 4. 映射資料
-            return dataRows.map(row => {
-                const rowData = {};
-                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
-                    if (headers[i]) { // 確保標頭存在才賦值
-                        rowData[headers[i]] = td.textContent;
-                    }
-                });
-                return rowData;
-            });
-        }).flat();
-
-        state.mergedHeaders = Array.from(allHeaders);
-        state.mergedData = tableData;
+    // ▼▼▼ NEW UNIFIED FUNCTION ▼▼▼
+    /**
+     * Creates the merged view modal based on selected tables and mode.
+     * @param {string} mode - 'all' (all visible rows) or 'checked' (only checked rows)
+     */
+    function createMergedView(mode = 'all') {
         
-        renderMergedTable();
-        updateColumnSelects(state.mergedHeaders); 
-        
-        state.isMergedView = true;
-        elements.mergeViewModal.classList.remove('hidden');
-        document.body.classList.add('no-scroll');
-    }
-    // ▲▲▲ RENAMED ▲▲▲
-
-
-    // ▼▼▼ NEW FUNCTION: Replaces the old window.open logic ▼▼▼
-    function createMergedView_Checked() {
-        // 1. Get all checked rows from the MAIN display area
-        const checkedRows = elements.displayArea.querySelectorAll('tbody .row-checkbox:checked');
-        if (checkedRows.length === 0) {
-            alert('請先在主畫面中勾選至少一個資料列。');
+        // 1. Get ALL visible tables to build a complete header map.
+        const allVisibleTables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
+        if (allVisibleTables.length === 0) {
+            alert('沒有可合併的表格。');
             return;
         }
 
-        // 2. Group rows by their parent table to get correct headers
-        const tables = {}; 
-        checkedRows.forEach(cb => {
-            const row = cb.closest('tr');
-            const table = row.closest('table');
-            const wrapper = table.closest('.table-wrapper');
-            const title = wrapper.querySelector('h4').textContent;
-
-            if (!tables[title]) {
-                // First time seeing this table, store its headers
-                tables[title] = {
-                    headers: Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
-                                  .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`),
-                    rows: []
-                };
+        // 2. If mode is 'checked', do a pre-check.
+        if (mode === 'checked') {
+            // We must check *within* the visible tables.
+            let checkedRowsInVisibleTables = 0;
+            allVisibleTables.forEach(table => {
+                checkedRowsInVisibleTables += table.querySelectorAll('tbody .row-checkbox:checked').length;
+            });
+            
+            if (checkedRowsInVisibleTables === 0) {
+                alert('請先在 *可見* 的表格中勾選至少一個資料列。');
+                return;
             }
-            tables[title].rows.push(row);
-        });
+        }
 
-        // 3. Build the mergedData and mergedHeaders
         const allHeaders = new Set();
         const tableData = [];
+        const tableHeaderMap = new Map(); // Cache headers per table
 
-        Object.values(tables).forEach(tableInfo => {
-            const { headers, rows } = tableInfo;
-            headers.forEach(h => allHeaders.add(h)); // Add all headers to the set
+        // 3. First pass: Iterate over *all visible tables* just to gather ALL headers
+        allVisibleTables.forEach(table => {
+            // Get headers for *this* table using the robust logic
+            let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
+                             .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
+            
+            const allDataRowsInTable = Array.from(table.querySelectorAll('tbody tr')); // Used for 'no header' check
+            
+            if (headers.length === 0 && allDataRowsInTable.length > 0) {
+                let maxCols = 0;
+                allDataRowsInTable.slice(0, 10).forEach(r => { // Sample rows
+                    const colCount = r.querySelectorAll('td:not(.checkbox-cell)').length;
+                    if (colCount > maxCols) maxCols = colCount;
+                });
+                headers = [];
+                for (let i = 0; i < maxCols; i++) {
+                    headers.push(`(欄位 ${i + 1})`);
+                }
+            }
+            
+            // Add this table's headers to the global set
+            headers.forEach(h => allHeaders.add(h));
+            // Cache the headers for this specific table
+            tableHeaderMap.set(table, headers);
+        });
 
-            rows.forEach(row => {
+
+        // 4. Second pass: Iterate over tables again to gather data based on mode
+        allVisibleTables.forEach(table => {
+            const headers = tableHeaderMap.get(table); // Get cached headers
+            if (!headers) return; // Should not happen
+
+            // Select which rows to process based on 'mode'
+            let rowsToProcess;
+            if (mode === 'all') {
+                // Get all rows that are NOT hidden by the search filter
+                rowsToProcess = Array.from(table.querySelectorAll('tbody tr')).filter(row => !row.classList.contains('row-hidden-search'));
+            } else { // mode === 'checked'
+                // Get only rows that are checked
+                rowsToProcess = Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'));
+            }
+
+            // Map the data from *only* the selected rows
+            rowsToProcess.forEach(row => {
                 const rowData = {};
                 Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
-                    if (headers[i]) {
+                    if (headers[i]) { // Use the correct header for this column index
                         rowData[headers[i]] = td.textContent;
                     }
                 });
-                tableData.push(rowData);
+                tableData.push(rowData); // Push directly to the final flat array
             });
         });
 
-        // 4. Set state and render (Same as createMergedView_All)
+        // 5. Set state and render
         state.mergedHeaders = Array.from(allHeaders);
         state.mergedData = tableData;
         
@@ -337,8 +319,7 @@ const ExcelViewer = (() => {
         elements.mergeViewModal.classList.remove('hidden');
         document.body.classList.add('no-scroll');
     }
-    // ▲▲▲ NEW FUNCTION ▲▲▲
-
+    // ▲▲▲ NEW UNIFIED FUNCTION ▲▲▲
 
     function closeMergeView() {
         if (state.isEditing && !confirm("您有未儲存的編輯，確定要關閉並捨棄變更嗎？")) {
@@ -383,11 +364,14 @@ const ExcelViewer = (() => {
                 const td = tr.insertCell();
                 td.contentEditable = state.isEditing;
                 td.dataset.colHeader = header;
+                // Use the master header list to pull data, defaulting to empty string
                 const value = rowData[header] || '';
                 td.textContent = value;
-                if (!isNaN(parseFloat(value.replace(/,/g, '')))) {
+                if (value && !isNaN(parseFloat(value.replace(/,/g, '')))) {
                     td.classList.add('numeric');
                     td.textContent = formatNumber(value);
+                } else if (!value) {
+                    td.textContent = ''; // Ensure it's empty, not 'undefined'
                 }
             });
         });
@@ -671,9 +655,7 @@ const ExcelViewer = (() => {
     
     function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } try { const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); if (allData.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } const ws = XLSX.utils.aoa_to_sheet(allData); ws['!cols'] = calculateColumnWidths(allData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, ws, 'Merged Data'); XLSX.writeFile(workbook, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`); alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料。`); } catch (err) { console.error('合併匯出 XLSX 錯誤:', err); alert('合併匯出 XLSX 時發生錯誤：' + err.message); } }
     
-    // --- ▼▼▼ REMOVED old viewCheckedCombined (window.open) function ▼▼▼ ---
-    // (The new createMergedView_Checked function replaces it)
-    // --- ▲▲▲ REMOVED ▲▲▲ ---
+    // --- (Removed old viewCheckedCombined function) ---
 
     function calculateColumnWidths(data) { if (data.length === 0) return []; return data[0].map((_, col) => ({ wch: Math.min(50, Math.max(10, ...data.map(row => row[col] ? String(row[col]).length : 0)) + 2) })); }
     
@@ -735,8 +717,6 @@ const ExcelViewer = (() => {
         buttonsToShow.forEach(id => {
             if(elements[id]) elements[id].classList.remove('hidden');
         });
-
-        // (Removed buttons from main control panel)
 
         elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1);
         const showHiddenStuff = hiddenCount > 0;
