@@ -78,10 +78,20 @@
                 <div class="control-group">
                     <label>▶️ 資料列操作</label>
                     <div class="button-group">
+                        <!-- Standard Buttons -->
                         <button class="btn btn-primary" id="select-by-keyword-btn">依關鍵字勾選</button>
                         <button class="btn btn-primary" id="select-empty-btn">勾選空白列</button>
                         <button class="btn btn-primary" id="select-all-btn">勾選全部</button>
                         <button class="btn btn-warning" id="invert-selection-btn">反向選取</button>
+                        
+                        <!-- Merge View Edit Buttons (Initially Hidden) -->
+                        <button class="btn btn-info hidden" id="edit-data-btn">編輯資料</button>
+                        <button class="btn btn-success hidden" id="save-edits-btn">儲存編輯</button>
+                        <button class="btn btn-secondary hidden" id="cancel-edits-btn">取消編輯</button>
+                        <button class="btn btn-primary hidden" id="add-new-row-btn">新增資料列</button>
+                        <button class="btn btn-primary hidden" id="copy-selected-rows-btn">複製選取列</button>
+
+                        <!-- Delete button is always visible -->
                         <button class="btn btn-danger" id="delete-selected-btn">刪除勾選列</button>
                     </div>
                 </div>
