@@ -69,9 +69,12 @@
                     </div>
                     <div class="control-group" id="select-by-keyword-group">
                         <label>✅ 依關鍵字勾選</label>
-                        <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
-                        <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
-                    </div>
+                        
+                        <div class="input-with-checkbox-group">
+                            <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
+                            <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
+                        </div>
+                        </div>
                 </div>
                 
                 <div class="control-group-row">
@@ -133,7 +136,6 @@
                 <button class="btn btn-primary" id="select-by-col-empty-btn" title="勾選指定欄位中，內容為空白的資料列">勾選為空</button>
                 <button class="btn btn-primary" id="select-by-col-exists-btn" title="勾選指定欄位中，內容非空白的資料列">勾選有值</button>
             </div>
-
             <div id="merge-view-content">
                 </div>
         </div>
