@@ -231,9 +231,28 @@ const ExcelViewer = (() => {
     function filterTable() { const keywords = elements.searchInput.value.toLowerCase().trim().split(/\s+/).filter(Boolean); const scope = state.isMergedView ? elements.mergedDisplayArea : elements.displayArea; scope.querySelectorAll('tbody tr').forEach(row => { const text = Array.from(row.cells).slice(1).map(c => c.textContent).join(' ').toLowerCase(); const isVisible = keywords.every(k => text.includes(k)); row.classList.toggle('row-hidden-search', !isVisible); }); if (!state.isMergedView) { elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => { const visibleRowCount = wrapper.querySelectorAll('tbody tr:not(.row-hidden-search)').length; wrapper.style.display = visibleRowCount > 0 ? '' : 'none'; }); } syncCheckboxesInScope(); }
 
     // --- Utility and Helper Functions ---
-    // THIS IS THE MISSING FUNCTION THAT WAS ADDED BACK
     function detectHiddenElements() {
         return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length;
+    }
+
+    function showAllHiddenElements() {
+        const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
+        if (hidden.length === 0) {
+            alert('沒有需要顯示的隱藏行列。');
+            return;
+        }
+        hidden.forEach(el => el.style.display = '');
+        alert(`已顯示 ${hidden.length} 個隱藏的行列。`);
+        elements.showHiddenBtn.classList.add('hidden');
+        elements.loadStatusMessage.classList.add('hidden');
+    }
+
+    function selectAllTables(isChecked) {
+        elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => {
+            if (cb.checked !== isChecked) {
+                cb.click(); 
+            }
+        });
     }
 
     function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
