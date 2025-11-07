@@ -168,16 +168,41 @@ const ExcelViewer = (() => {
 
         const allHeaders = new Set();
         const tableData = tables.map(table => {
-            const headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
+            // 1. 嘗試從 <thead> 讀取標頭 (包含上次的 "空白標頭" 修復)
+            let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
                 .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
-            headers.forEach(h => allHeaders.add(h));
-            return Array.from(table.querySelectorAll('tbody tr')).map(row => {
-                const rowData = {};
-                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
-                    rowData[headers[i]] = td.textContent;
-                });
-                return rowData;
-            });
+            
+            const dataRows = Array.from(table.querySelectorAll('tbody tr'));
+
+            // 2. 【關鍵修復】如果 <thead> 沒找到標頭，且 <tbody> 有資料
+            if (headers.length === 0 && dataRows.length > 0) {
+                // 檢查資料列，找出最大欄位數
+                let maxCols = 0;
+                dataRows.slice(0, 10).forEach(row => { // 抽樣檢查前10列來決定最大欄寬
+                    const colCount = row.querySelectorAll('td:not(.checkbox-cell)').length;
+                    if (colCount > maxCols) maxCols = colCount;
+                });
+
+                // 產生預設標頭
+                headers = []; // 清空 (雖然它本來就是空的)
+                for (let i = 0; i < maxCols; i++) {
+                    headers.push(`(欄位 ${i + 1})`);
+                }
+            }
+
+            // 3. 將標頭 (無論是讀取到的還是產生的) 加入
+            headers.forEach(h => allHeaders.add(h));
+
+            // 4. 映射資料
+            return dataRows.map(row => {
+                const rowData = {};
+                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
+                    if (headers[i]) { // 確保標頭存在才賦值
+                        rowData[headers[i]] = td.textContent;
+                    }
+                });
+                return rowData;
+            });
         }).flat();
 
         state.mergedHeaders = Array.from(allHeaders);
@@ -420,4 +445,5 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
