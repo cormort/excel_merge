@@ -168,7 +168,8 @@ const ExcelViewer = (() => {
 
         const allHeaders = new Set();
         const tableData = tables.map(table => {
-            const headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)')).map(th => th.textContent.trim());
+            const headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
+                .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
             headers.forEach(h => allHeaders.add(h));
             return Array.from(table.querySelectorAll('tbody tr')).map(row => {
                 const rowData = {};
@@ -419,3 +420,4 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
