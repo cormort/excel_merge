@@ -1,84 +1,26 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel 檢視器 - 多檔案整合工具</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-    <div class="page-container">
-        
-        <header class="page-header">
-            <h1>Excel檔案彙整器</h1>
-        </header>
-        
-        <main class="content-area">
-            <div id="import-options-container">
-                <fieldset>
-                    <legend>⚙️ 步驟一：選擇匯入方式</legend>
-                    <label class="import-option"><input type="radio" name="import-mode" value="all"> 匯入所有工作表</label>
-                    <label class="import-option"><input type="radio" name="import-mode" value="first" checked> 僅匯入第一張工作表</label>
-                    <label class="import-option"><input type="radio" name="import-mode" value="position"> 匯入指定位置</label>
-                    <div id="specific-sheet-position-group" class="input-group hidden"><input type="text" id="specific-sheet-position-input" placeholder="例如: 1, 3, 5-7"></div>
-                    <label class="import-option"><input type="radio" name="import-mode" value="specific"> 匯入指定名稱</label>
-                    <div id="specific-sheet-name-group" class="input-group hidden"><input type="text" id="specific-sheet-name-input" placeholder="請輸入名稱關鍵字"></div>
-                    <label class="import-option"><input type="radio" name="import-mode" value="manual"> 逐一檔案手動決定</label>
-                </fieldset>
-            </div>
-
-            <div id="drop-area">
-                <input type="file" id="file-input" accept=".xls,.xlsx" multiple>
-                <div id="drop-area-initial"><h3>📁 步驟二：拖放檔案到此處</h3><p>或點擊下方按鈕選擇檔案</p><button class="btn-upload">選擇 Excel 檔案</button></div>
-                <div id="drop-area-loaded" class="hidden"><div class="file-info"><div class="file-info-text"><h3>📊 已載入檔案 <span class="file-count" id="file-count">0</span></h3><p id="file-names">-</p></div><button class="btn-clear" id="clear-files-btn">🗑️ 清除所有檔案</button></div></div>
-            </div>
-
-            <div class="controls hidden" id="control-panel">
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label>👁️ 檢視選項</label>
-                        <div class="button-group">
-                            <button class="btn btn-secondary active" id="list-view-btn">列表檢視</button>
-                            <button class="btn btn-secondary" id="grid-view-btn">網格檢視</button>
-                        </div>
-                        <div id="grid-scale-control" class="hidden">
-                            <label for="grid-scale-slider">調整欄數:</label>
-                            <input type="range" id="grid-scale-slider" min="1" max="5" value="3">
-                        </div>
-                    </div>
-                    <div class="control-group" id="table-level-controls">
-                        <label>📋 表格層級操作</label>
-                        <div class="button-group">
-                            <button class="btn btn-primary" id="select-all-tables-btn">勾選所有表格</button>
-                            <button class="btn btn-secondary" id="unselect-all-tables-btn">取消勾選</button>
-                            <button class="btn btn-danger" id="delete-selected-tables-btn">刪除選定表格</button>
-                        </div>
-                        <div id="selected-tables-info" class="info-feedback-box hidden">
-                            <h5>目前選取的表格：</h5>
-                            <p id="selected-tables-list"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label for="search-input">🔍 即時搜尋篩選</label>
-                        <input type="text" id="search-input" placeholder="輸入關鍵字以篩選資料列...">
-                    </div>
-                    <div class="control-group" id="select-by-keyword-group">
-                        <label>✅ 依關鍵字勾選</label>
-                        <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔">
-                        <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex"> 使用正規表示式</label>
-                    </div>
-                </div>
-                
+<!-- ... existing code ... -->
                 <div class="control-group">
                     <label>▶️ 資料列操作</label>
+                    
+                    <!-- ▼▼▼ NEW COLUMN SELECT ▼▼▼ -->
+                    <div classs="input-group" style="margin-bottom: 10px;">
+                        <label for="column-select-ops" style="font-weight: normal; font-size: 0.9rem;">指定欄位 (僅限合併檢視模式):</label>
+                        <select id="column-select-ops" style="width: 100%; padding: 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.95rem;">
+                            <option value="">-- 請先載入並合併表格 --</option>
+                        </select>
+                    </div>
+                    <!-- ▲▲▲ NEW COLUMN SELECT ▲▲▲ -->
+
                     <div class="button-group">
                         <button class="btn btn-primary" id="select-by-keyword-btn">依關鍵字勾選</button>
                         <button class="btn btn-primary" id="select-empty-btn">勾選空白列</button>
+                        
+                        <!-- ▼▼▼ NEW BUTTONS ▼▼▼ -->
+                        <button class="btn btn-primary" id="select-by-col-zero-btn">勾選指定欄位為零</button>
+                        <button class="btn btn-primary" id="select-by-col-empty-btn">勾選指定欄位為空</button>
+                        <button class="btn btn-primary" id="select-by-col-exists-btn">勾選指定欄位有值</button>
+                        <!-- ▲▲▲ NEW BUTTONS ▲▲▲ -->
+                        
                         <button class="btn btn-primary" id="select-all-btn">勾選全部</button>
                         <button class="btn btn-warning" id="invert-selection-btn">反向選取</button>
                         <button class="btn btn-danger" id="delete-selected-btn">刪除勾選列</button>
@@ -89,67 +31,20 @@
                     <label>🔄 全局與匯出</label>
                     <div class="button-group">
                         <button class="btn btn-info hidden" id="merge-view-btn">合併檢視</button>
+                        <!-- ▼▼▼ NEW BUTTON ▼▼▼ -->
+                        <button class="btn btn-info" id="view-checked-combined-btn">勾選資料列合併檢視</button>
+                        <!-- ▲▲▲ NEW BUTTON ▲▲▲ -->
                         <button class="btn btn-info" id="show-hidden-btn">顯示隱藏行列</button>
+                        <!-- ▼▼▼ REMOVED BUTTONS ▼▼▼ -->
+                        <!-- 
                         <button class="btn btn-success" id="export-html-btn">匯出 HTML (全部)</button>
                         <button class="btn btn-success" id="export-selected-btn">匯出 HTML (選取)</button>
                         <button class="btn btn-success" id="export-xlsx-btn">匯出 XLSX (全部)</button>
                         <button class="btn btn-success" id="export-selected-xlsx-btn">匯出 XLSX (選取)</button>
+                         -->
                         <button class="btn btn-success" id="export-merged-xlsx-btn">合併所有表格</button>
                         <button class="btn btn-secondary" id="reset-view-btn">還原始初狀態</button>
                     </div>
                 </div>
             </div>
-            <div class="status-message hidden" id="load-status-message"></div>
-            
-            <section id="excel-display-area" class="list-view"></section>
-        </main>
-    </div>
-    
-    <!-- Merge View Modal -->
-    <div id="merge-view-modal" class="merge-view-overlay hidden">
-        <div class="merge-view-container">
-            <header id="merge-view-header">
-                <h3>合併檢視與編輯</h3>
-                <button id="close-merge-view-btn" class="close-btn">&times;</button>
-            </header>
-            <div id="merge-view-controls" class="button-group">
-                <button class="btn btn-primary" id="column-operations-btn">欄位操作</button>
-                <button class="btn btn-info" id="edit-data-btn">編輯資料</button>
-                <button class="btn btn-success hidden" id="save-edits-btn">儲存編輯</button>
-                <button class="btn btn-secondary hidden" id="cancel-edits-btn">取消編輯</button>
-                <button class="btn btn-primary" id="add-new-row-btn">新增資料列</button>
-                <button class="btn btn-primary" id="copy-selected-rows-btn">複製選取列</button>
-                <button class="btn btn-warning" id="toggle-total-row-btn">新增/移除合計列</button>
-                <button class="btn btn-danger" id="delete-merged-rows-btn">刪除勾選列</button>
-            </div>
-            <div id="merge-view-content">
-                <!-- Merged table will be rendered here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Column Operations Modal -->
-    <div id="column-modal" class="modal-overlay hidden">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3>欄位顯示/隱藏</h3>
-                <button id="close-column-modal-btn" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="column-checklist"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="modal-check-all">全選</button>
-                <button class="btn btn-secondary" id="modal-uncheck-all">全不選</button>
-                <button class="btn btn-primary" id="apply-column-changes-btn">套用</button>
-            </div>
-        </div>
-    </div>
-
-    <button id="back-to-top-btn" title="回到工具列">↑</button>
-
-    <script src="script.js"></script>
-</body>
-</html>
-
-
+<!-- ... existing code ... -->
