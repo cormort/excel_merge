@@ -87,25 +87,50 @@
                 </div>
 
                 <div class="control-group">
-                         <label>🔄 全局與匯出</label>
-                         <div class="button-group">
-                            <button class="btn btn-info" id="show-hidden-btn">顯示隱藏行列</button>
-                            <button class="btn btn-success" id="export-html-btn">匯出 HTML (全部)</button>
-                            <button class="btn btn-success" id="export-selected-btn">匯出 HTML (選取)</button>
-                            <button class="btn btn-success" id="export-xlsx-btn">匯出 XLSX (全部)</button>
-                            <button class="btn btn-success" id="export-selected-xlsx-btn">匯出 XLSX (選取)</button>
-                            <button class="btn btn-success" id="export-merged-xlsx-btn">合併所有表格</button>
-                            <button class="btn btn-secondary" id="reset-view-btn">還原始初狀態</button>
-                        </div>
+                    <label>🔄 全局與匯出</label>
+                    <div class="button-group">
+                        <!-- Buttons for Merge View -->
+                        <button class="btn btn-info hidden" id="merge-view-btn">合併檢視</button>
+                        <button class="btn btn-secondary hidden" id="back-to-multi-view-btn">返回多表檢視</button>
+                        <button class="btn btn-primary hidden" id="column-operations-btn">欄位操作</button>
+                        <!-- End Merge View Buttons -->
+                        <button class="btn btn-info" id="show-hidden-btn">顯示隱藏行列</button>
+                        <button class="btn btn-success" id="export-html-btn">匯出 HTML (全部)</button>
+                        <button class="btn btn-success" id="export-selected-btn">匯出 HTML (選取)</button>
+                        <button class="btn btn-success" id="export-xlsx-btn">匯出 XLSX (全部)</button>
+                        <button class="btn btn-success" id="export-selected-xlsx-btn">匯出 XLSX (選取)</button>
+                        <button class="btn btn-success" id="export-merged-xlsx-btn">合併所有表格</button>
+                        <button class="btn btn-secondary" id="reset-view-btn">還原始初狀態</button>
+                    </div>
                 </div>
             </div>
             <div class="status-message hidden" id="load-status-message"></div>
             
             <section id="excel-display-area" class="list-view"></section>
 
+            <!-- Container for the merged table -->
+            <section id="merged-display-area" class="hidden"></section>
         </main>
     </div>
     
+    <!-- Modal for column operations -->
+    <div id="column-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>欄位顯示/隱藏</h3>
+                <button id="close-column-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="column-checklist"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-check-all">全選</button>
+                <button class="btn btn-secondary" id="modal-uncheck-all">全不選</button>
+                <button class="btn btn-primary" id="apply-column-changes-btn">套用</button>
+            </div>
+        </div>
+    </div>
+
     <button id="back-to-top-btn" title="回到工具列">↑</button>
 
     <script src="script.js"></script>
