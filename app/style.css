@@ -222,16 +222,16 @@ table tbody tr:hover { background: #f8f9fa; }
 #back-to-top-btn.visible { opacity: 1; visibility: visible; }
 #back-to-top-btn:hover { transform: translateY(-2px); background: #5a6fd8; }
 
-body::-webkit-scrollbar, .table-content::-webkit-scrollbar, #merged-display-area::-webkit-scrollbar {
+body::-webkit-scrollbar, .table-content::-webkit-scrollbar {
     width: 8px; height: 8px;
 }
-body::-webkit-scrollbar-track, .table-content::-webkit-scrollbar-track, #merged-display-area::-webkit-scrollbar-track {
+body::-webkit-scrollbar-track, .table-content::-webkit-scrollbar-track {
     background: #f1f1f1;
 }
-body::-webkit-scrollbar-thumb, .table-content::-webkit-scrollbar-thumb, #merged-display-area::-webkit-scrollbar-thumb {
+body::-webkit-scrollbar-thumb, .table-content::-webkit-scrollbar-thumb {
     background-color: #888; border-radius: 6px; border: 2px solid #f1f1f1;
 }
-body::-webkit-scrollbar-thumb:hover, .table-content::-webkit-scrollbar-thumb:hover, #merged-display-area::-webkit-scrollbar-thumb:hover {
+body::-webkit-scrollbar-thumb:hover, .table-content::-webkit-scrollbar-thumb:hover {
     background-color: #555;
 }
 
@@ -257,37 +257,66 @@ body.no-scroll .controls { display: none !important; }
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* --- Styles for Merge View and Column Operations --- */
-#merged-display-area {
-    overflow-x: auto;
+/* --- Merge View Modal Styles --- */
+.merge-view-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    z-index: 10000;
+    display: flex;
+    padding: 20px;
 }
-#merged-display-area table th:not(.checkbox-cell) {
+.merge-view-container {
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#merge-view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    flex-shrink: 0;
+}
+#merge-view-header h3 { margin: 0; font-size: 1.2rem; }
+#merge-view-controls {
+    padding: 10px 20px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+}
+#merge-view-content {
+    flex-grow: 1;
+    overflow: auto;
+    position: relative; /* For sticky header */
+}
+#merge-view-content table th {
+    top: 0; /* Make header sticky inside the scrollable container */
+}
+#merge-view-content table th:not(.checkbox-cell) {
     cursor: pointer;
     user-select: none;
     position: relative;
 }
-#merged-display-area table th:not(.checkbox-cell):hover {
-    background: #5a6fd8;
+#merge-view-content table th:not(.checkbox-cell):hover { background: #5a6fd8; }
+#merge-view-content table th.sort-asc::after,
+#merge-view-content table th.sort-desc::after {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
 }
-#merged-display-area table th.sort-asc::after,
-#merged-display-area table th.sort-desc::after {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-#merged-display-area table th.sort-asc::after {
-    content: '▲';
-}
-#merged-display-area table th.sort-desc::after {
-    content: '▼';
-}
-.column-hidden {
-    display: none;
-}
+#merge-view-content table th.sort-asc::after { content: '▲'; }
+#merge-view-content table th.sort-desc::after { content: '▼'; }
+.column-hidden { display: none; }
 
 /* --- Styles for Edit Mode --- */
-#merged-display-area td[contenteditable="true"] {
+#merge-view-content td[contenteditable="true"] {
     background-color: #fffde7;
     outline: 1px dashed #fbc02d;
 }
@@ -299,79 +328,44 @@ body.no-scroll .controls { display: none !important; }
     0% { background-color: #a5d6a7; }
     100% { background-color: #e8f5e9; }
 }
-#merged-display-area.is-editing .row-checkbox {
+#merge-view-content.is-editing .row-checkbox {
     cursor: not-allowed;
 }
 
-/* Modal Styles */
+/* Modal Styles (for column operations) */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0; width: 100%; height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-    backdrop-filter: blur(2px);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 10001; /* Higher than merge view */
 }
 .modal-dialog {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
+    background: white; padding: 20px; border-radius: 8px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
+    width: 90%; max-width: 500px; max-height: 80vh;
+    display: flex; flex-direction: column;
 }
 .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #dee2e6;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #dee2e6; padding-bottom: 10px; margin-bottom: 15px;
 }
-.modal-header h3 {
-    margin: 0;
-    color: #495057;
-}
+.modal-header h3 { margin: 0; color: #495057; }
 .close-btn {
-    border: none;
-    background: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #6c757d;
+    border: none; background: none; font-size: 1.5rem;
+    cursor: pointer; color: #6c757d;
 }
-.modal-body {
-    overflow-y: auto;
-    flex-grow: 1;
-}
+.modal-body { overflow-y: auto; flex-grow: 1; }
 .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    border-top: 1px solid #dee2e6;
-    padding-top: 15px;
-    margin-top: 15px;
+    display: flex; justify-content: flex-end; gap: 8px;
+    border-top: 1px solid #dee2e6; padding-top: 15px; margin-top: 15px;
 }
 #column-checklist {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 10px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;
 }
 #column-checklist label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-size: 0.9rem;
+    display: flex; align-items: center; cursor: pointer; font-size: 0.9rem;
 }
 #column-checklist input {
-    margin-right: 8px;
-    width: 16px;
-    height: 16px;
+    margin-right: 8px; width: 16px; height: 16px;
 }
