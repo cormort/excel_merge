@@ -46,7 +46,7 @@ body.no-scroll {
     border: 3px dashed #667eea;
     border-radius: 12px;
     padding: 60px 40px;
-    min-height: 320px;
+    min-height: 300px;
     font-size: 1.2rem;
     text-align: center;
     background: #f8f9fa;
@@ -395,3 +395,4 @@ body.no-scroll .controls { display: none !important; }
 #column-checklist input {
     margin-right: 8px; width: 16px; height: 16px;
 }
+
