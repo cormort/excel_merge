@@ -8,8 +8,9 @@ const ExcelViewer = (() => {
         loadedTables: 0, 
         zoomedCard: null,
         isMergedView: false,
-        isEditing: false, // For merge view edit mode
-        mergedData: [], // To store data for the merged table
+        isEditing: false,
+        showTotalRow: false, // New state for total row
+        mergedData: [],
         mergedHeaders: []
     };
     const elements = {};
@@ -59,7 +60,8 @@ const ExcelViewer = (() => {
             cancelEditsBtn: 'cancel-edits-btn',
             addNewRowBtn: 'add-new-row-btn',
             copySelectedRowsBtn: 'copy-selected-rows-btn',
-            deleteMergedRowsBtn: 'delete-merged-rows-btn'
+            deleteMergedRowsBtn: 'delete-merged-rows-btn',
+            toggleTotalRowBtn: 'toggle-total-row-btn' // New button
         };
         Object.keys(mapping).forEach(key => {
             elements[key] = document.getElementById(mapping[key]);
@@ -110,14 +112,23 @@ const ExcelViewer = (() => {
         elements.addNewRowBtn.addEventListener('click', addNewRow);
         elements.copySelectedRowsBtn.addEventListener('click', copySelectedRows);
         elements.deleteMergedRowsBtn.addEventListener('click', deleteSelectedRows);
+        elements.toggleTotalRowBtn.addEventListener('click', () => {
+            state.showTotalRow = !state.showTotalRow;
+            renderMergedTable();
+        });
         
         // --- Input and Dynamic Content Handling ---
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
         elements.displayArea.addEventListener('click', handleCardClick);
         elements.mergeViewContent.addEventListener('click', e => {
-            if (e.target.matches('th:not(.checkbox-cell)')) {
-                handleMergedHeaderClick(e.target);
+            const th = e.target.closest('th:not(.checkbox-cell)');
+            const delBtn = e.target.closest('.delete-col-btn');
+            if (delBtn && th) {
+                e.stopPropagation();
+                deleteColumn(delBtn.dataset.header);
+            } else if (th) {
+                handleMergedHeaderClick(th);
             }
         });
         elements.importOptionsContainer.addEventListener('change', e => {
@@ -168,41 +179,15 @@ const ExcelViewer = (() => {
 
         const allHeaders = new Set();
         const tableData = tables.map(table => {
-            // 1. 嘗試從 <thead> 讀取標頭 (包含上次的 "空白標頭" 修復)
-            let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
-                .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
-            
-            const dataRows = Array.from(table.querySelectorAll('tbody tr'));
-
-            // 2. 【關鍵修復】如果 <thead> 沒找到標頭，且 <tbody> 有資料
-            if (headers.length === 0 && dataRows.length > 0) {
-                // 檢查資料列，找出最大欄位數
-                let maxCols = 0;
-                dataRows.slice(0, 10).forEach(row => { // 抽樣檢查前10列來決定最大欄寬
-                    const colCount = row.querySelectorAll('td:not(.checkbox-cell)').length;
-                    if (colCount > maxCols) maxCols = colCount;
-                });
-
-                // 產生預設標頭
-                headers = []; // 清空 (雖然它本來就是空的)
-                for (let i = 0; i < maxCols; i++) {
-                    headers.push(`(欄位 ${i + 1})`);
-                }
-            }
-
-            // 3. 將標頭 (無論是讀取到的還是產生的) 加入
-            headers.forEach(h => allHeaders.add(h));
-
-            // 4. 映射資料
-            return dataRows.map(row => {
-                const rowData = {};
-                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
-                    if (headers[i]) { // 確保標頭存在才賦值
-                        rowData[headers[i]] = td.textContent;
-                    }
-                });
-                return rowData;
-            });
+            const headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)')).map(th => th.textContent.trim());
+            headers.forEach(h => allHeaders.add(h));
+            return Array.from(table.querySelectorAll('tbody tr')).map(row => {
+                const rowData = {};
+                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
+                    rowData[headers[i]] = td.textContent;
+                });
+                return rowData;
+            });
         }).flat();
 
         state.mergedHeaders = Array.from(allHeaders);
@@ -224,27 +209,67 @@ const ExcelViewer = (() => {
         document.body.classList.remove('no-scroll');
         state.isMergedView = false;
         state.isEditing = false;
+        state.showTotalRow = false; // Reset total row state
         state.mergedData = [];
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
-        toggleEditMode(false); // Reset button states
+        toggleEditMode(false);
     }
 
     function renderMergedTable() {
-        let html = '<table><thead><tr>';
-        state.mergedHeaders.forEach(header => html += `<th>${header}</th>`);
-        html += '</tr></thead><tbody>';
-
-        state.mergedData.forEach((rowData, index) => {
-            html += `<tr data-row-index="${index}" class="${rowData._isNew ? 'new-row-highlight' : ''}">`;
-            state.mergedHeaders.forEach(header => {
-                html += `<td contenteditable="${state.isEditing}" data-col-header="${header}">${rowData[header] || ''}</td>`;
-            });
-            html += '</tr>';
-        });
-        html += '</tbody></table>';
+        const table = document.createElement('table');
+        const thead = table.createTHead();
+        const headerRow = thead.insertRow();
         
-        elements.mergeViewContent.innerHTML = html;
+        state.mergedHeaders.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'delete-col-btn';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = `刪除 ${header}`;
+            deleteBtn.dataset.header = header;
+            th.appendChild(deleteBtn);
+            headerRow.appendChild(th);
+        });
+
+        const tbody = table.createTBody();
+        state.mergedData.forEach((rowData, index) => {
+            const tr = tbody.insertRow();
+            tr.dataset.rowIndex = index;
+            if (rowData._isNew) tr.classList.add('new-row-highlight');
+            
+            state.mergedHeaders.forEach(header => {
+                const td = tr.insertCell();
+                td.contentEditable = state.isEditing;
+                td.dataset.colHeader = header;
+                const value = rowData[header] || '';
+                td.textContent = value;
+                if (!isNaN(parseFloat(value.replace(/,/g, '')))) {
+                    td.classList.add('numeric');
+                    td.textContent = formatNumber(value);
+                }
+            });
+        });
+
+        if (state.showTotalRow) {
+            const tfoot = table.createTFoot();
+            const totalRow = tfoot.insertRow();
+            totalRow.className = 'total-row';
+            const totals = calculateTotals();
+            state.mergedHeaders.forEach((header, index) => {
+                const td = totalRow.insertCell();
+                if (index === 0) {
+                    td.textContent = '合計';
+                } else {
+                    td.textContent = totals[header] ? formatNumber(totals[header]) : '';
+                    if (totals[header]) td.classList.add('numeric');
+                }
+            });
+        }
+        
+        elements.mergeViewContent.innerHTML = '';
+        elements.mergeViewContent.appendChild(table);
         elements.mergeViewContent.classList.toggle('is-editing', state.isEditing);
         
         injectCheckboxes(elements.mergeViewContent);
@@ -268,7 +293,7 @@ const ExcelViewer = (() => {
         elements.columnChecklist.querySelectorAll('input').forEach(input => { visibility[input.value] = input.checked; });
         const headers = Array.from(mergedTable.querySelectorAll('thead th:not(.checkbox-cell)'));
         headers.forEach((th, index) => {
-            const isVisible = visibility[th.textContent.trim()];
+            const isVisible = visibility[th.textContent.replace('×','').trim()];
             const colIndex = index + 2; // +1 for checkbox cell, +1 for nth-child selector
             mergedTable.querySelectorAll(`tr > *:nth-child(${colIndex})`).forEach(cell => { cell.classList.toggle('column-hidden', !isVisible); });
         });
@@ -276,8 +301,7 @@ const ExcelViewer = (() => {
     function handleMergedHeaderClick(th) {
         if (state.isEditing) return;
         const table = th.closest('table');
-        const colIndex = Array.from(th.parentNode.children).indexOf(th);
-        const headerText = th.textContent.trim();
+        const headerText = th.textContent.replace('×','').trim();
         const isAsc = th.classList.contains('sort-asc');
         table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
         th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
@@ -285,11 +309,34 @@ const ExcelViewer = (() => {
         state.mergedData.sort((a, b) => {
             const valA = a[headerText] || '';
             const valB = b[headerText] || '';
-            const numA = parseFloat(valA), numB = parseFloat(valB);
+            const numA = parseFloat(String(valA).replace(/,/g, ''));
+            const numB = parseFloat(String(valB).replace(/,/g, ''));
             const comparison = (!isNaN(numA) && !isNaN(numB)) ? numA - numB : valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
             return isAsc ? -comparison : comparison;
         });
         renderMergedTable();
+    }
+    function deleteColumn(headerToDelete) {
+        if (confirm(`確定要刪除「${headerToDelete}」這個欄位嗎？此操作無法復原。`)) {
+            state.mergedHeaders = state.mergedHeaders.filter(h => h !== headerToDelete);
+            state.mergedData.forEach(row => {
+                delete row[headerToDelete];
+            });
+            renderMergedTable();
+        }
+    }
+    function calculateTotals() {
+        const totals = {};
+        state.mergedHeaders.forEach(header => {
+            const sum = state.mergedData.reduce((acc, row) => {
+                const value = parseFloat(String(row[header]).replace(/,/g, ''));
+                return acc + (isNaN(value) ? 0 : value);
+            }, 0);
+            if (sum !== 0 || state.mergedData.some(row => !isNaN(parseFloat(String(row[header]).replace(/,/g, ''))))) {
+                totals[header] = sum;
+            }
+        });
+        return totals;
     }
 
     // --- Edit Mode Functions ---
@@ -302,6 +349,7 @@ const ExcelViewer = (() => {
         elements.copySelectedRowsBtn.disabled = state.isEditing;
         elements.deleteMergedRowsBtn.disabled = state.isEditing;
         elements.columnOperationsBtn.disabled = state.isEditing;
+        elements.toggleTotalRowBtn.disabled = state.isEditing;
         renderMergedTable();
     }
     function saveEdits() {
@@ -386,6 +434,15 @@ const ExcelViewer = (() => {
     function filterTable() { const keywords = elements.searchInput.value.toLowerCase().trim().split(/\s+/).filter(Boolean); const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr').forEach(row => { const text = Array.from(row.cells).slice(1).map(c => c.textContent).join(' ').toLowerCase(); const isVisible = keywords.every(k => text.includes(k)); row.classList.toggle('row-hidden-search', !isVisible); }); if (!state.isMergedView) { elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => { const visibleRowCount = wrapper.querySelectorAll('tbody tr:not(.row-hidden-search)').length; wrapper.style.display = visibleRowCount > 0 ? '' : 'none'; }); } syncCheckboxesInScope(); }
 
     // --- Utility and Helper Functions ---
+    function formatNumber(value) {
+        const num = parseFloat(String(value).replace(/,/g, ''));
+        if (isNaN(num)) return value;
+        try {
+            return new Intl.NumberFormat('en-US').format(num);
+        } catch (e) {
+            return num;
+        }
+    }
     function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
     function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
@@ -393,8 +450,8 @@ const ExcelViewer = (() => {
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
     async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
-    function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.trim()); if (includeFilename) { headerData.unshift('Source File'); } data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; const rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) { rowData.unshift(filename); } data.push(rowData); }); return data; }
-    function exportHtml(mode) { const tables = state.isMergedView ? [elements.mergeViewContent.querySelector('table')] : Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0 || !tables[0]) { alert('沒有可匯出的表格。'); return; } let content = ''; if (mode === 'all') { content = tables.map(table => { const clone = table.cloneNode(true); clone.querySelectorAll('.checkbox-cell, .column-hidden').forEach(el => el.remove()); return `<h4>${table.closest('.table-wrapper')?.querySelector('h4')?.textContent || '合併檢視'}</h4>` + clone.outerHTML; }).join('<br><hr><br>'); } else { const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; if (scope.querySelectorAll('.row-checkbox:checked').length === 0) { alert('請先勾選要匯出的資料列。'); return; } content = tables.map(table => { const selectedRows = table.querySelectorAll('tbody .row-checkbox:checked'); if (selectedRows.length === 0) return ''; const headerClone = table.querySelector('thead').cloneNode(true); headerClone.querySelectorAll('.checkbox-cell, .column-hidden')?.forEach(el => el.remove()); const rowsHtml = Array.from(selectedRows).map(cb => { const rowClone = cb.closest('tr').cloneNode(true); rowClone.querySelectorAll('.checkbox-cell, .column-hidden')?.forEach(el => el.remove()); return rowClone.outerHTML; }).join(''); return `<h4>${table.closest('.table-wrapper')?.querySelector('h4')?.textContent || '合併檢視 (選取)'}</h4><table>${headerClone.outerHTML}<tbody>${rowsHtml}</tbody></table>`; }).join('<br><hr><br>'); } if (!content) { alert('沒有找到可匯出的內容。'); return; } const title = `匯出報表 (${mode === 'all' ? '全部' : '選取項目'})`; const html = `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:sans-serif;margin:20px}table{border-collapse:collapse;width:100%;border:1px solid #ccc;margin-bottom:20px}th,td{border:1px solid #ddd;padding:8px 12px}th{background-color:#f2f2f2}</style></head><body><h1>${title}</h1><p>產生時間: ${new Date().toLocaleString()}</p>${content}</body></html>`; downloadHtml(html, `report_${mode}_${new Date().toISOString().slice(0, 10)}.html`); }
+    function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) { headerData.unshift('Source File'); } data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; const rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) { rowData.unshift(filename); } data.push(rowData); }); return data; }
+    function exportHtml(mode) { const tables = state.isMergedView ? [elements.mergeViewContent.querySelector('table')] : Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0 || !tables[0]) { alert('沒有可匯出的表格。'); return; } let content = ''; if (mode === 'all') { content = tables.map(table => { const clone = table.cloneNode(true); clone.querySelectorAll('.checkbox-cell, .column-hidden, .delete-col-btn').forEach(el => el.remove()); return `<h4>${table.closest('.table-wrapper')?.querySelector('h4')?.textContent || '合併檢視'}</h4>` + clone.outerHTML; }).join('<br><hr><br>'); } else { const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; if (scope.querySelectorAll('.row-checkbox:checked').length === 0) { alert('請先勾選要匯出的資料列。'); return; } content = tables.map(table => { const selectedRows = table.querySelectorAll('tbody .row-checkbox:checked'); if (selectedRows.length === 0) return ''; const headerClone = table.querySelector('thead').cloneNode(true); headerClone.querySelectorAll('.checkbox-cell, .column-hidden, .delete-col-btn')?.forEach(el => el.remove()); const rowsHtml = Array.from(selectedRows).map(cb => { const rowClone = cb.closest('tr').cloneNode(true); rowClone.querySelectorAll('.checkbox-cell, .column-hidden')?.forEach(el => el.remove()); return rowClone.outerHTML; }).join(''); return `<h4>${table.closest('.table-wrapper')?.querySelector('h4')?.textContent || '合併檢視 (選取)'}</h4><table>${headerClone.outerHTML}<tbody>${rowsHtml}</tbody></table>`; }).join('<br><hr><br>'); } if (!content) { alert('沒有找到可匯出的內容。'); return; } const title = `匯出報表 (${mode === 'all' ? '全部' : '選取項目'})`; const html = `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:sans-serif;margin:20px}table{border-collapse:collapse;width:100%;border:1px solid #ccc;margin-bottom:20px}th,td{border:1px solid #ddd;padding:8px 12px}th{background-color:#f2f2f2}</style></head><body><h1>${title}</h1><p>產生時間: ${new Date().toLocaleString()}</p>${content}</body></html>`; downloadHtml(html, `report_${mode}_${new Date().toISOString().slice(0, 10)}.html`); }
     function downloadHtml(content, filename) { const blob = new Blob([content], { type: 'text/html;charset=utf-8;' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
     function exportXlsx(mode) { const tables = state.isMergedView ? [elements.mergeViewContent.querySelector('table')] : Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0 || !tables[0]) { alert('沒有可匯出的表格。'); return; } const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; if (mode === 'selected' && scope.querySelectorAll('.row-checkbox:checked').length === 0) { alert('請先勾選要匯出的資料列。'); return; } try { const workbook = XLSX.utils.book_new(); tables.forEach((table, i) => { const data = extractTableData(table, { onlySelected: mode === 'selected', includeFilename: !state.isMergedView }); if (data.length > 1) { const ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = calculateColumnWidths(data); const sheetName = state.isMergedView ? 'Merged Data' : (table.closest('.table-wrapper')?.querySelector('h4')?.textContent.replace(/[*?:/\\\[\]]/g, '').substring(0, 31) || `Sheet${i + 1}`); XLSX.utils.book_append_sheet(workbook, ws, sheetName); } }); if (workbook.SheetNames.length === 0) { alert('沒有資料可以匯出。'); return; } XLSX.writeFile(workbook, `report_${mode}_${new Date().toISOString().slice(0, 10)}.xlsx`); } catch (err) { console.error('匯出 XLSX 錯誤:', err); alert('匯出 XLSX 時發生錯誤：' + err.message); } }
     function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } try { const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); if (allData.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } const ws = XLSX.utils.aoa_to_sheet(allData); ws['!cols'] = calculateColumnWidths(allData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, ws, 'Merged Data'); XLSX.writeFile(workbook, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`); alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料。`); } catch (err) { console.error('合併匯出 XLSX 錯誤:', err); alert('合併匯出 XLSX 時發生錯誤：' + err.message); } }
@@ -445,5 +502,3 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
-
-
