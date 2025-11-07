@@ -109,7 +109,7 @@ const ExcelViewer = (() => {
         elements.cancelEditsBtn.addEventListener('click', () => toggleEditMode(false));
         elements.addNewRowBtn.addEventListener('click', addNewRow);
         elements.copySelectedRowsBtn.addEventListener('click', copySelectedRows);
-        elements.deleteMergedRowsBtn.addEventListener('click', deleteSelectedRows); // Re-using the same function
+        elements.deleteMergedRowsBtn.addEventListener('click', deleteSelectedRows);
         
         // --- Input and Dynamic Content Handling ---
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
@@ -206,13 +206,11 @@ const ExcelViewer = (() => {
 
     function renderMergedTable() {
         let html = '<table><thead><tr>';
-        html += '<th></th>'; // Checkbox header
         state.mergedHeaders.forEach(header => html += `<th>${header}</th>`);
         html += '</tr></thead><tbody>';
 
         state.mergedData.forEach((rowData, index) => {
             html += `<tr data-row-index="${index}" class="${rowData._isNew ? 'new-row-highlight' : ''}">`;
-            html += '<td class="checkbox-cell"><input type="checkbox" class="row-checkbox"></td>';
             state.mergedHeaders.forEach(header => {
                 html += `<td contenteditable="${state.isEditing}" data-col-header="${header}">${rowData[header] || ''}</td>`;
             });
@@ -222,16 +220,16 @@ const ExcelViewer = (() => {
         
         elements.mergeViewContent.innerHTML = html;
         elements.mergeViewContent.classList.toggle('is-editing', state.isEditing);
-        // Manually add the select-all checkbox logic for the merged table header
-        const selectAllCheckbox = document.createElement('input');
-        selectAllCheckbox.type = 'checkbox';
-        selectAllCheckbox.title = '全選/全不選';
-        selectAllCheckbox.addEventListener('change', (e) => {
-            const isChecked = e.target.checked;
-            elements.mergeViewContent.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = isChecked);
-        });
-        const firstTh = elements.mergeViewContent.querySelector('th');
-        if (firstTh) firstTh.appendChild(selectAllCheckbox);
+        
+        injectCheckboxes(elements.mergeViewContent);
+
+        const selectAllCheckbox = elements.mergeViewContent.querySelector('thead input[type="checkbox"]');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                elements.mergeViewContent.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = isChecked);
+            });
+        }
     }
     
     function populateColumnModal(headers) { elements.columnChecklist.innerHTML = headers.map(header => `<label><input type="checkbox" value="${header}" checked> ${header}</label>`).join(''); }
@@ -250,22 +248,22 @@ const ExcelViewer = (() => {
         });
     }
     function handleMergedHeaderClick(th) {
-        if (state.isEditing) return; // Disable sorting in edit mode
-        const table = th.closest('table'), tbody = table.querySelector('tbody');
+        if (state.isEditing) return;
+        const table = th.closest('table');
         const colIndex = Array.from(th.parentNode.children).indexOf(th);
+        const headerText = th.textContent.trim();
         const isAsc = th.classList.contains('sort-asc');
         table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
         th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
         
         state.mergedData.sort((a, b) => {
-            const header = state.mergedHeaders[colIndex - 1]; // -1 for checkbox column
-            const valA = a[header] || '';
-            const valB = b[header] || '';
+            const valA = a[headerText] || '';
+            const valB = b[headerText] || '';
             const numA = parseFloat(valA), numB = parseFloat(valB);
             const comparison = (!isNaN(numA) && !isNaN(numB)) ? numA - numB : valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
             return isAsc ? -comparison : comparison;
         });
-        renderMergedTable(); // Re-render with sorted data
+        renderMergedTable();
     }
 
     // --- Edit Mode Functions ---
