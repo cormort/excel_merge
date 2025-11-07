@@ -108,18 +108,15 @@ const ExcelViewer = (() => {
         // --- Global, Export, and Merge Operations ---
         elements.resetViewBtn.addEventListener('click', resetView);
         elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
-        
-        // --- Removed Export Button Bindings ---
-        // elements.exportHtmlBtn.addEventListener('click', () => exportHtml('all'));
-        // elements.exportSelectedBtn.addEventListener('click', () => exportHtml('selected'));
-        // elements.exportXlsxBtn.addEventListener('click', () => exportXlsx('all'));
-        // elements.exportSelectedXlsxBtn.addEventListener('click', () => exportXlsx('selected'));
-        
         elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
         
         // --- Merge View Modal Events ---
-        elements.mergeViewBtn.addEventListener('click', createMergedView);
-        elements.viewCheckedCombinedBtn.addEventListener('click', viewCheckedCombined); // New
+        
+        // ▼▼▼ MODIFIED: Renamed function and bound new function ▼▼▼
+        elements.mergeViewBtn.addEventListener('click', createMergedView_All); 
+        elements.viewCheckedCombinedBtn.addEventListener('click', createMergedView_Checked);
+        // ▲▲▲ MODIFIED ▲▲▲
+
         elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
         elements.columnOperationsBtn.addEventListener('click', () => toggleColumnModal(true));
         elements.closeColumnModalBtn.addEventListener('click', () => toggleColumnModal(false));
@@ -224,7 +221,9 @@ const ExcelViewer = (() => {
     function injectCheckboxes(scope) { scope.querySelectorAll('thead tr').forEach((headRow, index) => { if(headRow.querySelector('.checkbox-cell')) return; const th = document.createElement('th'); th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${scope.id}-${index}" title="全選/全不選">`; th.classList.add('checkbox-cell'); headRow.prepend(th); }); scope.querySelectorAll('tbody tr').forEach(row => { if(row.querySelector('.checkbox-cell')) return; const td = document.createElement('td'); td.innerHTML = '<input type="checkbox" class="row-checkbox">'; td.classList.add('checkbox-cell'); row.prepend(td); }); }
     
     // --- Merged View and Column Operations ---
-    function createMergedView() {
+
+    // ▼▼▼ RENAMED: from createMergedView to createMergedView_All ▼▼▼
+    function createMergedView_All() {
         const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
         if (tables.length === 0) { alert('沒有可合併的表格。'); return; }
 
@@ -271,12 +270,75 @@ const ExcelViewer = (() => {
         state.mergedData = tableData;
         
         renderMergedTable();
-        updateColumnSelects(state.mergedHeaders); // <-- MODIFIED
+        updateColumnSelects(state.mergedHeaders); 
         
         state.isMergedView = true;
         elements.mergeViewModal.classList.remove('hidden');
         document.body.classList.add('no-scroll');
     }
+    // ▲▲▲ RENAMED ▲▲▲
+
+
+    // ▼▼▼ NEW FUNCTION: Replaces the old window.open logic ▼▼▼
+    function createMergedView_Checked() {
+        // 1. Get all checked rows from the MAIN display area
+        const checkedRows = elements.displayArea.querySelectorAll('tbody .row-checkbox:checked');
+        if (checkedRows.length === 0) {
+            alert('請先在主畫面中勾選至少一個資料列。');
+            return;
+        }
+
+        // 2. Group rows by their parent table to get correct headers
+        const tables = {}; 
+        checkedRows.forEach(cb => {
+            const row = cb.closest('tr');
+            const table = row.closest('table');
+            const wrapper = table.closest('.table-wrapper');
+            const title = wrapper.querySelector('h4').textContent;
+
+            if (!tables[title]) {
+                // First time seeing this table, store its headers
+                tables[title] = {
+                    headers: Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
+                                  .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`),
+                    rows: []
+                };
+            }
+            tables[title].rows.push(row);
+        });
+
+        // 3. Build the mergedData and mergedHeaders
+        const allHeaders = new Set();
+        const tableData = [];
+
+        Object.values(tables).forEach(tableInfo => {
+            const { headers, rows } = tableInfo;
+            headers.forEach(h => allHeaders.add(h)); // Add all headers to the set
+
+            rows.forEach(row => {
+                const rowData = {};
+                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
+                    if (headers[i]) {
+                        rowData[headers[i]] = td.textContent;
+                    }
+                });
+                tableData.push(rowData);
+            });
+        });
+
+        // 4. Set state and render (Same as createMergedView_All)
+        state.mergedHeaders = Array.from(allHeaders);
+        state.mergedData = tableData;
+        
+        renderMergedTable();
+        updateColumnSelects(state.mergedHeaders); 
+        
+        state.isMergedView = true;
+        elements.mergeViewModal.classList.remove('hidden');
+        document.body.classList.add('no-scroll');
+    }
+    // ▲▲▲ NEW FUNCTION ▲▲▲
+
 
     function closeMergeView() {
         if (state.isEditing && !confirm("您有未儲存的編輯，確定要關閉並捨棄變更嗎？")) {
@@ -290,11 +352,7 @@ const ExcelViewer = (() => {
         state.mergedData = [];
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
-        
-        // --- ▼▼▼ RESTORED TO ORIGINAL ▼▼▼ ---
         elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>'; 
-        // --- ▲▲▲ RESTORED ▲▲▲ ---
-
         toggleEditMode(false);
     }
 
@@ -365,7 +423,6 @@ const ExcelViewer = (() => {
         }
     }
     
-    // --- ▼▼▼ RENAMED (was populateColumnModal) ▼▼▼ ---
     function updateColumnSelects(headers) { 
         // 1. Populate modal checklist
         elements.columnChecklist.innerHTML = headers.map(header => `<label><input type="checkbox" value="${header}" checked> ${header}</label>`).join('');
@@ -379,7 +436,6 @@ const ExcelViewer = (() => {
             elements.columnSelectOps.appendChild(option);
         });
     }
-    // --- ▲▲▲ RENAMED ▲▲▲ ---
 
     function toggleColumnModal(forceShow) { elements.columnModal.classList.toggle('hidden', forceShow === false || !elements.columnModal.classList.contains('hidden')); }
     function setAllColumnCheckboxes(isChecked) { elements.columnChecklist.querySelectorAll('input').forEach(input => input.checked = isChecked); }
@@ -435,7 +491,7 @@ const ExcelViewer = (() => {
                 delete row[headerToDelete];
             });
             renderMergedTable();
-            updateColumnSelects(state.mergedHeaders); // <-- ADDED: Update dropdowns after deletion
+            updateColumnSelects(state.mergedHeaders); 
         }
     }
     function calculateTotals() {
@@ -463,12 +519,10 @@ const ExcelViewer = (() => {
         elements.deleteMergedRowsBtn.disabled = state.isEditing;
         elements.columnOperationsBtn.disabled = state.isEditing;
         elements.toggleTotalRowBtn.disabled = state.isEditing;
-        // --- ▼▼▼ ADDED: Disable new buttons during edit ▼▼▼ ---
         elements.columnSelectOps.disabled = state.isEditing;
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
         elements.selectByColExistsBtn.disabled = state.isEditing;
-        // --- ▲▲▲ ADDED ▲▲▲ ---
         renderMergedTable();
     }
     function saveEdits() {
@@ -551,9 +605,7 @@ const ExcelViewer = (() => {
     function selectEmptyRows() { let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (Array.from(row.cells).slice(1).every(c => c.textContent.trim() === '')) { row.querySelector('.row-checkbox').checked = true; count++; } }); if (count === 0) alert('未找到空白列'); }
     function selectByKeyword() { const keywordInput = elements.selectKeywordInput.value.trim(); const isRegex = elements.selectKeywordRegex.checked; if (!keywordInput) { alert('請先輸入關鍵字'); return; } let matchLogic; try { if (isRegex) { const regex = new RegExp(keywordInput, 'i'); matchLogic = text => regex.test(text); } else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); } else { const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); } } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; } let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (matchLogic(Array.from(row.cells).slice(1).map(c => c.textContent).join(' '))) { row.querySelector('.row-checkbox').checked = true; count++; } }); alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); }
     
-    // --- ▼▼▼ RESTORED/MODIFIED FUNCTION ▼▼▼ ---
     function selectByColumn(mode) {
-        // --- RESTORED: isMergedView check ---
         if (!state.isMergedView) {
             alert('此功能僅適用於「合併檢視」模式。\n請先點擊「合併檢視」按鈕。');
             return;
@@ -576,7 +628,6 @@ const ExcelViewer = (() => {
             default: return;
         }
 
-        // --- MERGE VIEW ONLY LOGIC ---
         scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
             const cell = row.querySelector(`td[data-col-header="${colName}"]`);
             const cellValue = cell ? cell.textContent.trim() : '';
@@ -594,7 +645,6 @@ const ExcelViewer = (() => {
             alert('未找到符合條件的資料列。');
         }
     }
-    // --- ▲▲▲ RESTORED/MODIFIED FUNCTION ▲▲▲ ---
 
     function filterTable() { const keywords = elements.searchInput.value.toLowerCase().trim().split(/\s+/).filter(Boolean); const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr').forEach(row => { const text = Array.from(row.cells).slice(1).map(c => c.textContent).join(' ').toLowerCase(); const isVisible = keywords.every(k => text.includes(k)); row.classList.toggle('row-hidden-search', !isVisible); }); if (!state.isMergedView) { elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => { const visibleRowCount = wrapper.querySelectorAll('tbody tr:not(.row-hidden-search)').length; wrapper.style.display = visibleRowCount > 0 ? '' : 'none'; }); } syncCheckboxesInScope(); }
 
@@ -617,110 +667,13 @@ const ExcelViewer = (() => {
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) { headerData.unshift('Source File'); } data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; const rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) { rowData.unshift(filename); } data.push(rowData); }); return data; }
     
-    // (Removed exportHtml and exportXlsx functions)
-
     function downloadHtml(content, filename) { const blob = new Blob([content], { type: 'text/html;charset=utf-8;' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
     
     function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } try { const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); if (allData.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } const ws = XLSX.utils.aoa_to_sheet(allData); ws['!cols'] = calculateColumnWidths(allData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, ws, 'Merged Data'); XLSX.writeFile(workbook, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`); alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料。`); } catch (err) { console.error('合併匯出 XLSX 錯誤:', err); alert('合併匯出 XLSX 時發生錯誤：' + err.message); } }
     
-    // --- ▼▼▼ NEW FUNCTION (viewCheckedCombined) ▼▼▼ ---
-    function viewCheckedCombined() {
-        const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea;
-        const checkedRows = scope.querySelectorAll('tbody .row-checkbox:checked');
-
-        if (checkedRows.length === 0) {
-            alert('請先勾選至少一個資料列');
-            return;
-        }
-
-        const newWindow = window.open('', '_blank');
-        newWindow.document.write('<html><head><title>勾選資料列合併檢視</title>');
-        
-        // 嘗試複製 style.css
-        const styleSheet = document.querySelector('link[href="style.css"]');
-        if (styleSheet) {
-            newWindow.document.write(styleSheet.outerHTML);
-        }
-        
-        // 加入基本樣式
-        newWindow.document.write(`<style>
-            body { font-family: sans-serif; padding: 20px; background: #fff; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; position: sticky; top: 0; }
-            tbody tr:nth-child(even) { background-color: #f9f9f9; }
-            h2, h3 { border-bottom: 2px solid #667eea; padding-bottom: 5px; color: #333; }
-            .table-content { max-height: none; overflow: visible; }
-            .table-wrapper { box-shadow: none; border: none; }
-            .column-hidden { display: table-cell; } /* 在新視窗中強制顯示所有欄位 */
-            .delete-col-btn { display: none; } /* 隱藏刪除按鈕 */
-        </style>`);
-        
-        newWindow.document.write('</head><body><h2>勾選資料列合併檢視</h2>');
-
-        if (state.isMergedView) {
-            // 合併檢視模式：只建立一個表格
-            const table = scope.querySelector('table');
-            const newTable = newWindow.document.createElement('table');
-            const newTHead = newWindow.document.createElement('thead');
-            const newTBody = newWindow.document.createElement('tbody');
-
-            // 複製表頭
-            const headerRow = table.querySelector('thead tr').cloneNode(true);
-            headerRow.cells[0].innerHTML = '序號'; // 將 checkbox 改為 '序號'
-            newTHead.appendChild(headerRow);
-            
-            // 複製勾選的資料列
-            checkedRows.forEach((cb, index) => {
-                const row = cb.closest('tr').cloneNode(true);
-                row.cells[0].innerHTML = index + 1; // 將 checkbox 改為行號
-                newTBody.appendChild(row);
-            });
-
-            newTable.appendChild(newTHead);
-            newTable.appendChild(newTBody);
-            newWindow.document.body.appendChild(newTable);
-
-        } else {
-            // 主畫面模式：為每個卡片建立表格
-            const tables = {}; // 用來將資料列按表格分組
-            checkedRows.forEach(cb => {
-                const wrapper = cb.closest('.table-wrapper');
-                const title = wrapper.querySelector('h4').textContent;
-                if (!tables[title]) {
-                    tables[title] = {
-                        header: wrapper.querySelector('thead tr').cloneNode(true),
-                        rows: []
-                    };
-                }
-                tables[title].rows.push(cb.closest('tr').cloneNode(true));
-            });
-
-            Object.keys(tables).forEach(title => {
-                const tableData = tables[title];
-                newWindow.document.write(`<h3>${title}</h3>`);
-                const newTable = newWindow.document.createElement('table');
-                const newTHead = newWindow.document.createElement('thead');
-                const newTBody = newWindow.document.createElement('tbody');
-
-                tableData.header.cells[0].innerHTML = '序號';
-                newTHead.appendChild(tableData.header);
-
-                tableData.rows.forEach((row, index) => {
-                    row.cells[0].innerHTML = index + 1;
-                    newTBody.appendChild(row);
-                });
-
-                newTable.appendChild(newTHead);
-                newTable.appendChild(newTBody);
-                newWindow.document.body.appendChild(newTable);
-            });
-        }
-
-        newWindow.document.write('</body></html>');
-        newWindow.document.close();
-    }
-    // --- ▲▲▲ NEW FUNCTION (viewCheckedCombined) ▲▲▲ ---
+    // --- ▼▼▼ REMOVED old viewCheckedCombined (window.open) function ▼▼▼ ---
+    // (The new createMergedView_Checked function replaces it)
+    // --- ▲▲▲ REMOVED ▲▲▲ ---
 
     function calculateColumnWidths(data) { if (data.length === 0) return []; return data[0].map((_, col) => ({ wch: Math.min(50, Math.max(10, ...data.map(row => row[col] ? String(row[col]).length : 0)) + 2) })); }
     
@@ -742,11 +695,6 @@ const ExcelViewer = (() => {
         } else { 
             elements.showHiddenBtn.classList.add('hidden'); 
         } 
-        
-        // --- ▼▼▼ REMOVED POPULATE LOGIC FROM HERE ▼▼▼ ---
-        // (No longer needed to re-populate on reset)
-        // --- ▲▲▲ REMOVED ▲▲▲ ---
-        
         updateSelectionInfo(); 
         setViewMode('list'); 
     }
@@ -763,11 +711,7 @@ const ExcelViewer = (() => {
         elements.fileInput.value = ''; 
         ['specificSheetNameInput', 'specificSheetPositionInput'].forEach(id => elements[id].value = ''); 
         elements.gridScaleSlider.value = 3; 
-        
-        // --- ▼▼▼ RESTORED TO ORIGINAL ▼▼▼ ---
         elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>'; 
-        // --- ▲▲▲ RESTORED ▲▲▲ ---
-        
         updateGridScale(); 
         updateDropAreaDisplay(); 
         resetControls(true); 
@@ -792,11 +736,7 @@ const ExcelViewer = (() => {
             if(elements[id]) elements[id].classList.remove('hidden');
         });
 
-        // --- ▼▼▼ REMOVED (Buttons are no longer in main control panel) ▼▼▼ ---
-        // elements.selectByColZeroBtn.classList.remove('hidden');
-        // elements.selectByColEmptyBtn.classList.remove('hidden');
-        // elements.selectByColExistsBtn.classList.remove('hidden');
-        // --- ▲▲▲ REMOVED ▲▲▲ ---
+        // (Removed buttons from main control panel)
 
         elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1);
         const showHiddenStuff = hiddenCount > 0;
