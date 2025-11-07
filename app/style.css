@@ -315,6 +315,29 @@ body.no-scroll .controls { display: none !important; }
 #merge-view-content table th.sort-desc::after { content: '▼'; }
 .column-hidden { display: none; }
 
+/* --- New Styles for Column Delete and Total Row --- */
+.delete-col-btn {
+    position: absolute; top: 2px; right: 2px; font-size: 10px; 
+    padding: 0px 4px; cursor: pointer; background-color: rgba(255,255,255,0.2);
+    color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; line-height: 1.2;
+    display: none; /* Hidden by default */
+}
+#merge-view-content th:hover .delete-col-btn {
+    display: inline-block; /* Show on hover */
+}
+.delete-col-btn:hover { background-color: #ef9a9a; color: #b71c1c; }
+.total-row td {
+    font-weight: bold;
+    background-color: #e8f5e9;
+    color: #1b5e20;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+}
+#merge-view-content td.numeric {
+    text-align: right;
+}
+
 /* --- Styles for Edit Mode --- */
 #merge-view-content td[contenteditable="true"] {
     background-color: #fffde7;
@@ -353,7 +376,10 @@ body.no-scroll .controls { display: none !important; }
 .modal-header h3 { margin: 0; color: #495057; }
 .close-btn {
     border: none; background: none; font-size: 1.5rem;
-    cursor: pointer; color: #6c757d;
+    cursor: pointer; color: #fff; /* White for merge view header */
+}
+#column-modal .close-btn {
+    color: #6c757d; /* Gray for column modal */
 }
 .modal-body { overflow-y: auto; flex-grow: 1; }
 .modal-footer {
