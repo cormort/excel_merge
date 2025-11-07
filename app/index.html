@@ -76,20 +76,11 @@
                 
                 <div class="control-group">
                     <label>▶️ 資料列操作</label>
-
-                    <div classs="input-group" style="margin-bottom: 10px;">
-                        <label for="column-select-ops" style="font-weight: normal; font-size: 0.9rem;">指定欄位:</label>
-                        <select id="column-select-ops" style="width: 100%; padding: 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.95rem;">
-                            <option value="">-- 請先載入表格 --</option>
-                        </select>
-                    </div>
+                    
                     <div class="button-group">
                         <button class="btn btn-primary" id="select-by-keyword-btn">依關鍵字勾選</button>
                         <button class="btn btn-primary" id="select-empty-btn">勾選空白列</button>
                         
-                        <button class="btn btn-primary" id="select-by-col-zero-btn">勾選指定欄位為零</button>
-                        <button class="btn btn-primary" id="select-by-col-empty-btn">勾選指定欄位為空</button>
-                        <button class="btn btn-primary" id="select-by-col-exists-btn">勾選指定欄位有值</button>
                         <button class="btn btn-primary" id="select-all-btn">勾選全部</button>
                         <button class="btn btn-warning" id="invert-selection-btn">反向選取</button>
                         <button class="btn btn-danger" id="delete-selected-btn">刪除勾選列</button>
@@ -100,6 +91,7 @@
                     <label>🔄 全局與匯出</label>
                     <div class="button-group">
                         <button class="btn btn-info hidden" id="merge-view-btn">合併檢視</button>
+                        
                         <button class="btn btn-info" id="view-checked-combined-btn">勾選資料列合併檢視</button>
                         <button class="btn btn-info" id="show-hidden-btn">顯示隱藏行列</button>
                         
@@ -129,6 +121,16 @@
                 <button class="btn btn-primary" id="copy-selected-rows-btn">複製選取列</button>
                 <button class="btn btn-warning" id="toggle-total-row-btn">新增/移除合計列</button>
                 <button class="btn btn-danger" id="delete-merged-rows-btn">刪除勾選列</button>
+            </div>
+
+            <div id="merge-view-column-ops" class="button-group" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; gap: 10px; align-items: center;">
+                <label for="column-select-ops" style="font-weight: 600; font-size: 0.95rem; color: #495057;">▶️ 依指定欄位勾選:</label>
+                <select id="column-select-ops" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;">
+                    <option value="">-- 請選擇欄位 --</option>
+                </select>
+                <button class="btn btn-primary" id="select-by-col-zero-btn">勾選為零</button>
+                <button class="btn btn-primary" id="select-by-col-empty-btn">勾選為空</button>
+                <button class="btn btn-primary" id="select-by-col-exists-btn">勾選有值</button>
             </div>
             <div id="merge-view-content">
                 </div>
