@@ -1,38 +1,38 @@
 <h1>🛠️ 程式碼維護與註解</h1>
-<p>此頁籤包含此工具的完整原始碼，方便您未來進行檢視、修改或維護。</p>
+<p>此頁面說明本工具的程式碼結構，方便您未來進行檢視、修改或維護。</p>
 
 <h2>程式碼結構</h2>
-<p>這是一個單一 HTML 檔案應用，結構如下：</p>
+<p>本工具採用「外層框架 + 內嵌應用」的結構，將頁籤導覽與核心功能分離。</p>
+
+<h3>1. 外層頁籤系統 (根目錄)</h3>
+<p>
+    這部分負責管理三個主要頁籤的切換和內容載入。
+</p>
 <ul>
-    <li><code>&lt;head&gt;</code>：
-        <ul>
-            <li>引入外部 <code>xlsx.full.min.js</code> 函式庫，這是讀取 Excel 檔案的核心。</li>
-            <li><code>&lt;style&gt;</code> 標籤：包含所有的 CSS 樣式。</li>
-        </ul>
-    </li>
-    <li><code>&lt;body&gt;</code>：
-        <ul>
-            <li>HTML 結構：定義了上傳區域、控制面板、表格顯示區域等所有介面元素。</li>
-            <li><code>&lt;script&gt;</code> 標籤：
-                <ul>
-                    <li>使用 IIFE (Immediately Invoked Function Expression) 模式，將所有程式碼封裝在 <code>ExcelViewer</code> 物件中，避免污染全域變數。</li>
-                    <li><code>ExcelViewer.init()</code>：程式的進入點，負責綁定所有事件監聽器。</li>
-                    <li><strong>狀態管理</strong>：使用 <code>state</code> 物件來追蹤目前狀態（如是否處理中、載入的檔案列表等）。</li>
-                    <li><strong>DOM 快取</strong>：使用 <code>cacheElements()</code> 函數在啟動時快取所有需要操作的 DOM 元素，提升效能。</li>
-                    <li><strong>主要邏輯</strong>：
-                        <ul>
-                            <li><code>processFiles()</code>: 處理檔案上傳、驗證、讀取和解析的核心非同步函數。</li>
-                            <li><code>renderTables()</code>: 將解析後的 HTML 表格渲染到頁面上，並呼叫 <code>injectCheckboxes()</code> 來插入勾選框。</li>
-                            <li><code>filterTable()</code>: 處理即時搜尋邏輯。</li>
-                            <li><code>selectByKeyword()</code> / <code>selectEmptyRows()</code> 等：處理各種資料列勾選邏輯。</li>
-                            <li><code>exportHtml()</code> / <code>exportXlsx()</code> / <code>exportMergedXlsx()</code>: 處理不同類型的匯出邏輯。</li>
-                        </ul>
-                    </li>
-                </ul>
-            </li>
-        </ul>
-    </li>
+    <li><code>index.html</code>: 整個專案的主入口點。它包含了三個頁籤的 HTML「外殼」，以及載入 Excel 檢視器的 <code>&lt;iframe&gt;</code>。</li>
+    <li><code>style.css</code>: 負責 <code>index.html</code> 中頁籤導覽列 (tab-nav) 和容器 (tab-container) 的外觀樣式。</li>
+    <li><code>script.js</code>: 負責頁籤的點擊切換邏輯。它會動態抓取 <code>guide.html</code> 和 <code>maintenance.html</code> 的內容，並將其載入到對應的頁籤面板中。</li>
+    <li><code>guide.html</code> / <code>maintenance.html</code>: 靜態的 HTML 內容頁面，本身不含 script，僅作為內容被 <code>script.js</code> 讀取。</li>
 </ul>
 
-<h2>完整原始碼</h2>
-<p>完整的原始碼已被拆分到 <code>app/</code> 資料夾下的 <code>index.html</code>, <code>style.css</code>, 和 <code>script.js</code> 中，以便於維護。</p>
+<h3>2. 核心應用程式 (<code>app/</code> 資料夾)</h3>
+<p>
+    這是「🚀 Excel 檢視器」頁籤中，透過 <code>&lt;iframe&gt;</code> 載入的獨立應用程式。
+</p>
+<ul>
+    <li><code>app/index.html</code>: 核心應用的 HTML 結構。定義了上傳區域、控制面板、表格顯示區域，以及合併檢視的彈窗 (modal)。</li>
+    <li><code>app/style.css</code>: 核心應用的所有 CSS 樣式。負責美化表格、按鈕、彈窗等所有介面元素。</li>
+    <li><code>app/script.js</code>: <strong>(主要邏輯)</strong> 所有的功能程式碼都在這裡。使用 IIFE (Immediately Invoked Function Expression) 模式封裝在 <code>ExcelViewer</code> 物件中，包含了檔案讀取 (XLSX.js)、表格渲染、合併檢視、資料編輯、篩選、匯出等所有核心邏輯。</li>
+</ul>
+
+<h3>維護建議</h3>
+<ul>
+    <li>
+        <strong>修改 App 功能：</strong>
+        如果您要修改「Excel 檢視器」的功能 (例如新增按鈕、修改合併邏輯)，您幾乎*只需要*修改 <code>app/</code> 資料夾中的檔案 (<code>app/index.html</code>, <code>app/style.css</code>, <code>app/script.js</code>)。
+    </li>
+    <li>
+        <strong>修改說明文字：</strong>
+        如果您要修改「使用說明」或「程式碼維護」的文字，請分別編輯 <code>guide.html</code> 或 <code>maintenance.html</code> 檔案即可。
+    </li>
+</ul>
