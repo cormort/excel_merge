@@ -1,161 +1,35 @@
-<h1>Excel 檢視與合併工具 - 使用說明</h1>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 檢視器與說明文件</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-    <div class="section">
-        <h2>🚀 1. 開始使用：載入檔案</h2>
-        <p>此工具讓您能快速讀取並預覽 Excel (.xls, .xlsx) 檔案內容。</p>
-        <ul>
-            <li><strong>拖放檔案：</strong> 直接將一個或多個 Excel 檔案拖曳到上方的虛線框區域。</li>
-            <li><strong>點擊選取：</strong> 點擊虛線框區域，會開啟檔案選取視窗。</li>
-            <li><strong>匯入模式：</strong> 在上傳檔案前，您可以選擇要匯入工作表的模式：
-                <ul>
-                    <li><strong>匯入所有工作表：</strong> 會讀取每個檔案中的所有工作表。</li>
-                    <li><strong>僅第一個工作表：</strong> (預設) 只讀取每個檔案的第一個工作表。</li>
-                    <li><strong>依工作表名稱：</strong> 僅讀取名稱中包含您輸入關鍵字的工作表。</li>
-                    <li><strong>依工作表位置：</strong> 僅讀取您指定位置的工作表 (例如：<code>1</code>, <code>3</code>, <code>5-8</code>)。</li>
-                    <li><strong>手動選擇：</strong> 針對每個檔案，彈出視窗讓您手動勾選要匯入的工作表。</li>
-                </ul>
-            </li>
-            <li><strong>清除檔案：</strong> 點擊 <code>清除檔案</code> 按鈕可移除所有已載入的表格，重置介面。</li>
-        </ul>
+    <div class="tab-container">
+        <nav class="tab-nav">
+            <button class="tab-btn" data-tab="tab-guide-pane" data-source="guide.html">📖 使用說明</button>
+            <button class="tab-btn active" data-tab="tab-app-pane">🚀 Excel 檢視器</button>
+            <button class="tab-btn" data-tab="tab-code-pane" data-source="maintenance.html">🛠️ 程式碼維護</button>
+        </nav>
+
+        <main class="tab-content">
+            <!-- 說明文件內容將被動態載入到這裡 -->
+            <section id="tab-guide-pane" class="tab-pane doc-page"></section>
+
+            <!-- Excel 檢視器應用程式 -->
+            <section id="tab-app-pane" class="tab-pane active">
+                <iframe id="app-iframe" title="Excel 檢視器應用程式" src="./app/index.html"></iframe>
+            </section>
+
+            <!-- 程式碼維護內容將被動態載入到這裡 -->
+            <section id="tab-code-pane" class="tab-pane doc-page"></section>
+        </main>
     </div>
 
-    <div class="section">
-        <h2>🖥️ 2. 主介面功能</h2>
-        <p>檔案載入後，每個工作表會以一張「卡片」的形式顯示在下方。您可以進行以下操作：</p>
-        
-        <h3>檢視與篩選</h3>
-        <ul>
-            <li><strong>切換視圖：</strong>
-                <ul>
-                    <li><code>列表視圖 (List)</code>：預設模式，表格垂直排列，適合詳細閱讀。</li>
-                    <li><code>網格視圖 (Grid)</code>：表格以網格排列。您可以使用 <strong>調整欄數</strong> 滑桿調整每行顯示的表格數量。</li>
-                </ul>
-            </li>
-            <li><strong>全域搜尋：</strong> 在上方的 <code>即時搜尋篩選</code> 輸入框中輸入關鍵字，會即時篩選<strong>所有表格中</strong>包含這些關鍵字的資料列。</li>
-            <li><strong>重設檢視：</strong> 點擊 <code>還原始初狀態</code> 會清除所有篩選、還原所有被刪除的資料列 (僅限當次載入)，並重置搜尋框。</li>
-        </ul>
+    <script src="script.js"></script>
 
-        <h3>選取資料列</h3>
-        <p>您可以對表格中的資料列 (row) 進行勾選，以利後續操作。</p>
-        <ul>
-            <li><strong>全選/全不選：</strong> 點擊表格標頭 (Header) 左上角的核取方塊，可全選或全不選該表格的<strong>可見</strong>資料列。</li>
-            <li><code>勾選全部</code>：點擊上方控制面板的此按鈕，會勾選<strong>所有表格</strong>中的所有<strong>可見</strong>資料列。</li>
-            <li><code>反向選取</code>：反轉目前所有表格的勾選狀態。</li>
-            <li><code>依關鍵字勾選</code>：輸入關鍵字，勾選所有包含該關鍵字的資料列 (支援 <code>Regex</code>、<code>,</code> (或) 或 <code>空白</code> (且))。</li>
-            <li><code>勾選空白列</code>：勾選所有內容完全空白的資料列。</li>
-        </ul>
-
-        <h3>刪除資料</h3>
-        <ul>
-            <li><strong>刪除表格：</strong>
-                <ul>
-                    <li>(卡片內) <code>刪除此表</code>：永久刪除這張工作表卡片。</li>
-                    <li>(勾選表格) <code>刪除選定表格</code>：勾選卡片標題旁的核取方塊，再點擊此按鈕，可一次刪除多個表格。</li>
-                </ul>
-            </li>
-            <li><strong>刪除資料列：</strong>
-                <ul>
-                    <li>(卡片內) <code>刪除選取列</code>：刪除這張卡片中已勾選的資料列。</li>
-                    <li>(全域) <code>刪除勾選列</code>：刪除<strong>所有表格</strong>中已勾選的資料列。</li>
-                </ul>
-            </li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>📊 3. 合併檢視與編輯 (核心功能)</h2>
-        <p>
-            此為本工具的核心。您有兩種方式進入合併檢視：
-        </p>
-        <ul>
-            <li><code>合併檢視</code>：(載入2個以上表格時出現) 將<strong>所有目前可見</strong>的表格資料合併成一個可編輯的新表格。</li>
-            <li><code>勾選資料列合併檢視</code>：僅將您在主介面中**勾選**的資料列合併成一個可編輯的新表格。</li>
-        </ul>
-
-        <div class="key-feature">
-            <p><strong>合併邏輯：</strong> 程式會自動比對所有表格的「標頭 (Header)」。</p>
-            <ul>
-                <li>標頭名稱相同的欄位會被合併到同一欄。</li>
-                <li>如果表格沒有標頭，程式會自動產生 <code>(欄位 1)</code>, <code>(欄位 2)</code> ... 這樣的預設標頭。</li>
-                <li>合併後的表格會自動加上 <code>_sourceFile</code> (來源檔案) 欄位，並在您滑鼠移上資料列時顯示來源。</li>
-            </ul>
-        </div>
-        
-        <h3>⭐ 快速應用流程 (範例)</h3>
-        <p>這是在彙整多個檔案時，最快速的資料清理方式：</p>
-        <ol>
-            <li>載入您需要彙整的多個 Excel 檔案。</li>
-            <li>點擊 <code>合併檢視</code> 按鈕，將所有資料彙整到一個大表格中。</li>
-            <li>在「合併檢視」中，找到 <code>依指定欄位勾選</code> 區塊。</li>
-            <li>從下拉選單中，選擇一個您確定「有值即代表有效」的關鍵欄位 (例如："訂單編號" 或 "姓名")。</li>
-            <li>點擊 <code>勾選有值</code> 按鈕。</li>
-            <li>程式會自動勾選所有在該欄位「有資料」的資料列。這通常就是您需要保留的有效資料。</li>
-            <li>(可選) 接著，您可以點擊主介面上的 <code>反向選取</code>，然後 <code>刪除勾選列</code>，即可快速清除所有無效或空白的資料。</li>
-        </ol>
-
-        <h3>資料編輯</h3>
-        <ul>
-            <li><code>編輯資料</code>：點擊後，表格進入編輯模式，您可以直接點擊儲存格來修改內容。</li>
-            <li><code>儲存編輯</code> / <code>取消編輯</code>：儲存或放棄您在編輯模式下所做的修改。</li>
-            <li><code>新增資料列</code>：在表格最上方新增一筆空白資料列，並自動進入編輯模式。</li>
-            <li><code>複製選取列</code>：複製所有已勾選的資料列，並將其新增到表格頂端。</li>
-            <li><code>刪除勾選列</code>：刪除合併表格中所有已勾選的資料列。</li>
-        </ul>
-
-        <h3>欄位操作</h3>
-        <ul>
-            <li><strong>排序 (Sort)：</strong> 點擊任一欄位的標頭 (例如 "金額") 即可進行升冪/降冪排序。</li>
-            <li><strong>刪除欄位 (Delete)：</strong> 點擊欄位標頭上出現的 <code>&times;</code> 按鈕，可永久刪除該欄位。</li>
-            <li><code>欄位操作</code>：開啟彈窗，您可以在此
-                <ul>
-                    <li><code>全選</code> / <code>全不選</code> 欄位。</li>
-                    <li>手動勾選要<strong>顯示或隱藏</strong>的欄位。</li>
-                    <li>點擊 <code>套用</code> 來更新表格。</li>
-                </ul>
-            </li>
-        </ul>
-
-        <h3>資料分析</h3>
-        <ul>
-            <li><code>新增/移除合計列</code>：在表格最下方顯示一個「合計列 (Total)」，自動加總所有可辨識為數字的欄位。</li>
-            <li><strong>依指定欄位勾選</strong>：
-                <ul>
-                    <li>先從下拉選單中選擇一個欄位 (例如 "數量")。</li>
-                    <li><code>勾選為零</code>：勾選該欄位內容為 <code>0</code> 的資料列。</li>
-                    <li><code>勾選為空</code>：勾選該欄位內容為空白的資料列。</li>
-                    <li><code>勾選有值</code>：勾選該欄位內容非空白的資料列。</li>
-                </ul>
-            </li>
-            <li><strong>搜尋：</strong> 主介面的 <code>即時搜尋篩選</code> 功能在合併檢視中同樣有效，可快速篩選合併後的大量資料。</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>📤 4. 匯出功能</h2>
-        <p>您可以將處理後的資料匯出。</p>
-        
-        <div class="warning">
-            <p><strong>注意：</strong> 舊版的多種匯出按鈕 (如匯出HTML、匯出選取XLSX) 已被移除，整合成一個更強大的功能。</p>
-        </div>
-
-        <h3>匯出按鈕</h3>
-        <ul>
-            <li><code>(主介面) 合併所有表格</code>：這是一個快捷按鈕。它會**一步到位**，將所有在主介面可見的表格合併（並自動包含一個「Source File」欄位來標記來源檔案）並直接匯出為一個 Excel (.xlsx) 檔案，而不需要先進入「合併檢視」。</li>
-        </ul>
-        <p>
-            如果您需要匯出在「合併檢視」中編輯或篩選後的資料，請在未來的版本更新中期待此功能，或目前可以手動選取 (Ctrl+A, Ctrl+C) 表格內容並貼到 Excel 中。
-        </p>
-    </div>
-
-    <div class="section">
-        <h2>⌨️ 5. 快捷鍵</h2>
-        <ul>
-            <li><code>Esc</code> 鍵：
-                <ul>
-                    <li>如果在「欄位操作」彈窗開啟時按下，會關閉彈窗。</li>
-                    <li>如果在「合併檢視」中按下，會關閉合併檢視 (若有未儲存編輯會提示)。</li>
-                    <li>如果在「網格視圖」的放大預覽中按下，會關閉預覽。</li>
-                </ul>
-            </li>
-        </ul>
-    </div>
+</body>
+</html>
