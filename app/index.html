@@ -127,11 +127,28 @@
                 <button class="btn btn-primary" id="copy-selected-rows-btn" title="複製目前勾選的資料列，並新增到表格頂端">複製選取列</button>
                 <button class="btn btn-warning" id="toggle-total-row-btn" title="顯示或隱藏最下方的合計列">新增/移除合計列</button>
                 <button class="btn btn-warning" id="invert-selection-merged-btn" title="反轉此表格中所有資料列的勾選狀態">反向選取</button>
-                
                 <button class="btn btn-success" id="export-selected-merged-xlsx-btn" title="將此合併表格中 *未被勾選* 的資料列匯出為 XLSX">匯出剩餘資料列 (XLSX)</button>
                 <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選列</button>
             </div>
 
+            <div id="merge-view-search-controls" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                <div class="control-group-row">
+                    <div class="control-group">
+                        <label for="search-input-merged">🔍 即時搜尋篩選</label>
+                        <input type="text" id="search-input-merged" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選合併表格中的資料列">
+                    </div>
+                    <div class="control-group" id="select-by-keyword-group-merged">
+                        <label>✅ 依關鍵字勾選</label>
+                        <div class="input-with-checkbox-group">
+                            <input type="text" id="select-keyword-input-merged" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
+                            <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex-merged" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
+                        </div>
+                        <div class="button-group" style="margin-top: 4px;">
+                             <button class="btn btn-primary" id="select-by-keyword-btn-merged" title="根據上方輸入的關鍵字勾選資料列">依關鍵字勾選</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div id="merge-view-column-ops" class="button-group" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; gap: 10px; align-items: center;">
                 <label for="column-select-ops" style="font-weight: 600; font-size: 0.95rem; color: #495057;">▶️ 依指定欄位勾選:</label>
                 <select id="column-select-ops" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇一個欄位以進行勾選操作">
