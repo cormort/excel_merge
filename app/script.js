@@ -108,7 +108,7 @@ const ExcelViewer = (() => {
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
             exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
             exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
-            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn', // <-- NEW ELEMENT
+            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn',
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -183,7 +183,7 @@ const ExcelViewer = (() => {
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
-        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); // <-- NEW BINDING
+        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
 
 
         // --- Input and Dynamic Content Handling ---
@@ -1123,7 +1123,8 @@ const ExcelViewer = (() => {
     // ▼▼▼ MODIFIED FUNCTION (Using new state properties) ▼▼▼
     function sortTablesByFundName() {
         if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) {
-            alert('錯誤：基金順序列表尚未載入或為空。\n請檢查 fund-config.json 檔案是否正確放置且已載入。');
+            // Don't alert, just log. This can run before config is loaded.
+            console.warn('基金順序列表尚未載入，暫不排序。');
             return;
         }
 
