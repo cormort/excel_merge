@@ -3,196 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel 檢視器 - 多檔案整合工具</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>Excel 檢視器與說明文件</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="page-container">
-        
-        <header class="page-header">
-            <h1>Excel檔案彙整器</h1>
-        </header>
-        
-        <main class="content-area">
-            <div id="import-options-container">
-                <fieldset>
-                    <legend>⚙️ 步驟一：選擇匯入方式</legend>
-                    <label class="import-option"><input type="radio" name="import-mode" value="all" title="匯入每個 Excel 檔案中的所有工作表"> 匯入所有工作表</label>
-                    <label class="import-option"><input type="radio" name="import-mode" value="first" checked title="僅匯入每個 Excel 檔案的第一張工作表"> 僅匯入第一張工作表</label>
-                    <label class="import-option"><input type="radio" name="import-mode" value="position" title="僅匯入指定位置的工作表 (例如: 1, 3, 5-7)"> 匯入指定位置</label>
-                    <div id="specific-sheet-position-group" class="input-group hidden"><input type="text" id="specific-sheet-position-input" placeholder="例如: 1, 3, 5-7"></div>
-                    <label class="import-option"><input type="radio" name="import-mode" value="specific" title="僅匯入名稱包含關鍵字的工作表"> 匯入指定名稱</label>
-                    <div id="specific-sheet-name-group" class="input-group hidden"><input type="text" id="specific-sheet-name-input" placeholder="請輸入名稱關鍵字"></div>
-                    <label class="import-option"><input type="radio" name="import-mode" value="manual" title="針對每個檔案，手動勾選要匯入的工作表"> 逐一檔案手動決定</label>
-                </fieldset>
-            </div>
+    <div class="tab-container">
+        <nav class="tab-nav">
+            <button class="tab-btn" data-tab="tab-guide-pane" data-source="guide.html">📖 使用說明</button>
+            <button class="tab-btn active" data-tab="tab-app-pane">🚀 Excel 檢視器</button>
+            <button class="tab-btn" data-tab="tab-code-pane" data-source="maintenance.html">🛠️ 程式碼維護</button>
+        </nav>
 
-            <div id="drop-area">
-                <input type="file" id="file-input" accept=".xls,.xlsx" multiple title="選擇檔案">
-                <div id="drop-area-initial"><h3>📁 步驟二：拖放檔案到此處</h3><p>或點擊下方按鈕選擇檔案</p><button class="btn-upload" title="點擊此處或拖曳檔案以選擇">選擇 Excel 檔案</button></div>
-                <div id="drop-area-loaded" class="hidden"><div class="file-info"><div class="file-info-text"><h3>📊 已載入檔案 <span class="file-count" id="file-count">0</span></h3><p id="file-names">-</p></div><button class="btn-clear" id="clear-files-btn" title="清除所有已載入的檔案和表格">🗑️ 清除所有檔案</button></div></div>
-            </div>
+        <main class="tab-content">
+            <!-- 說明文件內容將被動態載入到這裡 -->
+            <section id="tab-guide-pane" class="tab-pane doc-page"></section>
 
-            <div class="controls hidden" id="control-panel">
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label>👁️ 檢視選項</label>
-                        <div class="button-group">
-                            <button class="btn btn-secondary active" id="list-view-btn" title="將表格以垂直列表方式顯示">列表檢視</button>
-                            <button class="btn btn-secondary" id="grid-view-btn" title="將表格以網格方式顯示">網格檢視</button>
-                        </div>
-                        <div id="grid-scale-control" class="hidden">
-                            <label for="grid-scale-slider">調整欄數:</label>
-                            <input type="range" id="grid-scale-slider" min="1" max="5" value="3" title="調整網格檢視下的欄位寬度">
-                        </div>
-                    </div>
-                    <div class="control-group" id="table-level-controls">
-                        <label>📋 表格層級操作</label>
-                        <div class="button-group">
-                            <button class="btn btn-primary" id="sort-by-fund-name-btn" title="根據預設的基金列表排序表格 (僅排序主畫面卡片)">依基金名稱排序</button>
-                            <button class="btn btn-primary" id="select-all-tables-btn" title="勾選目前載入的所有表格卡片">勾選所有表格</button>
-                            <button class="btn btn-secondary" id="unselect-all-tables-btn" title="取消勾選所有表格卡片">取消勾選</button>
-                            <button class="btn btn-danger" id="delete-selected-tables-btn" title="刪除所有被勾選的表格卡片">刪除選定表格</button>
-                        </div>
-                        <div id="selected-tables-info" class="info-feedback-box hidden">
-                            <h5>目前選取的表格：</h5>
-                            <p id="selected-tables-list"></p>
-                        </div>
-                    </div>
-                </div>
+            <!-- Excel 檢視器應用程式 -->
+            <section id="tab-app-pane" class="tab-pane active">
+                <iframe id="app-iframe" title="Excel 檢視器應用程式" src="./app/index.html"></iframe>
+            </section>
 
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label for="search-input">🔍 即時搜尋篩選 (主畫面)</label>
-                        <input type="text" id="search-input" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選所有表格中的資料列">
-                    </div>
-                    <div class="control-group" id="select-by-keyword-group">
-                        <label>✅ 依關鍵字勾選 (主畫面)</label>
-                        
-                        <div class="input-with-checkbox-group">
-                            <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
-                            <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
-                        </div>
-
-                    </div>
-                </div>
-                
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label>▶️ 資料列操作 (主畫面)</label>
-                        
-                        <div class="button-group">
-                            <button class="btn btn-primary" id="select-by-keyword-btn" title="根據上方輸入的關鍵字勾選資料列">依關鍵字勾選</button>
-                            <button class="btn btn-primary" id="select-empty-btn" title="勾選所有內容完全空白的資料列">勾選空白列</button>
-                            <button class="btn btn-primary" id="select-all-btn" title="勾選所有表格中所有可見的資料列">勾選全部</button>
-                            <button class="btn btn-warning" id="invert-selection-btn" title="反轉目前所有資料列的勾選狀態">反向選取</button>
-                            <button class="btn btn-danger" id="delete-selected-btn" title="刪除所有表格中被勾選的資料列">刪除勾選列</button>
-                            <button class="btn btn-secondary" id="reset-view-btn" title="清除所有篩選並還原所有表格的初始狀態">還原始初狀態</button>
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <label>🔄 全局與匯出</label>
-                        <div class="button-group">
-                            <button class="btn btn-info hidden" id="merge-view-btn" title="將所有可見表格合併為一個可編輯的新表格">合併檢視</button>
-                            <button class="btn btn-info" id="view-checked-combined-btn" title="將所有被勾選的資料列合併為一個新表格">勾選資料列合併檢視</button>
-                            <button class="btn btn-info" id="show-hidden-btn" title="(若有) 顯示 Excel 中被隱藏的欄或列">顯示隱藏行列</button>
-                            
-                            <button class="btn btn-success" id="export-merged-xlsx-btn" title="將所有可見表格合併並直接匯出為一個 XLSX 檔案">合併所有表格</button>
-                        </div>
-                    </div>
-                </div> 
-
-            </div>
-            <div class="status-message hidden" id="load-status-message"></div>
-            
-            <section id="excel-display-area" class="list-view"></section>
+            <!-- 程式碼維護內容將被動態載入到這裡 -->
+            <section id="tab-code-pane" class="tab-pane doc-page"></section>
         </main>
     </div>
-    
-    <!-- Merge View Modal -->
-    <div id="merge-view-modal" class="merge-view-overlay hidden">
-        <div class="merge-view-container">
-            <header id="merge-view-header">
-                <h3>合併檢視與編輯</h3>
-                <button id="close-merge-view-btn" class="close-btn" title="關閉合併檢視 (Esc)">&times;</button>
-            </header>
-            <div id="merge-view-controls" class="button-group">
-                <button class="btn btn-primary" id="column-operations-btn" title="開啟欄位顯示/隱藏/排序選單">欄位操作</button>
-                <button class="btn btn-primary" id="toggle-source-col-btn" title="切換顯示/隱藏 來源檔案欄位">新增來源欄位</button>
-                <button class="btn btn-info" id="edit-data-btn" title="啟用/停用表格內容編輯功能">編輯資料</button>
-                <button class="btn btn-success hidden" id="save-edits-btn" title="儲存您對表格所做的變更">儲存編輯</button>
-                <button class="btn btn-secondary hidden" id="cancel-edits-btn" title="放棄編輯並還原回儲存前的狀態">取消編輯</button>
-                <button class="btn btn-primary" id="add-new-row-btn" title="在表格最上方新增一筆空白資料列">新增資料列</button>
-                <button class="btn btn-primary" id="copy-selected-rows-btn" title="複製目前勾選的資料列，並新增到表格頂端">複製選取列</button>
-                <button class="btn btn-warning" id="toggle-total-row-btn" title="顯示或隱藏最下方的合計列">新增/移除合計列</button>
-                <button class="btn btn-warning" id="invert-selection-merged-btn" title="反轉此表格中所有資料列的勾選狀態">反向選取</button>
-                
-                <!-- ▼▼▼ NEW BUTTON ADDED ▼▼▼ -->
-                <button class="btn btn-success" id="export-current-merged-xlsx-btn" title="將目前合併檢視中的 *所有可見* 資料列匯出為 XLSX">匯出此檢視 (XLSX)</button>
-                <button class="btn btn-success" id="export-selected-merged-xlsx-btn" title="將此合併表格中 *未被勾選* 的資料列匯出為 XLSX">匯出剩餘資料列 (XLSX)</button>
-                <!-- ▲▲▲ NEW BUTTON ADDED ▲▲▲ -->
-
-                <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選列</button>
-            </div>
-
-            <div id="merge-view-search-controls" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
-                <div class="control-group-row">
-                    <div class="control-group">
-                        <label for="search-input-merged">🔍 即時搜尋篩選 (合併視窗)</label>
-                        <input type="text" id="search-input-merged" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選合併表格中的資料列">
-                    </div>
-                    <div class="control-group" id="select-by-keyword-group-merged">
-                        <label>✅ 依關鍵字勾選 (合併視窗)</label>
-                        <div class="input-with-checkbox-group">
-                            <input type="text" id="select-keyword-input-merged" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
-                            <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex-merged" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
-                        </div>
-                        <div class="button-group" style="margin-top: 4px;">
-                             <button class="btn btn-primary" id="select-by-keyword-btn-merged" title="根據上方輸入的關鍵字勾選資料列">依關鍵字勾選</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="merge-view-column-ops" class="button-group" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; gap: 10px; align-items: center;">
-                <label for="column-select-ops" style="font-weight: 600; font-size: 0.95rem; color: #495057;">▶️ 依指定欄位勾選:</label>
-                <select id="column-select-ops" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇一個欄位以進行勾選操作">
-                    <option value="">-- 請選擇欄位 --</option>
-                </select>
-                <button class="btn btn-primary" id="select-by-col-zero-btn" title="勾選指定欄位中，內容為 '0' 的資料列">勾選為零</button>
-                <button class="btn btn-primary" id="select-by-col-empty-btn" title="勾選指定欄位中，內容為空白的資料列">勾選為空</button>
-                <button class="btn btn-primary" id="select-by-col-exists-btn" title="勾選指定欄位中，內容非空白的資料列">勾選有值</button>
-            </div>
-
-            <div id="merge-view-content">
-                <!-- Merged table will be rendered here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Column Operations Modal -->
-    <div id="column-modal" class="modal-overlay hidden">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3>欄位顯示/隱藏</h3>
-                <button id="close-column-modal-btn" class="close-btn" title="關閉此視窗 (Esc)">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="column-checklist"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="modal-check-all" title="勾選所有欄位">全選</button>
-                <button class="btn btn-secondary" id="modal-uncheck-all" title="取消勾選所有欄位">全不選</button>
-                <button class="btn btn-primary" id="apply-column-changes-btn" title="套用欄位顯示/隱藏設定">套用</button>
-            </div>
-        </div>
-    </div>
-
-    <button id="back-to-top-btn" title="回到工具列">↑</button>
 
     <script src="script.js"></script>
+
 </body>
 </html>
