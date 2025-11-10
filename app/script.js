@@ -16,15 +16,18 @@ const ExcelViewer = (() => {
         mergedData: [],
         mergedHeaders: [],
         fundSortOrder: [], // <-- NEW: Will hold the sortOrder array
-        fundAliasMap: {}   // <-- NEW: Will hold the aliasMap object
+        fundAliasMap: {},   // <-- NEW: Will hold the aliasMap object
+        fundAliasKeys: []  // <-- NEW: Cached keys for searching
     };
     const elements = {};
 
-    function init() {
+    // ▼▼▼ MODIFIED: Made init async ▼▼▼
+    async function init() {
         cacheElements();
+        await loadFundConfig(); // <-- NEW: Wait for config before binding events
         bindEvents();
-        loadFundConfig(); // <-- NEW: Load the config file on startup
     }
+    // ▲▲▲ MODIFIED ▲▲▲
 
     // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
     /**
@@ -32,8 +35,8 @@ const ExcelViewer = (() => {
      */
     async function loadFundConfig() {
         try {
-            // 假設 fund-config.json 與 script.js 在同一 /app/ 目錄下
-            const response = await fetch('fund-config.json'); 
+            // 為了避免瀏覽器快取，加入一個隨機參數
+            const response = await fetch(`fund-config.json?v=${Date.now()}`); 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -42,6 +45,8 @@ const ExcelViewer = (() => {
             if (config.sortOrder && config.aliasMap) {
                 state.fundSortOrder = config.sortOrder;
                 state.fundAliasMap = config.aliasMap;
+                // 將 aliasMap 的 key 儲存起來，並依照長度排序，優先比對長的關鍵字
+                state.fundAliasKeys = Object.keys(config.aliasMap).sort((a, b) => b.length - a.length);
                 console.log("基金設定檔 (fund-config.json) 載入成功。");
             } else {
                 console.error("基金設定檔格式錯誤：缺少 sortOrder 或 aliasMap。");
@@ -102,6 +107,7 @@ const ExcelViewer = (() => {
             toggleSourceColBtn: 'toggle-source-col-btn', 
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
             exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
+            exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', // <-- NEW ELEMENT
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -175,6 +181,7 @@ const ExcelViewer = (() => {
         elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
+        elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); // <-- NEW BINDING
 
 
         // --- Input and Dynamic Content Handling ---
@@ -279,6 +286,10 @@ const ExcelViewer = (() => {
         state.originalHtmlString = elements.displayArea.innerHTML; 
         injectCheckboxes(elements.displayArea); 
         showControls(detectHiddenElements()); 
+        
+        // ▼▼▼ NEW: Auto-sort on render ▼▼▼
+        sortTablesByFundName();
+        // ▲▲▲ NEW ▲▲▲
     }
     
     function injectCheckboxes(scope) { scope.querySelectorAll('thead tr').forEach((headRow, index) => { if(headRow.querySelector('.checkbox-cell')) return; const th = document.createElement('th'); th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${scope.id}-${index}" title="全選/全不選">`; th.classList.add('checkbox-cell'); headRow.prepend(th); }); scope.querySelectorAll('tbody tr').forEach(row => { if(row.querySelector('.checkbox-cell')) return; const td = document.createElement('td'); td.innerHTML = '<input type="checkbox" class="row-checkbox">'; td.classList.add('checkbox-cell'); row.prepend(td); }); }
@@ -630,6 +641,7 @@ const ExcelViewer = (() => {
         elements.toggleSourceColBtn.disabled = state.isEditing; 
         elements.invertSelectionMergedBtn.disabled = state.isEditing; 
         elements.exportSelectedMergedXlsxBtn.disabled = state.isEditing; 
+        elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
         elements.columnSelectOps.disabled = state.isEditing;
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
@@ -860,12 +872,22 @@ const ExcelViewer = (() => {
     function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
     function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
-    function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsArrayBuffer(file); }); }
+    
+    // ▼▼▼ CORRECTED: Use readAsBinaryString for this XLSX library version ▼▼▼
+    function readFileAsBinary(file) { 
+        return new Promise((resolve, reject) => { 
+            const reader = new FileReader(); 
+            reader.onload = e => resolve(e.target.result); 
+            reader.onerror = reject; 
+            reader.readAsBinaryString(file); // <-- This is the correct method
+        }); 
+    }
+    // ▲▲▲ CORRECTED ▲▲▲
+
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
     async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
     
-    // ▼▼▼ MODIFIED: To account for new source col visibility ▼▼▼
     function extractTableData(table, { onlySelected = false, includeFilename = false, includeSourceCol = false } = {}) { 
         const data = []; 
         const headerRow = table.querySelector('thead tr'); 
@@ -878,12 +900,6 @@ const ExcelViewer = (() => {
             if (includeFilename) { 
                 headerData.unshift('Source File'); 
             }
-            // This is for MERGED view export (from exportSelectedMergedXlsx)
-            // if (includeSourceCol && !headerData.includes('來源檔案')) {
-            //     headerData.unshift('來源檔案');
-            // }
-            // Correction: The headerData *already* includes '來源檔案' if it's visible.
-
             data.push(headerData); 
         } 
         
@@ -891,11 +907,11 @@ const ExcelViewer = (() => {
         
         // Determine which rows to process
         let rows;
-        if (onlySelected === true) { // Explicitly true
+        if (onlySelected === true) { // Explicitly true: only checked
             rows = Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'));
-        } else if (onlySelected === false) { // Explicitly false, for "remaining"
+        } else if (onlySelected === false) { // Explicitly false: only UNCHECKED (and not hidden by search)
              rows = Array.from(table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox:not(:checked)')).map(cb => cb.closest('tr'));
-        } else { // null or undefined, for "all"
+        } else { // null or undefined: ALL (and not hidden by search)
             rows = table.querySelectorAll('tbody tr:not(.row-hidden-search)');
         }
             
@@ -906,16 +922,64 @@ const ExcelViewer = (() => {
             if (includeFilename) { 
                 rowData.unshift(filename); 
             }
-            // if (includeSourceCol && !includeFilename) {
-            //      // Get source from title - This is redundant, as source-col is now part of the querySelectorAll
-            //     rowData.unshift(row.title.replace('來源: ', '') || 'N/A');
-            // }
             data.push(rowData); 
         }); 
         return data; 
     }
-    // ▲▲▲ MODIFIED ▲▲▲
     
+    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
+    /**
+     * Exports ALL visible data from the MERGED view.
+     */
+    function exportCurrentMergedXlsx() {
+        if (!state.isMergedView) {
+            alert('此功能僅限合併檢視模式使用。');
+            return;
+        }
+
+        const table = elements.mergeViewContent.querySelector('table');
+        if (!table) {
+            alert('找不到合併表格。');
+            return;
+        }
+        
+        // 1. Get visible headers
+        const headerData = extractTableData(table, { 
+            onlySelected: null, // Get ALL headers
+            includeSourceCol: state.showSourceColumn 
+        })[0]; // Get only the header row
+        
+        if (!headerData) {
+            alert('無法讀取表頭。');
+            return;
+        }
+
+        // 2. Get data for *all* rows that are *not hidden by search*
+        const data = extractTableData(table, {
+            onlySelected: null, // null means get ALL visible
+            includeSourceCol: state.showSourceColumn
+        }).slice(1); // Get data rows (slice(1) skips header)
+        
+        if (data.length === 0) {
+            alert('沒有可見的資料列可匯出。');
+            return;
+        }
+
+        // 3. Create and download workbook
+        try {
+            const ws_data = [headerData].concat(data);
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            ws['!cols'] = calculateColumnWidths(ws_data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Merged View Data");
+            XLSX.writeFile(wb, `merged_view_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (err) {
+            console.error('匯出目前合併檢視時發生錯誤:', err);
+            alert('匯出時發生錯誤：' + err.message);
+        }
+    }
+    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
+
     // ▼▼▼ MODIFIED FUNCTION (exports UNCHECKED rows) ▼▼▼
     function exportSelectedMergedXlsx() {
         if (!state.isMergedView) {
@@ -1065,21 +1129,27 @@ const ExcelViewer = (() => {
 
         const wrappers = Array.from(elements.displayArea.querySelectorAll('.table-wrapper'));
 
-        // Helper function to extract the key (sheet name) from the h4 tag
-        const getFundName = (wrapper) => {
+        // Helper: 從卡片標題 "檔名 (工作表名稱)" 中提取 "檔名"
+        const getFileName = (wrapper) => {
             const text = wrapper.querySelector('h4').textContent;
-            // 嘗試從 "檔名 (工作表名稱)" 中取出 "工作表名稱"
-            const match = text.match(/\((.*?)\)$/); 
+            const match = text.match(/^(.*?)\s*\(/); // 抓取開頭到第一個 ( 之前的內容
             return match ? match[1].trim() : text.trim(); // 找不到括號就回傳完整名稱
         };
 
-        wrappers.sort((a, b) => {
-            const nameA = getFundName(a);
-            const nameB = getFundName(b);
+        // Helper: 根據檔名在 aliasMap 中尋找對應的標準名稱
+        const findStandardName = (fileName) => {
+            // state.fundAliasKeys 已經依長度排序 (長的優先)
+            const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
+            return foundAlias ? state.fundAliasMap[foundAlias] : null;
+        };
 
-            // 1. 從工作表名稱 (別名) 找到標準名稱
-            const canonicalA = state.fundAliasMap[nameA];
-            const canonicalB = state.fundAliasMap[nameB];
+        wrappers.sort((a, b) => {
+            const fileNameA = getFileName(a);
+            const fileNameB = getFileName(b);
+
+            // 1. 從檔名 (別名) 找到標準名稱
+            const canonicalA = findStandardName(fileNameA);
+            const canonicalB = findStandardName(fileNameB);
 
             // 2. 從標準名稱找到排序順序
             const indexA = canonicalA ? state.fundSortOrder.indexOf(canonicalA) : -1;
@@ -1091,7 +1161,7 @@ const ExcelViewer = (() => {
 
             if (priorityA === priorityB) {
                 // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
-                return nameA.localeCompare(nameB);
+                return fileNameA.localeCompare(fileNameB);
             }
             
             return priorityA - priorityB;
