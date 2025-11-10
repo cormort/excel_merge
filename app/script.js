@@ -10,7 +10,7 @@ const ExcelViewer = (() => {
         isMergedView: false,
         isEditing: false,
         showTotalRow: false,
-        showSourceColumn: false, // <-- NEW STATE
+        showSourceColumn: false, 
         mergedData: [],
         mergedHeaders: []
     };
@@ -63,8 +63,9 @@ const ExcelViewer = (() => {
             copySelectedRowsBtn: 'copy-selected-rows-btn',
             deleteMergedRowsBtn: 'delete-merged-rows-btn',
             toggleTotalRowBtn: 'toggle-total-row-btn', 
-            toggleSourceColBtn: 'toggle-source-col-btn', // <-- NEW ELEMENT
-            invertSelectionMergedBtn: 'invert-selection-merged-btn', // <-- NEW ELEMENT
+            toggleSourceColBtn: 'toggle-source-col-btn', 
+            invertSelectionMergedBtn: 'invert-selection-merged-btn',
+            exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', // <-- NEW ELEMENT
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -128,8 +129,9 @@ const ExcelViewer = (() => {
             renderMergedTable();
         });
         
-        elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); // <-- NEW BINDING
-        elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); }); // <-- NEW BINDING
+        elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
+        elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+        elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); // <-- NEW BINDING
 
 
         // --- Input and Dynamic Content Handling ---
@@ -345,14 +347,12 @@ const ExcelViewer = (() => {
         const thead = table.createTHead();
         const headerRow = thead.insertRow();
         
-        // ▼▼▼ MODIFICATION: Conditionally prepend Source Header ▼▼▼
         if (state.showSourceColumn) {
             const thSource = document.createElement('th');
             thSource.textContent = '來源檔案';
             thSource.classList.add('source-col');
             headerRow.prepend(thSource);
         }
-        // ▲▲▲ END MODIFICATION ▲▲▲
         
         state.mergedHeaders.forEach(header => {
             const th = document.createElement('th');
@@ -363,7 +363,7 @@ const ExcelViewer = (() => {
             deleteBtn.title = `刪除 ${header}`;
             deleteBtn.dataset.header = header;
             th.appendChild(deleteBtn);
-            headerRow.appendChild(th); // Appends after the source col
+            headerRow.appendChild(th); 
         });
 
         const tbody = table.createTBody();
@@ -375,19 +375,17 @@ const ExcelViewer = (() => {
                 tr.title = `來源: ${rowData._sourceFile}`;
             }
 
-            // ▼▼▼ MODIFICATION: Conditionally prepend Source Cell ▼▼▼
             if (state.showSourceColumn) {
                 const tdSource = document.createElement('td');
                 tdSource.textContent = rowData._sourceFile || '';
                 tdSource.classList.add('source-col');
                 tr.prepend(tdSource);
             }
-            // ▲▲▲ END MODIFICATION ▲▲▲
 
             if (rowData._isNew) tr.classList.add('new-row-highlight');
             
             state.mergedHeaders.forEach(header => {
-                const td = tr.insertCell(); // Appends after the source cell
+                const td = tr.insertCell(); 
                 td.contentEditable = state.isEditing;
                 td.dataset.colHeader = header;
                 const value = rowData[header] || '';
@@ -406,11 +404,9 @@ const ExcelViewer = (() => {
             const totalRow = tfoot.insertRow();
             totalRow.className = 'total-row';
 
-            // --- Rewrite total row logic for clarity and correctness ---
-            totalRow.innerHTML = ''; // Clear previous attempts
+            totalRow.innerHTML = ''; 
             
-            // Add checkbox cell
-            totalRow.insertCell(); 
+            totalRow.insertCell(); // Add checkbox cell
             
             if (state.showSourceColumn) {
                 totalRow.insertCell().textContent = ''; // Empty cell for source
@@ -433,14 +429,13 @@ const ExcelViewer = (() => {
                     td.textContent = '';
                 }
             });
-            // --- End total row logic rewrite ---
         }
         
         elements.mergeViewContent.innerHTML = '';
         elements.mergeViewContent.appendChild(table);
         elements.mergeViewContent.classList.toggle('is-editing', state.isEditing);
         
-        injectCheckboxes(elements.mergeViewContent); // This will PREPEND checkbox cells, which is correct.
+        injectCheckboxes(elements.mergeViewContent); 
 
         const selectAllCheckbox = elements.mergeViewContent.querySelector('thead input[type="checkbox"]');
         if (selectAllCheckbox) {
@@ -451,7 +446,6 @@ const ExcelViewer = (() => {
         }
     }
     
-    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
     function toggleSourceColumn() {
         if (state.isEditing) {
             alert('請先儲存或取消編輯。');
@@ -464,7 +458,6 @@ const ExcelViewer = (() => {
         elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
         elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
     }
-    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
 
     function updateColumnSelects(headers) { 
         // 1. Populate modal checklist
@@ -493,7 +486,6 @@ const ExcelViewer = (() => {
         });
 
         // 2. 遍歷表格的標頭 (th)
-        //    We skip checkbox (index 0) and potentially source col (index 1)
         const allHeaders = Array.from(mergedTable.querySelectorAll('thead th'));
         const firstDataColIndex = allHeaders.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
         
@@ -567,8 +559,9 @@ const ExcelViewer = (() => {
         elements.deleteMergedRowsBtn.disabled = state.isEditing;
         elements.columnOperationsBtn.disabled = state.isEditing;
         elements.toggleTotalRowBtn.disabled = state.isEditing;
-        elements.toggleSourceColBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
-        elements.invertSelectionMergedBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
+        elements.toggleSourceColBtn.disabled = state.isEditing; 
+        elements.invertSelectionMergedBtn.disabled = state.isEditing; 
+        elements.exportSelectedMergedXlsxBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
         elements.columnSelectOps.disabled = state.isEditing;
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
@@ -580,21 +573,17 @@ const ExcelViewer = (() => {
         const newData = [];
         tableRows.forEach((tr, index) => {
             const newRowData = {};
-            // ▼▼▼ MODIFICATION: Re-assign sourceFile when saving ▼▼▼
             const sourceCell = tr.querySelector('.source-col');
             if (sourceCell) {
                 newRowData._sourceFile = sourceCell.textContent;
             } else {
-                // Find from original data
                 const originalIndex = parseInt(tr.dataset.rowIndex, 10);
                 if(!isNaN(originalIndex) && state.mergedData[originalIndex]) {
                      newRowData._sourceFile = state.mergedData[originalIndex]._sourceFile;
                 } else {
-                    // Fallback for newly added rows that might not have rowIndex yet
                     newRowData._sourceFile = ' (新增資料列)';
                 }
             }
-            // ▲▲▲ END MODIFICATION ▲▲▲
             
             tr.querySelectorAll('td[data-col-header]').forEach(cell => {
                 const header = cell.dataset.colHeader;
@@ -727,7 +716,7 @@ const ExcelViewer = (() => {
         }
     }
     function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
-    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
+    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*..."display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
     function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
@@ -735,6 +724,67 @@ const ExcelViewer = (() => {
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) { headerData.unshift('Source File'); } data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; const rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) { rowData.unshift(filename); } data.push(rowData); }); return data; }
     
+    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
+    function exportSelectedMergedXlsx() {
+        if (!state.isMergedView) {
+            alert('此功能僅限合併檢視模式使用。');
+            return;
+        }
+
+        const selectedCheckboxes = elements.mergeViewContent.querySelectorAll('tbody .row-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert('請先勾選要匯出的資料列。');
+            return;
+        }
+
+        // 1. Get visible headers
+        const visibility = {};
+        elements.columnChecklist.querySelectorAll('input').forEach(input => {
+            visibility[input.value] = input.checked;
+        });
+        const visibleHeaders = state.mergedHeaders.filter(header => visibility[header]);
+        
+        const finalHeaders = [...visibleHeaders];
+        if (state.showSourceColumn) {
+            finalHeaders.unshift('來源檔案');
+        }
+
+        // 2. Get data for selected rows
+        const indicesToExport = new Set();
+        selectedCheckboxes.forEach(cb => {
+            const rowIndex = parseInt(cb.closest('tr').dataset.rowIndex, 10);
+            if (!isNaN(rowIndex)) indicesToExport.add(rowIndex);
+        });
+
+        const data = [];
+        state.mergedData.forEach((rowData, index) => {
+            if (!indicesToExport.has(index)) return; // Skip non-selected rows
+            
+            const rowToExport = [];
+            if (state.showSourceColumn) {
+                rowToExport.push(rowData._sourceFile || '');
+            }
+            visibleHeaders.forEach(header => {
+                rowToExport.push(rowData[header] || '');
+            });
+            data.push(rowToExport);
+        });
+
+        // 3. Create and download workbook
+        try {
+            const ws_data = [finalHeaders].concat(data);
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            ws['!cols'] = calculateColumnWidths(ws_data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Merged Selected Data");
+            XLSX.writeFile(wb, `merged_selected_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (err) {
+            console.error('匯出選取的合併資料時發生錯誤:', err);
+            alert('匯出時發生錯誤：' + err.message);
+        }
+    }
+    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
+
     function downloadHtml(content, filename) { const blob = new Blob([content], { type: 'text/html;charset=utf-8;' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
     
     function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } try { const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); if (allData.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } const ws = XLSX.utils.aoa_to_sheet(allData); ws['!cols'] = calculateColumnWidths(allData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, ws, 'Merged Data'); XLSX.writeFile(workbook, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`); alert(`成功合併 ${tables.length} 個表格，共 ${allData.length - 1} 筆資料。`); } catch (err) { console.error('合併匯出 XLSX 錯誤:', err); alert('合併匯出 XLSX 時發生錯誤：' + err.message); } }
