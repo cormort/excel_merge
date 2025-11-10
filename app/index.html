@@ -74,7 +74,8 @@
                             <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
                             <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
                         </div>
-                        </div>
+
+                    </div>
                 </div>
                 
                 <div class="control-group-row">
@@ -87,7 +88,6 @@
                             <button class="btn btn-primary" id="select-all-btn" title="勾選所有表格中所有可見的資料列">勾選全部</button>
                             <button class="btn btn-warning" id="invert-selection-btn" title="反轉目前所有資料列的勾選狀態">反向選取</button>
                             <button class="btn btn-danger" id="delete-selected-btn" title="刪除所有表格中被勾選的資料列">刪除勾選列</button>
-                            
                             <button class="btn btn-secondary" id="reset-view-btn" title="清除所有篩選並還原所有表格的初始狀態">還原始初狀態</button>
                         </div>
                     </div>
@@ -100,16 +100,18 @@
                             <button class="btn btn-info" id="show-hidden-btn" title="(若有) 顯示 Excel 中被隱藏的欄或列">顯示隱藏行列</button>
                             
                             <button class="btn btn-success" id="export-merged-xlsx-btn" title="將所有可見表格合併並直接匯出為一個 XLSX 檔案">合併所有表格</button>
-                            
-                            </div>
+                        </div>
                     </div>
-                </div> </div>
+                </div> 
+
+            </div>
             <div class="status-message hidden" id="load-status-message"></div>
             
             <section id="excel-display-area" class="list-view"></section>
         </main>
     </div>
     
+    <!-- Merge View Modal -->
     <div id="merge-view-modal" class="merge-view-overlay hidden">
         <div class="merge-view-container">
             <header id="merge-view-header">
@@ -118,6 +120,9 @@
             </header>
             <div id="merge-view-controls" class="button-group">
                 <button class="btn btn-primary" id="column-operations-btn" title="開啟欄位顯示/隱藏/排序選單">欄位操作</button>
+                <!-- ▼▼▼ NEW BUTTON ▼▼▼ -->
+                <button class="btn btn-primary" id="toggle-source-col-btn" title="切換顯示/隱藏 來源檔案欄位">新增來源欄位</button>
+                <!-- ▲▲▲ NEW BUTTON ▲▲▲ -->
                 <button class="btn btn-info" id="edit-data-btn" title="啟用/停用表格內容編輯功能">編輯資料</button>
                 <button class="btn btn-success hidden" id="save-edits-btn" title="儲存您對表格所做的變更">儲存編輯</button>
                 <button class="btn btn-secondary hidden" id="cancel-edits-btn" title="放棄編輯並還原回儲存前的狀態">取消編輯</button>
@@ -136,11 +141,14 @@
                 <button class="btn btn-primary" id="select-by-col-empty-btn" title="勾選指定欄位中，內容為空白的資料列">勾選為空</button>
                 <button class="btn btn-primary" id="select-by-col-exists-btn" title="勾選指定欄位中，內容非空白的資料列">勾選有值</button>
             </div>
+
             <div id="merge-view-content">
-                </div>
+                <!-- Merged table will be rendered here -->
+            </div>
         </div>
     </div>
 
+    <!-- Column Operations Modal -->
     <div id="column-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
             <div class="modal-header">
