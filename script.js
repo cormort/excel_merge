@@ -1,9 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // 修正：確保 tabContainer 存在
     const tabContainer = document.querySelector('.tab-container');
-    
-    // 檢查 tabContainer 是否存在，避免在其他頁面出錯
     if (!tabContainer) {
-        return;
+        // 如果在 app/index.html 中（沒有 tab-container），就直接停止
+        return; 
     }
 
     const tabBtns = tabContainer.querySelectorAll('.tab-btn');
