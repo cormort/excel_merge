@@ -64,6 +64,7 @@ const ExcelViewer = (() => {
             deleteMergedRowsBtn: 'delete-merged-rows-btn',
             toggleTotalRowBtn: 'toggle-total-row-btn', 
             toggleSourceColBtn: 'toggle-source-col-btn', // <-- NEW ELEMENT
+            invertSelectionMergedBtn: 'invert-selection-merged-btn', // <-- NEW ELEMENT
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -128,6 +129,8 @@ const ExcelViewer = (() => {
         });
         
         elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); // <-- NEW BINDING
+        elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); }); // <-- NEW BINDING
+
 
         // --- Input and Dynamic Content Handling ---
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
@@ -280,10 +283,8 @@ const ExcelViewer = (() => {
             const headers = tableHeaderMap.get(table); // Get cached headers
             if (!headers) return; // Should not happen
 
-            // ▼▼▼ MODIFICATION: Get the filename HERE ▼▼▼
             const wrapper = table.closest('.table-wrapper');
             const filename = wrapper?.querySelector('h4')?.textContent || '未知來源';
-            // ▲▲▲ END MODIFICATION ▲▲▲
 
             // Select which rows to process based on 'mode'
             let rowsToProcess;
@@ -298,11 +299,7 @@ const ExcelViewer = (() => {
             // Map the data from *only* the selected rows
             rowsToProcess.forEach(row => {
                 const rowData = {};
-                
-                // ▼▼▼ MODIFICATION: Add the source file property ▼▼▼
-                rowData._sourceFile = filename;
-                // ▲▲▲ END MODIFICATION ▲▲▲
-
+                rowData._sourceFile = filename; // Add the source file property
                 Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
                     if (headers[i]) { // Use the correct header for this column index
                         rowData[headers[i]] = td.textContent;
@@ -571,6 +568,7 @@ const ExcelViewer = (() => {
         elements.columnOperationsBtn.disabled = state.isEditing;
         elements.toggleTotalRowBtn.disabled = state.isEditing;
         elements.toggleSourceColBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
+        elements.invertSelectionMergedBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
         elements.columnSelectOps.disabled = state.isEditing;
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
@@ -673,7 +671,7 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
     function selectEmptyRows() { let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (Array.from(row.cells).slice(1).every(c => c.textContent.trim() === '')) { row.querySelector('.row-checkbox').checked = true; count++; } }); if (count === 0) alert('未找到空白列'); }
-    function selectByKeyword() { const keywordInput = elements.selectKeywordInput.value.trim(); const isRegex = elements.selectKeywordRegex.checked; if (!keywordInput) { alert('請先輸入關鍵字'); return; } let matchLogic; try { if (isRegex) { const regex = new RegExp(keywordInput, 'i'); matchLogic = text => regex.test(text); } else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); } else { const keywords = keywordWord.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); } } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; } let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (matchLogic(Array.from(row.cells).slice(1).map(c => c.textContent).join(' '))) { row.querySelector('.row-checkbox').checked = true; count++; } }); alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); }
+    function selectByKeyword() { const keywordInput = elements.selectKeywordInput.value.trim(); const isRegex = elements.selectKeywordRegex.checked; if (!keywordInput) { alert('請先輸入關鍵字'); return; } let matchLogic; try { if (isRegex) { const regex = new RegExp(keywordInput, 'i'); matchLogic = text => regex.test(text); } else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); } else { const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); } } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; } let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (matchLogic(Array.from(row.cells).slice(1).map(c => c.textContent).join(' '))) { row.querySelector('.row-checkbox').checked = true; count++; } }); alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); }
     
     function selectByColumn(mode) {
         if (!state.isMergedView) {
