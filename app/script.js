@@ -65,7 +65,7 @@ const ExcelViewer = (() => {
             toggleTotalRowBtn: 'toggle-total-row-btn', 
             toggleSourceColBtn: 'toggle-source-col-btn', 
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
-            exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', // <-- NEW ELEMENT
+            exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', // <-- This is the one
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -131,7 +131,7 @@ const ExcelViewer = (() => {
         
         elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-        elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); // <-- NEW BINDING
+        elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); // <-- BINDING
 
 
         // --- Input and Dynamic Content Handling ---
@@ -332,9 +332,9 @@ const ExcelViewer = (() => {
         state.isMergedView = false;
         state.isEditing = false;
         state.showTotalRow = false;
-        state.showSourceColumn = false; // <-- RESET STATE
-        elements.toggleSourceColBtn.textContent = '新增來源欄位'; // <-- RESET BUTTON TEXT
-        elements.toggleSourceColBtn.classList.remove('active'); // <-- RESET BUTTON STYLE
+        state.showSourceColumn = false; 
+        elements.toggleSourceColBtn.textContent = '新增來源欄位'; 
+        elements.toggleSourceColBtn.classList.remove('active'); 
         state.mergedData = [];
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
@@ -406,7 +406,7 @@ const ExcelViewer = (() => {
 
             totalRow.innerHTML = ''; 
             
-            totalRow.insertCell(); // Add checkbox cell
+            totalRow.insertCell(); 
             
             if (state.showSourceColumn) {
                 totalRow.insertCell().textContent = ''; // Empty cell for source
@@ -716,7 +716,7 @@ const ExcelViewer = (() => {
         }
     }
     function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
-    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*..."display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
+    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
     function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
@@ -724,20 +724,21 @@ const ExcelViewer = (() => {
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) { headerData.unshift('Source File'); } data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; const rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) { rowData.unshift(filename); } data.push(rowData); }); return data; }
     
-    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
+    // --- ▼▼▼ MODIFIED FUNCTION ▼▼▼ ---
     function exportSelectedMergedXlsx() {
         if (!state.isMergedView) {
             alert('此功能僅限合併檢視模式使用。');
             return;
         }
 
-        const selectedCheckboxes = elements.mergeViewContent.querySelectorAll('tbody .row-checkbox:checked');
-        if (selectedCheckboxes.length === 0) {
-            alert('請先勾選要匯出的資料列。');
+        // Get all *unselected* checkboxes that are *not hidden by search*
+        const unselectedCheckboxes = elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox:not(:checked)');
+        if (unselectedCheckboxes.length === 0) {
+            alert('沒有剩餘的(未勾選)資料列可匯出。');
             return;
         }
 
-        // 1. Get visible headers
+        // 1. Get visible headers (respecting user's column visibility choice)
         const visibility = {};
         elements.columnChecklist.querySelectorAll('input').forEach(input => {
             visibility[input.value] = input.checked;
@@ -745,13 +746,14 @@ const ExcelViewer = (() => {
         const visibleHeaders = state.mergedHeaders.filter(header => visibility[header]);
         
         const finalHeaders = [...visibleHeaders];
+        // Also include the source column if it's currently shown
         if (state.showSourceColumn) {
             finalHeaders.unshift('來源檔案');
         }
 
-        // 2. Get data for selected rows
+        // 2. Get data for *unselected* rows
         const indicesToExport = new Set();
-        selectedCheckboxes.forEach(cb => {
+        unselectedCheckboxes.forEach(cb => {
             const rowIndex = parseInt(cb.closest('tr').dataset.rowIndex, 10);
             if (!isNaN(rowIndex)) indicesToExport.add(rowIndex);
         });
@@ -776,14 +778,15 @@ const ExcelViewer = (() => {
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
             ws['!cols'] = calculateColumnWidths(ws_data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Merged Selected Data");
-            XLSX.writeFile(wb, `merged_selected_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Merged Remaining Data");
+            // Update filename to match new function
+            XLSX.writeFile(wb, `merged_remaining_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
         } catch (err) {
-            console.error('匯出選取的合併資料時發生錯誤:', err);
+            console.error('匯出剩餘的合併資料時發生錯誤:', err);
             alert('匯出時發生錯誤：' + err.message);
         }
     }
-    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
+    // --- ▲▲▲ MODIFIED FUNCTION ▲▲▲ ---
 
     function downloadHtml(content, filename) { const blob = new Blob([content], { type: 'text/html;charset=utf-8;' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
     
