@@ -107,7 +107,8 @@ const ExcelViewer = (() => {
             toggleSourceColBtn: 'toggle-source-col-btn', 
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
             exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
-            exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', // <-- NEW ELEMENT
+            exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
+            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn', // <-- NEW ELEMENT
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -181,7 +182,8 @@ const ExcelViewer = (() => {
         elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
-        elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); // <-- NEW BINDING
+        elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
+        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); // <-- NEW BINDING
 
 
         // --- Input and Dynamic Content Handling ---
@@ -641,7 +643,8 @@ const ExcelViewer = (() => {
         elements.toggleSourceColBtn.disabled = state.isEditing; 
         elements.invertSelectionMergedBtn.disabled = state.isEditing; 
         elements.exportSelectedMergedXlsxBtn.disabled = state.isEditing; 
-        elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
+        elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; 
+        elements.sortMergedByNameBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
         elements.columnSelectOps.disabled = state.isEditing;
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
@@ -945,7 +948,7 @@ const ExcelViewer = (() => {
         
         // 1. Get visible headers
         const headerData = extractTableData(table, { 
-            onlySelected: null, // Get ALL headers
+            onlySelected: null, // We pass null to get ALL headers
             includeSourceCol: state.showSourceColumn 
         })[0]; // Get only the header row
         
@@ -980,7 +983,6 @@ const ExcelViewer = (() => {
     }
     // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
 
-    // ▼▼▼ MODIFIED FUNCTION (exports UNCHECKED rows) ▼▼▼
     function exportSelectedMergedXlsx() {
         if (!state.isMergedView) {
             alert('此功能僅限合併檢視模式使用。');
@@ -1022,14 +1024,12 @@ const ExcelViewer = (() => {
             ws['!cols'] = calculateColumnWidths(ws_data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Merged Remaining Data");
-            // Update filename to match new function
             XLSX.writeFile(wb, `merged_remaining_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
         } catch (err) {
             console.error('匯出剩餘的合併資料時發生錯誤:', err);
             alert('匯出時發生錯誤：' + err.message);
         }
     }
-    // --- ▲▲▲ MODIFIED FUNCTION ▲▲▲ ---
 
     function downloadHtml(content, filename) { const blob = new Blob([content], { type: 'text/html;charset=utf-8;' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
     
@@ -1174,6 +1174,58 @@ const ExcelViewer = (() => {
         });
     }
     // ▲▲▲ MODIFIED FUNCTION ▲▲▲
+
+    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
+    /**
+     * Sorts the data currently in the MERGED VIEW by fund name
+     */
+    function sortMergedTableByFundName() {
+        if (state.isEditing) {
+            alert('請先儲存或取消編輯。');
+            return;
+        }
+        if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) {
+            alert('錯誤：基金順序列表尚未載入或為空。\n請檢查 fund-config.json 檔案。');
+            return;
+        }
+
+        // Helper: 根據檔名在 aliasMap 中尋找對應的標準名稱
+        const findStandardName = (fileName) => {
+            // state.fundAliasKeys 已經依長度排序 (長的優先)
+            const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
+            return foundAlias ? state.fundAliasMap[foundAlias] : null;
+        };
+
+        state.mergedData.sort((a, b) => {
+            // 1. Get the source filename from the row data
+            const fileNameA = a._sourceFile || '';
+            const fileNameB = b._sourceFile || '';
+
+            // 2. 從檔名 (別名) 找到標準名稱
+            const canonicalA = findStandardName(fileNameA);
+            const canonicalB = findStandardName(fileNameB);
+
+            // 3. 從標準名稱找到排序順序
+            const indexA = canonicalA ? state.fundSortOrder.indexOf(canonicalA) : -1;
+            const indexB = canonicalB ? state.fundSortOrder.indexOf(canonicalB) : -1;
+
+            // 4. 決定優先級 (找不到的排最後)
+            const priorityA = (indexA === -1) ? Infinity : indexA;
+            const priorityB = (indexB === -1) ? Infinity : indexB;
+
+            if (priorityA === priorityB) {
+                // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
+                return fileNameA.localeCompare(fileNameB);
+            }
+            
+            return priorityA - priorityB;
+        });
+
+        // Re-render the merged table
+        renderMergedTable();
+    }
+    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
+
 
     return { init };
 })();
