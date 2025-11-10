@@ -1,3 +1,5 @@
+// --- 移除了頂部的 FUND_ORDER_LIST ---
+
 const ExcelViewer = (() => {
     'use strict';
     const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
@@ -181,7 +183,7 @@ const ExcelViewer = (() => {
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
-        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); // <-- NEW BINDING
+        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
 
 
         // --- Input and Dynamic Content Handling ---
@@ -255,7 +257,72 @@ const ExcelViewer = (() => {
         ['dragleave', 'drop'].forEach(eventName => { elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.remove('highlight')); });
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
-    async function processFiles(fileList) { const validation = validateFiles(fileList); if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } if (state.isProcessing) { alert('正在處理檔案...'); return; } const importMode = document.querySelector('input[name="import-mode"]:checked').value; const specificSheetName = elements.specificSheetNameInput.value.trim(); const specificSheetPosition = elements.specificSheetPositionInput.value.trim(); if (importMode === 'specific' && !specificSheetName) { alert('請輸入工作表名稱！'); return; } if (importMode === 'position' && !specificSheetPosition) { alert('請輸入工作表位置！'); return; } state.isProcessing = true; elements.displayArea.innerHTML = '<div class="loading">讀取中...</div>'; resetControls(true); const tablesToRender = []; const missedFiles = []; state.loadedFiles = []; try { for (let index = 0; index < validation.files.length; index++) { const file = validation.files[index]; elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; const binaryData = await readFileAsBinary(file); const workbook = XLSX.read(binaryData, { type: 'binary' }); const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) { missedFiles.push(file.name); } for (const sheetName of sheetNames) { const sheet = workbook.Sheets[sheetName]; const htmlString = XLSX.utils.sheet_to_html(sheet); tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); state.loadedFiles.push(`${file.name} (${sheetName})`); } } if (missedFiles.length > 0) { const criteria = importMode === 'specific' ? `名稱包含 "${specificSheetName}"` : `位置符合 "${specificSheetPosition}"`; alert(`以下檔案找不到 ${criteria} 的工作表：\n\n- ${missedFiles.join('\n- ')}`); } state.loadedTables = tablesToRender.length; renderTables(tablesToRender); updateDropAreaDisplay(); } catch (err) { console.error("處理檔案時發生錯誤:", err); elements.displayArea.innerHTML = `<p style="color: red;">處理檔案錯誤：${err.message || '未知錯誤'}</p>`; resetControls(true); } finally { state.isProcessing = false; } }
+    
+    // ▼▼▼ MODIFIED: Added blank row removal ▼▼▼
+    async function processFiles(fileList) { 
+        const validation = validateFiles(fileList); 
+        if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
+        if (state.isProcessing) { alert('正在處理檔案...'); return; } 
+        const importMode = document.querySelector('input[name="import-mode"]:checked').value; 
+        const specificSheetName = elements.specificSheetNameInput.value.trim(); 
+        const specificSheetPosition = elements.specificSheetPositionInput.value.trim(); 
+        if (importMode === 'specific' && !specificSheetName) { alert('請輸入工作表名稱！'); return; } 
+        if (importMode === 'position' && !specificSheetPosition) { alert('請輸入工作表位置！'); return; } 
+        
+        state.isProcessing = true; 
+        elements.displayArea.innerHTML = '<div class="loading">讀取中...</div>'; 
+        resetControls(true); 
+        const tablesToRender = []; 
+        const missedFiles = []; 
+        state.loadedFiles = []; 
+        
+        try { 
+            for (let index = 0; index < validation.files.length; index++) { 
+                const file = validation.files[index]; 
+                elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; 
+                const binaryData = await readFileAsBinary(file); 
+                const workbook = XLSX.read(binaryData, { type: 'binary' }); 
+                const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); 
+                
+                if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) { 
+                    missedFiles.push(file.name); 
+                } 
+                
+                for (const sheetName of sheetNames) { 
+                    const sheet = workbook.Sheets[sheetName];
+                    
+                    // --- NEW: Remove blank rows ---
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                    const filteredData = jsonData.filter(row => 
+                        Array.isArray(row) && row.some(cell => String(cell).trim() !== '')
+                    );
+                    const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
+                    // --- End: Remove blank rows ---
+
+                    const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); // Use cleanedSheet
+                    
+                    tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); 
+                    state.loadedFiles.push(`${file.name} (${sheetName})`); 
+                } 
+            } 
+            
+            if (missedFiles.length > 0) { 
+                const criteria = importMode === 'specific' ? `名稱包含 "${specificSheetName}"` : `位置符合 "${specificSheetPosition}"`; 
+                alert(`以下檔案找不到 ${criteria} 的工作表：\n\n- ${missedFiles.join('\n- ')}`); 
+            } 
+            
+            state.loadedTables = tablesToRender.length; 
+            renderTables(tablesToRender); 
+            updateDropAreaDisplay(); 
+        } catch (err) { 
+            console.error("處理檔案時發生錯誤:", err); 
+            elements.displayArea.innerHTML = `<p style="color: red;">處理檔案錯誤：${err.message || '未知錯誤'}</p>`; 
+            resetControls(true); 
+        } finally { 
+            state.isProcessing = false; 
+        } 
+    }
+    // ▲▲▲ MODIFIED ▲▲▲
     
     function renderTables(tablesToRender) { 
         if (tablesToRender.length === 0) { 
@@ -1118,7 +1185,7 @@ const ExcelViewer = (() => {
     function handleDisplayAreaChange(e) { const target = e.target; if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return; let table; if (target.matches('.table-select-checkbox')) { const wrapper = target.closest('.table-wrapper'); table = wrapper ? wrapper.querySelector('table') : null; if (table) { toggleSelectAll(target.checked, table); } } else if (target.matches('[id^="select-all-checkbox"]')) { table = target.closest('table'); toggleSelectAll(target.checked, table); } else { table = target.closest('table'); } if (table) { syncTableCheckboxState(table); } if (!state.isMergedView) { updateSelectionInfo(); } }
     function toggleSelectAll(isChecked, table) { if (!table) return; table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked); }
     
-    // --- ▼▼▼ HELPER FUNCTION FOR SORTING ▼▼▼ ---
+    // ▼▼▼ HELPER FUNCTION (MOVED) ▼▼▼
     function getFundSortPriority(fileName) {
         if (state.fundSortOrder.length === 0) return { index: Infinity, name: fileName };
         
@@ -1135,7 +1202,7 @@ const ExcelViewer = (() => {
 
         return { index: priority, name: fileName };
     }
-    // --- ▲▲▲ HELPER FUNCTION FOR SORTING ▲▲▲ ---
+    // ▲▲▲ HELPER FUNCTION (MOVED) ▲▲▲
 
 
     // ▼▼▼ MODIFIED FUNCTION (Using new state properties) ▼▼▼
@@ -1152,7 +1219,7 @@ const ExcelViewer = (() => {
         // Helper: 從卡片標題 "檔名 (工作表名稱)" 中提取 "檔名"
         const getFileName = (wrapper) => {
             const text = wrapper.querySelector('h4').textContent;
-            const match = text.match(/(.*)\s\(.*\)$/) // 抓取開頭到第一個 ( 之前的內容
+            const match = text.match(/(.*)\s\(.*\)$/); // 抓取開頭到第一個 ( 之前的內容
             return match ? match[1].trim() : text.trim(); // 找不到括號就回傳完整名稱
         };
 
@@ -1201,7 +1268,7 @@ const ExcelViewer = (() => {
             
             if (fileA.index === fileB.index) {
                 // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
-                return fileA.name.localeCompare(fileB.name);
+                return fileNameA.localeCompare(fileNameB);
             }
             
             return fileA.index - fileB.index;
@@ -1217,4 +1284,3 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
-
