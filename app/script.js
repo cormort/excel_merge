@@ -1152,7 +1152,7 @@ const ExcelViewer = (() => {
         // Helper: 從卡片標題 "檔名 (工作表名稱)" 中提取 "檔名"
         const getFileName = (wrapper) => {
             const text = wrapper.querySelector('h4').textContent;
-            const match = text.match(/^(.*?)\s*\(/); // 抓取開頭到第一個 ( 之前的內容
+            const match = text.match(/(.*)\s\(.*\)$/) // 抓取開頭到第一個 ( 之前的內容
             return match ? match[1].trim() : text.trim(); // 找不到括號就回傳完整名稱
         };
 
@@ -1217,3 +1217,4 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
