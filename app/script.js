@@ -1,5 +1,3 @@
-// --- 移除了頂部的 FUND_ORDER_LIST ---
-
 const ExcelViewer = (() => {
     'use strict';
     const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
@@ -108,7 +106,7 @@ const ExcelViewer = (() => {
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
             exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
             exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
-            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn',
+            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn', // <-- NEW ELEMENT
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
@@ -183,7 +181,7 @@ const ExcelViewer = (() => {
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
-        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
+        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); // <-- NEW BINDING
 
 
         // --- Input and Dynamic Content Handling ---
@@ -1120,11 +1118,32 @@ const ExcelViewer = (() => {
     function handleDisplayAreaChange(e) { const target = e.target; if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return; let table; if (target.matches('.table-select-checkbox')) { const wrapper = target.closest('.table-wrapper'); table = wrapper ? wrapper.querySelector('table') : null; if (table) { toggleSelectAll(target.checked, table); } } else if (target.matches('[id^="select-all-checkbox"]')) { table = target.closest('table'); toggleSelectAll(target.checked, table); } else { table = target.closest('table'); } if (table) { syncTableCheckboxState(table); } if (!state.isMergedView) { updateSelectionInfo(); } }
     function toggleSelectAll(isChecked, table) { if (!table) return; table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked); }
     
+    // --- ▼▼▼ HELPER FUNCTION FOR SORTING ▼▼▼ ---
+    function getFundSortPriority(fileName) {
+        if (state.fundSortOrder.length === 0) return { index: Infinity, name: fileName };
+        
+        // 1. 根據檔名 (別名) 找到標準名稱
+        // state.fundAliasKeys 已經依長度排序 (長的優先)
+        const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
+        const canonicalName = foundAlias ? state.fundAliasMap[foundAlias] : null;
+
+        // 2. 從標準名稱找到排序順序
+        const index = canonicalName ? state.fundSortOrder.indexOf(canonicalName) : -1;
+
+        // 3. 決定優先級 (找不到的排最後)
+        const priority = (index === -1) ? Infinity : index;
+
+        return { index: priority, name: fileName };
+    }
+    // --- ▲▲▲ HELPER FUNCTION FOR SORTING ▲▲▲ ---
+
+
     // ▼▼▼ MODIFIED FUNCTION (Using new state properties) ▼▼▼
     function sortTablesByFundName() {
         if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) {
-            // Don't alert, just log. This can run before config is loaded.
-            console.warn('基金順序列表尚未載入，暫不排序。');
+            // 由於 init() 是 async，在 loadFundConfig() 完成前，renderTables() 可能會先執行
+            // 所以這裡不要 alert，而是靜默失敗
+            console.warn('基金順序列表尚未載入，暫不執行自動排序。');
             return;
         }
 
@@ -1137,35 +1156,16 @@ const ExcelViewer = (() => {
             return match ? match[1].trim() : text.trim(); // 找不到括號就回傳完整名稱
         };
 
-        // Helper: 根據檔名在 aliasMap 中尋找對應的標準名稱
-        const findStandardName = (fileName) => {
-            // state.fundAliasKeys 已經依長度排序 (長的優先)
-            const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
-            return foundAlias ? state.fundAliasMap[foundAlias] : null;
-        };
-
         wrappers.sort((a, b) => {
-            const fileNameA = getFileName(a);
-            const fileNameB = getFileName(b);
+            const fileA = getFundSortPriority(getFileName(a));
+            const fileB = getFundSortPriority(getFileName(b));
 
-            // 1. 從檔名 (別名) 找到標準名稱
-            const canonicalA = findStandardName(fileNameA);
-            const canonicalB = findStandardName(fileNameB);
-
-            // 2. 從標準名稱找到排序順序
-            const indexA = canonicalA ? state.fundSortOrder.indexOf(canonicalA) : -1;
-            const indexB = canonicalB ? state.fundSortOrder.indexOf(canonicalB) : -1;
-
-            // 3. 決定優先級 (找不到的排最後)
-            const priorityA = (indexA === -1) ? Infinity : indexA;
-            const priorityB = (indexB === -1) ? Infinity : indexB;
-
-            if (priorityA === priorityB) {
+            if (fileA.index === fileB.index) {
                 // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
-                return fileNameA.localeCompare(fileNameB);
+                return fileA.name.localeCompare(fileB.name);
             }
             
-            return priorityA - priorityB;
+            return fileA.index - fileB.index;
         });
 
         // Re-append sorted wrappers to the display area
@@ -1190,36 +1190,21 @@ const ExcelViewer = (() => {
             return;
         }
 
-        // Helper: 根據檔名在 aliasMap 中尋找對應的標準名稱
-        const findStandardName = (fileName) => {
-            // state.fundAliasKeys 已經依長度排序 (長的優先)
-            const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
-            return foundAlias ? state.fundAliasMap[foundAlias] : null;
-        };
-
         state.mergedData.sort((a, b) => {
             // 1. Get the source filename from the row data
             const fileNameA = a._sourceFile || '';
             const fileNameB = b._sourceFile || '';
 
-            // 2. 從檔名 (別名) 找到標準名稱
-            const canonicalA = findStandardName(fileNameA);
-            const canonicalB = findStandardName(fileNameB);
-
-            // 3. 從標準名稱找到排序順序
-            const indexA = canonicalA ? state.fundSortOrder.indexOf(canonicalA) : -1;
-            const indexB = canonicalB ? state.fundSortOrder.indexOf(canonicalB) : -1;
-
-            // 4. 決定優先級 (找不到的排最後)
-            const priorityA = (indexA === -1) ? Infinity : indexA;
-            const priorityB = (indexB === -1) ? Infinity : indexB;
-
-            if (priorityA === priorityB) {
+            // 2. Get sort priority
+            const fileA = getFundSortPriority(fileNameA);
+            const fileB = getFundSortPriority(fileNameB);
+            
+            if (fileA.index === fileB.index) {
                 // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
-                return fileNameA.localeCompare(fileNameB);
+                return fileA.name.localeCompare(fileB.name);
             }
             
-            return priorityA - priorityB;
+            return fileA.index - fileB.index;
         });
 
         // Re-render the merged table
