@@ -51,6 +51,7 @@
                     <div class="control-group" id="table-level-controls">
                         <label>📋 表格層級操作</label>
                         <div class="button-group">
+                            <button class="btn btn-primary" id="sort-by-fund-name-btn" title="根據預設的基金列表排序表格 (僅排序主畫面卡片)">依基金名稱排序</button>
                             <button class="btn btn-primary" id="select-all-tables-btn" title="勾選目前載入的所有表格卡片">勾選所有表格</button>
                             <button class="btn btn-secondary" id="unselect-all-tables-btn" title="取消勾選所有表格卡片">取消勾選</button>
                             <button class="btn btn-danger" id="delete-selected-tables-btn" title="刪除所有被勾選的表格卡片">刪除選定表格</button>
@@ -64,11 +65,11 @@
 
                 <div class="control-group-row">
                     <div class="control-group">
-                        <label for="search-input">🔍 即時搜尋篩選</label>
+                        <label for="search-input">🔍 即時搜尋篩選 (主畫面)</label>
                         <input type="text" id="search-input" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選所有表格中的資料列">
                     </div>
                     <div class="control-group" id="select-by-keyword-group">
-                        <label>✅ 依關鍵字勾選</label>
+                        <label>✅ 依關鍵字勾選 (主畫面)</label>
                         
                         <div class="input-with-checkbox-group">
                             <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
@@ -80,7 +81,7 @@
                 
                 <div class="control-group-row">
                     <div class="control-group">
-                        <label>▶️ 資料列操作</label>
+                        <label>▶️ 資料列操作 (主畫面)</label>
                         
                         <div class="button-group">
                             <button class="btn btn-primary" id="select-by-keyword-btn" title="根據上方輸入的關鍵字勾選資料列">依關鍵字勾選</button>
@@ -134,11 +135,11 @@
             <div id="merge-view-search-controls" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
                 <div class="control-group-row">
                     <div class="control-group">
-                        <label for="search-input-merged">🔍 即時搜尋篩選</label>
+                        <label for="search-input-merged">🔍 即時搜尋篩選 (合併視窗)</label>
                         <input type="text" id="search-input-merged" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選合併表格中的資料列">
                     </div>
                     <div class="control-group" id="select-by-keyword-group-merged">
-                        <label>✅ 依關鍵字勾選</label>
+                        <label>✅ 依關鍵字勾選 (合併視窗)</label>
                         <div class="input-with-checkbox-group">
                             <input type="text" id="select-keyword-input-merged" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">
                             <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex-merged" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
