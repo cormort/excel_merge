@@ -1,10 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
     const tabContainer = document.querySelector('.tab-container');
+    
+    // 檢查 tabContainer 是否存在，避免在其他頁面出錯
+    if (!tabContainer) {
+        return;
+    }
+
     const tabBtns = tabContainer.querySelectorAll('.tab-btn');
     const tabPanes = tabContainer.querySelectorAll('.tab-pane');
 
     // 預先載入第一個說明頁面
-    const initialTab = document.querySelector('.tab-btn[data-source]');
+    const initialTab = tabContainer.querySelector('.tab-btn[data-source]');
     if (initialTab) {
         loadTabContent(initialTab);
     }
@@ -53,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetPane.setAttribute('data-is-loaded', 'true'); // 標記為已載入
             } catch (error) {
                 console.error('載入內容時發生錯誤:', error);
-                targetPane.innerHTML = `<p style="color: red;">內容載入失敗。</p>`;
+                targetPane.innerHTML = `<p style="color: red; padding: 20px;">無法載入內容：${error.message}</p>`;
             }
         }
     }
