@@ -540,6 +540,7 @@ const ExcelViewer = (() => {
         toggleEditMode(false);
     }
 
+// ▼▼▼ MODIFIED: Fix data truncation issue in Merged View ▼▼▼
     function renderMergedTable() {
         const table = document.createElement('table');
         const thead = table.createTHead();
@@ -587,13 +588,23 @@ const ExcelViewer = (() => {
                 td.contentEditable = state.isEditing;
                 td.dataset.colHeader = header;
                 const value = rowData[header] || '';
-                td.textContent = value;
-                if (value && !isNaN(parseFloat(value.replace(/,/g, '')))) {
+                
+                // --- 關鍵修正開始 (FIX START) ---
+                // 舊邏輯：!isNaN(parseFloat(...)) 會把 "1.行政院" 判斷成數字 1，導致文字遺失。
+                // 新邏輯：使用 !isNaN(cleanVal) 進行嚴格檢查。
+                // 只有當 "整個字串" 都是數字時 (例如 "1000", "123.45")，才進行格式化。
+                
+                const cleanVal = String(value).replace(/,/g, '').trim();
+                const isStrictNumber = cleanVal !== '' && !isNaN(cleanVal);
+
+                if (isStrictNumber) {
                     td.classList.add('numeric');
                     td.textContent = formatNumber(value);
-                } else if (!value) {
-                    td.textContent = '';
+                } else {
+                    // 如果不是純數字 (例如 "1.行政院")，就原樣顯示文字
+                    td.textContent = value;
                 }
+                // --- 關鍵修正結束 (FIX END) ---
             });
         });
 
@@ -643,6 +654,7 @@ const ExcelViewer = (() => {
             });
         }
     }
+    // ▲▲▲ MODIFIED ▲▲▲
     
     function toggleSourceColumn() {
         if (state.isEditing) {
@@ -1367,6 +1379,7 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
 
