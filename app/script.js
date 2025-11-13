@@ -481,6 +481,7 @@ const ExcelViewer = (() => {
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
         elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>'; 
+        elements.columnSelectOps2.innerHTML = '<option value="">-- 欄位 2 (選填) --</option>'; // --- NEW: Reset 2nd dropdown
         
         elements.searchInputMerged.value = '';
         elements.selectKeywordInputMerged.value = '';
@@ -721,6 +722,7 @@ const ExcelViewer = (() => {
         elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; 
         elements.sortMergedByNameBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
         elements.columnSelectOps.disabled = state.isEditing;
+        elements.columnSelectOps2.disabled = state.isEditing; // --- NEW: Disable 2nd dropdown
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
         elements.selectByColExistsBtn.disabled = state.isEditing;
@@ -1315,4 +1317,5 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
