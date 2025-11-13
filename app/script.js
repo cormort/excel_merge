@@ -112,6 +112,7 @@ const ExcelViewer = (() => {
             // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
             viewCheckedCombinedBtn: 'view-checked-combined-btn',
             columnSelectOps: 'column-select-ops',
+            columnSelectOps2: 'column-select-ops-2', // <--- 新增這行
             selectByColZeroBtn: 'select-by-col-zero-btn',
             selectByColEmptyBtn: 'select-by-col-empty-btn',
             selectByColExistsBtn: 'select-by-col-exists-btn',
@@ -617,6 +618,15 @@ const ExcelViewer = (() => {
             option.textContent = header;
             elements.columnSelectOps.appendChild(option);
         });
+        // --- NEW: Populate Second Dropdown (Clone options) ---
+        elements.columnSelectOps2.innerHTML = '<option value="">-- 欄位 2 (選填) --</option>';
+        headers.forEach(header => {
+            const option = document.createElement('option');
+            option.value = header;
+            option.textContent = header;
+            elements.columnSelectOps2.appendChild(option);
+        });
+        
     }
 
     function toggleColumnModal(forceShow) { elements.columnModal.classList.toggle('hidden', forceShow === false || !elements.columnModal.classList.contains('hidden')); }
@@ -865,9 +875,12 @@ const ExcelViewer = (() => {
             return;
         }
 
-        const colName = elements.columnSelectOps.value;
-        if (!colName) {
-            alert('請先從下拉選單中指定一個欄位。');
+        const colName1 = elements.columnSelectOps.value;
+        const colName2 = elements.columnSelectOps2.value; // --- NEW ---
+
+        // --- MODIFIED: 檢查至少選了一個欄位 ---
+        if (!colName1 && !colName2) {
+            alert('請至少從下拉選單中指定一個欄位。');
             return;
         }
 
@@ -883,11 +896,29 @@ const ExcelViewer = (() => {
         }
 
         scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-            const cell = row.querySelector(`td[data-col-header="${colName}"]`);
-            const cellValue = cell ? cell.textContent.trim() : '';
             const checkbox = row.querySelector('.row-checkbox');
-            
-            if (checkbox && checkFunction(cellValue)) {
+            if (!checkbox) return;
+
+            // --- NEW LOGIC: Dual Column Check ---
+            let match1 = true;
+            let match2 = true;
+
+            // 檢查欄位 1 (如果有選)
+            if (colName1) {
+                const cell1 = row.querySelector(`td[data-col-header="${colName1}"]`);
+                const val1 = cell1 ? cell1.textContent.trim() : '';
+                match1 = checkFunction(val1);
+            }
+
+            // 檢查欄位 2 (如果有選)
+            if (colName2) {
+                const cell2 = row.querySelector(`td[data-col-header="${colName2}"]`);
+                const val2 = cell2 ? cell2.textContent.trim() : '';
+                match2 = checkFunction(val2);
+            }
+
+            // AND 邏輯：兩個都必須符合 (若未選該欄位則預設為 true)
+            if (match1 && match2) {
                 checkbox.checked = true;
                 count++;
             }
@@ -1284,3 +1315,4 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
