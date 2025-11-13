@@ -259,7 +259,7 @@ const ExcelViewer = (() => {
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-    // ▼▼▼ MODIFIED: Fixed hidden row detection (Added offset logic) ▼▼▼
+    // ▼▼▼ MODIFIED: Filter out BOTH hidden rows AND hidden columns ▼▼▼
     async function processFiles(fileList) { 
         const validation = validateFiles(fileList); 
         if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
@@ -283,7 +283,7 @@ const ExcelViewer = (() => {
                 elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; 
                 const binaryData = await readFileAsBinary(file); 
                 
-                // 讀取時確保解析所有樣式與屬性
+                // 讀取時包含樣式 (確保能讀取 hidden 屬性)
                 const workbook = XLSX.read(binaryData, { type: 'binary', cellStyles: true }); 
                 
                 const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); 
@@ -295,33 +295,58 @@ const ExcelViewer = (() => {
                 for (const sheetName of sheetNames) { 
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // 1. 取得該工作表的資料範圍資訊
+                    // 1. 解析資料範圍，取得起始列與起始欄
                     let startRow = 0;
+                    let startCol = 0;
+                    let endCol = 0;
+                    
                     if (sheet['!ref']) {
                         const range = XLSX.utils.decode_range(sheet['!ref']);
-                        startRow = range.s.r; // 資料起始的列索引 (0-based)
+                        startRow = range.s.r;
+                        startCol = range.s.c;
+                        endCol = range.e.c;
                     }
 
-                    // 2. 取得列屬性 (包含 hidden 資訊)
+                    // 2. 取得隱藏屬性 (!rows 和 !cols)
                     const rowProps = sheet['!rows'] || []; 
+                    const colProps = sheet['!cols'] || []; 
 
-                    // 3. 轉換資料 (header: 1 保證產生陣列，defval: '' 保證空值存在)
+                    // 3. [新功能] 預先計算哪些 "相對欄位索引" 是可見的
+                    // sheet_to_json 產生的陣列 index 0 對應到 startCol (例如 B欄)
+                    // 我們需要檢查 colProps[startCol + index] 是否隱藏
+                    const visibleRelativeIndices = [];
+                    for (let c = startCol; c <= endCol; c++) {
+                        // 檢查絕對欄位索引 c 是否被隱藏
+                        const isHidden = colProps[c] && colProps[c].hidden;
+                        if (!isHidden) {
+                            // 如果沒隱藏，則記錄它相對於資料陣列的索引 (例如 0, 2, 3...)
+                            visibleRelativeIndices.push(c - startCol);
+                        }
+                    }
+
                     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-                    
-                    // 4. 過濾邏輯
-                    const filteredData = jsonData.filter((row, index) => {
-                        // 修正：計算該資料列在 Excel 中的 "絕對列號"
+                    const filteredData = [];
+
+                    // 4. 逐列處理
+                    jsonData.forEach((row, index) => {
+                        // A. 檢查列是否隱藏
                         const absoluteRowIndex = startRow + index;
+                        if (rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden) {
+                            return; // 若列隱藏，直接跳過
+                        }
 
-                        // 檢查該絕對列號是否被隱藏
-                        const isHidden = rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden;
-                        if (isHidden) return false; // 是隱藏列則丟棄
+                        // B. 濾除隱藏欄位
+                        // 根據我們剛算好的 visibleRelativeIndices，重組出一個新的 row 陣列
+                        const newRow = visibleRelativeIndices.map(i => (row[i] !== undefined ? row[i] : ''));
 
-                        // 檢查是否為空白列
-                        return Array.isArray(row) && row.some(cell => String(cell).trim() !== '');
+                        // C. 檢查是否變為空白列 (只檢查可見欄位是否有值)
+                        const hasContent = newRow.some(cell => String(cell).trim() !== '');
+                        if (hasContent) {
+                            filteredData.push(newRow);
+                        }
                     });
 
-                    // 如果過濾後還有資料，才進行渲染
+                    // 只有當還有剩餘資料時才渲染
                     if (filteredData.length > 0) {
                         const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
                         const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
@@ -1342,6 +1367,7 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
 
