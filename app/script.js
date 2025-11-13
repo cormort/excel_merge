@@ -259,7 +259,7 @@ const ExcelViewer = (() => {
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-    // ▼▼▼ MODIFIED: Filter out BOTH hidden rows AND hidden columns ▼▼▼
+// ▼▼▼ MODIFIED: Handle Merged Cells + Filter Hidden Rows/Cols ▼▼▼
     async function processFiles(fileList) { 
         const validation = validateFiles(fileList); 
         if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
@@ -295,7 +295,7 @@ const ExcelViewer = (() => {
                 for (const sheetName of sheetNames) { 
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // 1. 解析資料範圍，取得起始列與起始欄
+                    // 1. 解析資料範圍
                     let startRow = 0;
                     let startCol = 0;
                     let endCol = 0;
@@ -307,27 +307,55 @@ const ExcelViewer = (() => {
                         endCol = range.e.c;
                     }
 
-                    // 2. 取得隱藏屬性 (!rows 和 !cols)
+                    // 2. 轉成 JSON (包含空值)
+                    // 注意：此時 jsonData 的 index 0 對應到 Excel 的 startRow
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                    // --- NEW: 處理合併儲存格 (Data Filling) ---
+                    // 在過濾隱藏列之前，先把合併儲存格的值「擴散」到該範圍內的所有格子
+                    if (sheet['!merges']) {
+                        sheet['!merges'].forEach(merge => {
+                            // 計算合併範圍相對於 jsonData 的索引
+                            // merge.s 是 start (左上), merge.e 是 end (右下)
+                            const startR = merge.s.r - startRow;
+                            const startC = merge.s.c - startCol;
+                            const endR = merge.e.r - startRow;
+                            const endC = merge.e.c - startCol;
+
+                            // 確保範圍在有效資料內
+                            if (startR >= 0 && startC >= 0 && jsonData[startR]) {
+                                // 取得左上角的值 (主要值)
+                                const primaryValue = jsonData[startR][startC];
+
+                                // 將此值填入範圍內的所有格子
+                                for (let r = startR; r <= endR; r++) {
+                                    for (let c = startC; c <= endC; c++) {
+                                        if (jsonData[r]) {
+                                            jsonData[r][c] = primaryValue;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    // --- End Data Filling ---
+
+                    // 3. 取得隱藏屬性
                     const rowProps = sheet['!rows'] || []; 
                     const colProps = sheet['!cols'] || []; 
 
-                    // 3. [新功能] 預先計算哪些 "相對欄位索引" 是可見的
-                    // sheet_to_json 產生的陣列 index 0 對應到 startCol (例如 B欄)
-                    // 我們需要檢查 colProps[startCol + index] 是否隱藏
+                    // 4. 計算可見欄位索引
                     const visibleRelativeIndices = [];
                     for (let c = startCol; c <= endCol; c++) {
-                        // 檢查絕對欄位索引 c 是否被隱藏
                         const isHidden = colProps[c] && colProps[c].hidden;
                         if (!isHidden) {
-                            // 如果沒隱藏，則記錄它相對於資料陣列的索引 (例如 0, 2, 3...)
                             visibleRelativeIndices.push(c - startCol);
                         }
                     }
 
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
                     const filteredData = [];
 
-                    // 4. 逐列處理
+                    // 5. 逐列過濾 (隱藏列 + 隱藏欄)
                     jsonData.forEach((row, index) => {
                         // A. 檢查列是否隱藏
                         const absoluteRowIndex = startRow + index;
@@ -335,18 +363,16 @@ const ExcelViewer = (() => {
                             return; // 若列隱藏，直接跳過
                         }
 
-                        // B. 濾除隱藏欄位
-                        // 根據我們剛算好的 visibleRelativeIndices，重組出一個新的 row 陣列
+                        // B. 濾除隱藏欄位 (使用填滿過後的 row 資料)
                         const newRow = visibleRelativeIndices.map(i => (row[i] !== undefined ? row[i] : ''));
 
-                        // C. 檢查是否變為空白列 (只檢查可見欄位是否有值)
+                        // C. 檢查是否變為空白列
                         const hasContent = newRow.some(cell => String(cell).trim() !== '');
                         if (hasContent) {
                             filteredData.push(newRow);
                         }
                     });
 
-                    // 只有當還有剩餘資料時才渲染
                     if (filteredData.length > 0) {
                         const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
                         const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
@@ -1379,6 +1405,7 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
 
