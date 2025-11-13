@@ -259,7 +259,7 @@ const ExcelViewer = (() => {
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-    // ▼▼▼ MODIFIED: Added hidden row removal logic ▼▼▼
+    // ▼▼▼ MODIFIED: Fixed hidden row detection (Added offset logic) ▼▼▼
     async function processFiles(fileList) { 
         const validation = validateFiles(fileList); 
         if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
@@ -282,7 +282,10 @@ const ExcelViewer = (() => {
                 const file = validation.files[index]; 
                 elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; 
                 const binaryData = await readFileAsBinary(file); 
-                const workbook = XLSX.read(binaryData, { type: 'binary' }); 
+                
+                // 讀取時確保解析所有樣式與屬性
+                const workbook = XLSX.read(binaryData, { type: 'binary', cellStyles: true }); 
+                
                 const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); 
                 
                 if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) { 
@@ -292,29 +295,40 @@ const ExcelViewer = (() => {
                 for (const sheetName of sheetNames) { 
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // --- NEW: 取得原始 Excel 的列屬性 (包含隱藏資訊) ---
+                    // 1. 取得該工作表的資料範圍資訊
+                    let startRow = 0;
+                    if (sheet['!ref']) {
+                        const range = XLSX.utils.decode_range(sheet['!ref']);
+                        startRow = range.s.r; // 資料起始的列索引 (0-based)
+                    }
+
+                    // 2. 取得列屬性 (包含 hidden 資訊)
                     const rowProps = sheet['!rows'] || []; 
 
+                    // 3. 轉換資料 (header: 1 保證產生陣列，defval: '' 保證空值存在)
                     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
                     
-                    // --- MODIFIED: 同時過濾 "隱藏列" 與 "空白列" ---
-                    const filteredData = jsonData.filter((row, rowIndex) => {
-                        // 1. 檢查是否為 Excel 原始隱藏列
-                        // rowProps 的 index 對應到 Excel 的列號 (從 0 開始)
-                        const isHidden = rowProps[rowIndex] && rowProps[rowIndex].hidden;
-                        if (isHidden) return false; // 如果是隱藏列，直接丟棄
+                    // 4. 過濾邏輯
+                    const filteredData = jsonData.filter((row, index) => {
+                        // 修正：計算該資料列在 Excel 中的 "絕對列號"
+                        const absoluteRowIndex = startRow + index;
 
-                        // 2. 檢查是否為空白列 (既有邏輯)
+                        // 檢查該絕對列號是否被隱藏
+                        const isHidden = rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden;
+                        if (isHidden) return false; // 是隱藏列則丟棄
+
+                        // 檢查是否為空白列
                         return Array.isArray(row) && row.some(cell => String(cell).trim() !== '');
                     });
 
-                    const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
-                    // --- End: Filter logic ---
-
-                    const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
-                    
-                    tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); 
-                    state.loadedFiles.push(`${file.name} (${sheetName})`); 
+                    // 如果過濾後還有資料，才進行渲染
+                    if (filteredData.length > 0) {
+                        const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
+                        const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
+                        
+                        tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); 
+                        state.loadedFiles.push(`${file.name} (${sheetName})`); 
+                    }
                 } 
             } 
             
@@ -1328,6 +1342,7 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
 
