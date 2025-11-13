@@ -259,7 +259,7 @@ const ExcelViewer = (() => {
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-    // ▼▼▼ MODIFIED: Added blank row removal ▼▼▼
+    // ▼▼▼ MODIFIED: Added hidden row removal logic ▼▼▼
     async function processFiles(fileList) { 
         const validation = validateFiles(fileList); 
         if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
@@ -292,15 +292,26 @@ const ExcelViewer = (() => {
                 for (const sheetName of sheetNames) { 
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // --- NEW: Remove blank rows ---
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-                    const filteredData = jsonData.filter(row => 
-                        Array.isArray(row) && row.some(cell => String(cell).trim() !== '')
-                    );
-                    const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
-                    // --- End: Remove blank rows ---
+                    // --- NEW: 取得原始 Excel 的列屬性 (包含隱藏資訊) ---
+                    const rowProps = sheet['!rows'] || []; 
 
-                    const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); // Use cleanedSheet
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                    
+                    // --- MODIFIED: 同時過濾 "隱藏列" 與 "空白列" ---
+                    const filteredData = jsonData.filter((row, rowIndex) => {
+                        // 1. 檢查是否為 Excel 原始隱藏列
+                        // rowProps 的 index 對應到 Excel 的列號 (從 0 開始)
+                        const isHidden = rowProps[rowIndex] && rowProps[rowIndex].hidden;
+                        if (isHidden) return false; // 如果是隱藏列，直接丟棄
+
+                        // 2. 檢查是否為空白列 (既有邏輯)
+                        return Array.isArray(row) && row.some(cell => String(cell).trim() !== '');
+                    });
+
+                    const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
+                    // --- End: Filter logic ---
+
+                    const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
                     
                     tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); 
                     state.loadedFiles.push(`${file.name} (${sheetName})`); 
@@ -1317,5 +1328,6 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
