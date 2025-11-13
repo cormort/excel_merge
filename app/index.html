@@ -155,9 +155,17 @@
 
             <div id="merge-view-column-ops" class="button-group" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; gap: 10px; align-items: center;">
                 <label for="column-select-ops" style="font-weight: 600; font-size: 0.95rem; color: #495057;">▶️ 依指定欄位勾選:</label>
+                
                 <select id="column-select-ops" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇一個欄位以進行勾選操作">
                     <option value="">-- 請選擇欄位 --</option>
                 </select>
+
+                <span style="font-weight: bold; color: #6c757d;">+</span>
+
+                <select id="column-select-ops-2" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇第二個欄位 (選填，若選擇則需同時符合兩個欄位的條件)">
+                    <option value="">-- 欄位 2 (選填) --</option>
+                </select>
+
                 <button class="btn btn-primary" id="select-by-col-zero-btn" title="勾選指定欄位中，內容為 '0' 的資料列">勾選為零</button>
                 <button class="btn btn-primary" id="select-by-col-empty-btn" title="勾選指定欄位中，內容為空白的資料列">勾選為空</button>
                 <button class="btn btn-primary" id="select-by-col-exists-btn" title="勾選指定欄位中，內容非空白的資料列">勾選有值</button>
@@ -190,3 +198,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
