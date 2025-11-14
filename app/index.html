@@ -187,15 +187,15 @@
                                 <label><input type="radio" name="criteria-2" value="value"> 有值</label>
                                 <label><input type="radio" name="criteria-2" value="exact"> 等於</label>
                                 <label><input type="radio" name="criteria-2" value="includes"> 包含</label>
+                                <input type="text" id="input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled>
                             </div>
-                            <input type="text" id="input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled>
                         </div>
                     </div>
                     
                     <div class="filter-row execute-row">
                         <div class="button-group" style="margin-left: auto;">
                             <button id="unselect-merged-rows-btn" class="btn btn-secondary">取消勾選</button>
-                            <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選</button>
+                            <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選列</button>
                             <button id="execute-filter-selection-btn" class="btn btn-primary">🚀 執行篩選勾選</button>
                         </div>
                     </div>
@@ -229,3 +229,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
