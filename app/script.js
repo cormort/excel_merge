@@ -115,7 +115,7 @@ const ExcelViewer = (() => {
         });
     }
 
-    function bindEvents() {
+function bindEvents() {
         // --- Core File Handling ---
         elements.fileInput.addEventListener('change', e => processFiles(e.target.files));
         setupDragAndDrop();
@@ -137,7 +137,7 @@ const ExcelViewer = (() => {
         elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         
-        // --- COMPLEX FILTER EXECUTE ---
+        // --- COMPLEX FILTER EXECUTE (使用新按鈕) ---
         if (elements.executeComplexSelectBtn) {
             elements.executeComplexSelectBtn.addEventListener('click', () => {
                 executeComplexSelection(); 
@@ -1322,3 +1322,4 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
