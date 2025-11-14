@@ -621,6 +621,50 @@ table tbody tr:hover {
     .merge-view-overlay { padding: 5px; }
     table th, table td { padding: 6px; font-size: 0.85rem; }
 }
+/* --- 合併檢視篩選器排版優化 --- */
+
+#merge-view-column-ops .filter-section {
+    display: flex; /* 讓 filter-section 內的元素水平排列 */
+    align-items: center; /* 垂直置中對齊 */
+    flex-wrap: wrap; /* 允許換行，以防空間不足 */
+    margin-bottom: 5px; /* 增加一點和下一行的間距 */
+}
+
+#merge-view-column-ops .filter-section > label {
+    flex-shrink: 0; /* "條件 A/B" 標籤不要縮小 */
+    margin-right: 5px;
+}
+
+#merge-view-column-ops .filter-section .filter-select {
+    flex-shrink: 0; /* 下拉選單不要縮小 */
+    width: 220px; /* 給下拉選單一個固定寬度 */
+    margin-right: 10px; /* 和右邊的選項有點間距 */
+}
+
+#merge-view-column-ops .filter-section .radio-group {
+    flex: 1; /* 佔據所有剩餘空間 */
+    display: flex; /* 讓 radio-group 內的元素 (label, input) 水平排列 */
+    align-items: center; /* 垂直置中 */
+    flex-wrap: wrap; /* 允許 radio 按鈕換行 */
+    min-width: 300px; /* 最小寬度，避免過度壓縮 */
+}
+
+#merge-view-column-ops .filter-section .radio-group label {
+    margin-right: 10px; /* radio 選項之間的間距 */
+    white-space: nowrap; /* 避免 "空值" 等文字換行 */
+    margin-bottom: 0; /* 覆蓋可能的預設樣式 */
+}
+
+#merge-view-column-ops .filter-section .radio-group .filter-input {
+    width: 150px; /* 給最後的 input 一個寬度 */
+}
+
+/* 調整 AND/OR 邏輯運算子的間距 */
+#merge-view-column-ops .logic-operator {
+    padding-left: 20px; 
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
 
 
 
