@@ -78,7 +78,7 @@ function cacheElements() {
             closeMergeViewBtn: 'close-merge-view-btn',
             mergeViewContent: 'merge-view-content',
             mergeViewBtn: 'merge-view-btn',
-            viewCheckedCombinedBtn: 'view-checked-combined-btn', // 確保此按鈕存在
+            viewCheckedCombinedBtn: 'view-checked-combined-btn', 
             
             // Column operations
             columnOperationsBtn: 'column-operations-btn',
@@ -107,6 +107,8 @@ function cacheElements() {
             colSelect1: 'col-select-1',
             colSelect2: 'col-select-2',
             executeComplexSelectBtn: 'execute-complex-select-btn',
+            inputCriteria1: 'input-criteria-1', // <-- 新增
+            inputCriteria2: 'input-criteria-2', // <-- 新增
 
             // --- NEW MERGED VIEW CONTROLS ---
             searchInputMerged: 'search-input-merged',
@@ -118,7 +120,33 @@ function cacheElements() {
             elements[key] = document.getElementById(mapping[key]);
         });
     }
+    
+// --- NEW: 處理篩選條件變更，啟用/禁用輸入框 ---
+    function handleCriteriaChange(e) {
+        // 找到觸發事件的 radio button
+        const radio = e.target;
+        if (radio.type !== 'radio') return;
 
+        // 找到它所屬的群組 (div.radio-group)
+        const group = radio.closest('.radio-group');
+        if (!group) return;
+
+        // 根據群組的 data-target 屬性找到對應的 input
+        const targetInputId = group.dataset.target;
+        const targetInput = elements[targetInputId];
+        if (!targetInput) return;
+
+        // 檢查新選中的值
+        const newValue = radio.value;
+        if (newValue === 'exact' || newValue === 'includes') {
+            targetInput.disabled = false;
+            targetInput.focus();
+        } else {
+            targetInput.disabled = true;
+            targetInput.value = '';
+        }
+    }
+    
 function bindEvents() {
         // --- Core File Handling ---
         elements.fileInput.addEventListener('change', e => processFiles(e.target.files));
@@ -155,7 +183,6 @@ function bindEvents() {
         elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
         
         // --- Merge View Modal Events ---
-        // 崩潰點已移除，以下按鈕現在可以正常運作了
         elements.mergeViewBtn.addEventListener('click', () => createMergedView('all')); 
         elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
         elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
@@ -186,6 +213,7 @@ function bindEvents() {
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
         elements.displayArea.addEventListener('click', handleCardClick);
         
+        // --- [MODIFIED] 監聽 mergeViewContent 內的變更 (for Radio buttons) ---
         elements.mergeViewContent.addEventListener('click', e => {
             const th = e.target.closest('th:not(.checkbox-cell)');
             const delBtn = e.target.closest('.delete-col-btn');
@@ -196,6 +224,13 @@ function bindEvents() {
                 handleMergedHeaderClick(th);
             }
         });
+        // --- [NEW] 監聽 radio button 的變更 ---
+        elements.mergeViewModal.addEventListener('change', e => {
+            if (e.target.name === 'criteria-1' || e.target.name === 'criteria-2') {
+                handleCriteriaChange(e);
+            }
+        });
+        
         elements.importOptionsContainer.addEventListener('change', e => {
             if (e.target.name === 'import-mode') {
                 const selectedMode = e.target.value;
@@ -508,7 +543,7 @@ function bindEvents() {
         document.body.classList.add('no-scroll');
     }
 
-    function closeMergeView() {
+function closeMergeView() {
         if (state.isEditing && !confirm("您有未儲存的編輯，確定要關閉並捨棄變更嗎？")) {
             return;
         }
@@ -524,9 +559,19 @@ function bindEvents() {
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
         
+        // --- [NEW] 重置新元件 ---
         elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; 
         elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
-        
+        elements.inputCriteria1.value = '';
+        elements.inputCriteria2.value = '';
+        elements.inputCriteria1.disabled = true;
+        elements.inputCriteria2.disabled = true;
+        // (重置 radio button 回到預設)
+        document.querySelector('input[name="criteria-1"][value="empty"]').checked = true;
+        document.querySelector('input[name="criteria-2"][value="empty"]').checked = true;
+        document.querySelector('input[name="logic-op"][value="and"]').checked = true;
+        // --- 結束 ---
+
         elements.searchInputMerged.value = '';
         elements.selectKeywordInputMerged.value = '';
         elements.selectKeywordRegexMerged.checked = false;
@@ -674,28 +719,52 @@ function bindEvents() {
         });
     }
     
-    // --- EXECUTE COMPLEX SELECTION ---
+// --- [REPLACED] 執行複雜篩選 (支援 5 種條件) ---
     function executeComplexSelection() {
         if (!state.isMergedView) return;
 
+        // 1. 取得使用者設定
         const col1 = elements.colSelect1.value;
         const col2 = elements.colSelect2.value;
 
-        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value; 
+        // 取得 Radio Button 的值
+        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value; // zero, empty, value, exact, includes
         const criteria2 = document.querySelector('input[name="criteria-2"]:checked').value;
-        const logicOp = document.querySelector('input[name="logic-op"]:checked').value;
+        const logicOp = document.querySelector('input[name="logic-op"]:checked').value; // and, or
+
+        // 取得輸入框的值
+        const inputVal1 = elements.inputCriteria1.value;
+        const inputVal2 = elements.inputCriteria2.value;
 
         if (!col1 && !col2) {
             alert('請至少選擇一個欄位 (條件 A 或 條件 B)。');
             return;
         }
 
-        const checkValue = (val, criteria) => {
-            const strVal = String(val).trim();
-            if (criteria === 'empty') return strVal === '';
-            if (criteria === 'zero') return strVal === '0';
-            if (criteria === 'value') return strVal !== '';
-            return false;
+        // Helper: 判斷單一數值是否符合條件
+        const checkValue = (cellVal, criteria, inputVal) => {
+            const strCellVal = String(cellVal).trim();
+            const strInputVal = String(inputVal).trim(); // The value from the text box
+
+            switch (criteria) {
+                case 'empty': 
+                    return strCellVal === '';
+                case 'zero':  
+                    return strCellVal === '0';
+                case 'value': 
+                    return strCellVal !== '';
+                case 'exact': 
+                    // 嚴格區分大小寫的完全符合
+                    return strCellVal === strInputVal;
+                case 'includes':
+                    // [注意] "A".includes("") 永遠是 true。
+                    // 所以如果輸入框為空，我們當作 "不符合" (false) 來處理。
+                    if (strInputVal === '') return false; 
+                    // 不區分大小寫的「包括」
+                    return strCellVal.toLowerCase().includes(strInputVal.toLowerCase());
+                default: 
+                    return false;
+            }
         };
 
         const scope = elements.mergeViewContent;
@@ -705,32 +774,38 @@ function bindEvents() {
             const checkbox = row.querySelector('.row-checkbox');
             if (!checkbox) return;
 
-            let result1 = null; 
+            let result1 = null; // null 代表未啟用該條件
             let result2 = null;
 
+            // 檢查條件 A
             if (col1) {
                 const cell = row.querySelector(`td[data-col-header="${col1}"]`);
                 const val = cell ? cell.textContent : '';
-                result1 = checkValue(val, criteria1);
+                result1 = checkValue(val, criteria1, inputVal1);
             }
 
+            // 檢查條件 B
             if (col2) {
                 const cell = row.querySelector(`td[data-col-header="${col2}"]`);
                 const val = cell ? cell.textContent : '';
-                result2 = checkValue(val, criteria2);
+                result2 = checkValue(val, criteria2, inputVal2);
             }
 
+            // 綜合判斷
             let finalMatch = false;
 
             if (col1 && col2) {
+                // 雙欄位模式
                 if (logicOp === 'and') {
-                    finalMatch = result1 && result2; 
+                    finalMatch = result1 && result2; // 且: 兩者皆 True
                 } else {
-                    finalMatch = result1 || result2; 
+                    finalMatch = result1 || result2; // 或: 任一 True
                 }
             } else if (col1) {
+                // 只選了 A
                 finalMatch = result1;
             } else if (col2) {
+                // 只選了 B
                 finalMatch = result2;
             }
 
@@ -819,8 +894,7 @@ function bindEvents() {
         return totals;
     }
 
-    // --- Edit Mode Functions ---
-    function toggleEditMode(startEditing) {
+function toggleEditMode(startEditing) {
         state.isEditing = startEditing;
         elements.editDataBtn.classList.toggle('hidden', state.isEditing);
         elements.saveEditsBtn.classList.toggle('hidden', !state.isEditing);
@@ -836,9 +910,11 @@ function bindEvents() {
         elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; 
         elements.sortMergedByNameBtn.disabled = state.isEditing;
         
-        // Disable complex filter inputs
+        // --- [MODIFIED] 禁用所有篩選元件 ---
         elements.colSelect1.disabled = state.isEditing;
         elements.colSelect2.disabled = state.isEditing;
+        elements.inputCriteria1.disabled = true; // 編輯時永遠禁用
+        elements.inputCriteria2.disabled = true; // 編輯時永遠禁用
         elements.executeComplexSelectBtn.disabled = state.isEditing;
         document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => {
             r.disabled = state.isEditing;
@@ -1342,5 +1418,6 @@ function bindEvents() {
 })();
 
 ExcelViewer.init();
+
 
 
