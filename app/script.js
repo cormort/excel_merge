@@ -116,7 +116,10 @@ const ExcelViewer = (() => {
             selectByColZeroBtn: 'select-by-col-zero-btn',
             selectByColEmptyBtn: 'select-by-col-empty-btn',
             selectByColExistsBtn: 'select-by-col-exists-btn',
-
+            // --- MODIFIED: 新的篩選介面元件 ---
+            colSelect1: 'col-select-1',
+            colSelect2: 'col-select-2',
+            executeComplexSelectBtn: 'execute-complex-select-btn',
             // --- NEW MERGED VIEW CONTROLS ---
             searchInputMerged: 'search-input-merged',
             selectKeywordInputMerged: 'select-keyword-input-merged',
@@ -144,12 +147,20 @@ const ExcelViewer = (() => {
         elements.sortByNameBtn.addEventListener('click', sortTablesByFundName); 
         
         // --- Row Operations (Main View) ---
-        elements.selectByKeywordBtn.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
-        elements.selectEmptyBtn.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
-        elements.selectAllBtn.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
-        elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-        elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
-
+        //-- elements.selectByKeywordBtn.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
+        //-- elements.selectEmptyBtn.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
+        //-- elements.selectAllBtn.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
+        //-- elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+        //-- elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
+        
+        // 新的:
+        if (elements.executeComplexSelectBtn) {
+            elements.executeComplexSelectBtn.addEventListener('click', () => {
+                executeComplexSelection(); 
+                syncCheckboxesInScope();
+            });
+        }
+        
         // --- ROW OPERATIONS (Now inside merge view, but events are bound globally) ---
         elements.selectByColZeroBtn.addEventListener('click', () => { selectByColumn('zero'); syncCheckboxesInScope(); });
         elements.selectByColEmptyBtn.addEventListener('click', () => { selectByColumn('empty'); syncCheckboxesInScope(); });
@@ -696,28 +707,110 @@ const ExcelViewer = (() => {
     }
 
     function updateColumnSelects(headers) { 
-        // 1. Populate modal checklist
+        // 1. Checklist (Modal)
         elements.columnChecklist.innerHTML = headers.map(header => `<label><input type="checkbox" value="${header}" checked> ${header}</label>`).join('');
         
-        // 2. Populate new operations dropdown
-        elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>';
+        // 2. Populate Dropdown 1
+        elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>';
         headers.forEach(header => {
             const option = document.createElement('option');
             option.value = header;
             option.textContent = header;
-            elements.columnSelectOps.appendChild(option);
+            elements.colSelect1.appendChild(option);
         });
-        // --- NEW: Populate Second Dropdown (Clone options) ---
-        elements.columnSelectOps2.innerHTML = '<option value="">-- 欄位 2 (選填) --</option>';
-        headers.forEach(header => {
-            const option = document.createElement('option');
-            option.value = header;
-            option.textContent = header;
-            elements.columnSelectOps2.appendChild(option);
-        });
-        
-    }
 
+        // 3. Populate Dropdown 2
+        elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
+        headers.forEach(header => {
+            const option = document.createElement('option');
+            option.value = header;
+            option.textContent = header;
+            elements.colSelect2.appendChild(option);
+        });
+    }
+    
+// --- NEW FUNCTION: 執行複雜篩選 (雙重條件 + 邏輯判斷) ---
+    function executeComplexSelection() {
+        if (!state.isMergedView) return;
+
+        // 1. 取得使用者設定
+        const col1 = elements.colSelect1.value;
+        const col2 = elements.colSelect2.value;
+
+        // 取得 Radio Button 的值
+        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value; // zero, empty, value
+        const criteria2 = document.querySelector('input[name="criteria-2"]:checked').value;
+        const logicOp = document.querySelector('input[name="logic-op"]:checked').value; // and, or
+
+        if (!col1 && !col2) {
+            alert('請至少選擇一個欄位 (條件 A 或 條件 B)。');
+            return;
+        }
+
+        // Helper: 判斷單一數值是否符合條件
+        const checkValue = (val, criteria) => {
+            const strVal = String(val).trim();
+            if (criteria === 'empty') return strVal === '';
+            if (criteria === 'zero') return strVal === '0';
+            if (criteria === 'value') return strVal !== '';
+            return false;
+        };
+
+        const scope = elements.mergeViewContent;
+        let count = 0;
+
+        scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
+            const checkbox = row.querySelector('.row-checkbox');
+            if (!checkbox) return;
+
+            let result1 = null; // null 代表未啟用該條件
+            let result2 = null;
+
+            // 檢查條件 A
+            if (col1) {
+                const cell = row.querySelector(`td[data-col-header="${col1}"]`);
+                const val = cell ? cell.textContent : '';
+                result1 = checkValue(val, criteria1);
+            }
+
+            // 檢查條件 B
+            if (col2) {
+                const cell = row.querySelector(`td[data-col-header="${col2}"]`);
+                const val = cell ? cell.textContent : '';
+                result2 = checkValue(val, criteria2);
+            }
+
+            // 綜合判斷
+            let finalMatch = false;
+
+            if (col1 && col2) {
+                // 雙欄位模式
+                if (logicOp === 'and') {
+                    finalMatch = result1 && result2; // 且: 兩者皆 True
+                } else {
+                    finalMatch = result1 || result2; // 或: 任一 True
+                }
+            } else if (col1) {
+                // 只選了 A
+                finalMatch = result1;
+            } else if (col2) {
+                // 只選了 B
+                finalMatch = result2;
+            }
+
+            if (finalMatch) {
+                checkbox.checked = true;
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            alert(`已勾選 ${count} 筆符合條件的資料。`);
+        } else {
+            alert('未找到符合條件的資料。');
+        }
+    }
+    
     function toggleColumnModal(forceShow) { elements.columnModal.classList.toggle('hidden', forceShow === false || !elements.columnModal.classList.contains('hidden')); }
     function setAllColumnCheckboxes(isChecked) { elements.columnChecklist.querySelectorAll('input').forEach(input => input.checked = isChecked); }
     function applyColumnChanges() {
@@ -809,8 +902,13 @@ const ExcelViewer = (() => {
         elements.exportSelectedMergedXlsxBtn.disabled = state.isEditing; 
         elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; 
         elements.sortMergedByNameBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
-        elements.columnSelectOps.disabled = state.isEditing;
-        elements.columnSelectOps2.disabled = state.isEditing; // --- NEW: Disable 2nd dropdown
+        elements.colSelect1.disabled = state.isEditing;
+        elements.colSelect2.disabled = state.isEditing;
+        elements.executeComplexSelectBtn.disabled = state.isEditing; // --- NEW: Disable 2nd dropdown
+        // 禁用所有 Radio Button
+        document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => {
+            r.disabled = state.isEditing;
+        });
         elements.selectByColZeroBtn.disabled = state.isEditing;
         elements.selectByColEmptyBtn.disabled = state.isEditing;
         elements.selectByColExistsBtn.disabled = state.isEditing;
@@ -1405,6 +1503,7 @@ const ExcelViewer = (() => {
 })();
 
 ExcelViewer.init();
+
 
 
 
