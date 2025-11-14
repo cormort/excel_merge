@@ -50,7 +50,7 @@ const ExcelViewer = (() => {
         }
     }
 
-    function cacheElements() {
+function cacheElements() {
         const mapping = {
             fileInput: 'file-input', displayArea: 'excel-display-area', searchInput: 'search-input',
             dropArea: 'drop-area', deleteSelectedBtn: 'delete-selected-btn', invertSelectionBtn: 'invert-selection-btn',
@@ -72,11 +72,14 @@ const ExcelViewer = (() => {
             selectedTablesList: 'selected-tables-list', listViewBtn: 'list-view-btn',
             gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
+            
             // Merge view Modal
             mergeViewModal: 'merge-view-modal',
             closeMergeViewBtn: 'close-merge-view-btn',
             mergeViewContent: 'merge-view-content',
             mergeViewBtn: 'merge-view-btn',
+            viewCheckedCombinedBtn: 'view-checked-combined-btn', // 確保此按鈕存在
+            
             // Column operations
             columnOperationsBtn: 'column-operations-btn',
             columnModal: 'column-modal',
@@ -85,6 +88,7 @@ const ExcelViewer = (() => {
             applyColumnChangesBtn: 'apply-column-changes-btn',
             modalCheckAll: 'modal-check-all',
             modalUncheckAll: 'modal-uncheck-all',
+            
             // Edit operations
             editDataBtn: 'edit-data-btn',
             saveEditsBtn: 'save-edits-btn',
@@ -137,7 +141,7 @@ function bindEvents() {
         elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         
-        // --- COMPLEX FILTER EXECUTE (使用新按鈕) ---
+        // --- COMPLEX FILTER EXECUTE ---
         if (elements.executeComplexSelectBtn) {
             elements.executeComplexSelectBtn.addEventListener('click', () => {
                 executeComplexSelection(); 
@@ -151,6 +155,7 @@ function bindEvents() {
         elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
         
         // --- Merge View Modal Events ---
+        // 崩潰點已移除，以下按鈕現在可以正常運作了
         elements.mergeViewBtn.addEventListener('click', () => createMergedView('all')); 
         elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
         elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
@@ -180,6 +185,7 @@ function bindEvents() {
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
         elements.displayArea.addEventListener('click', handleCardClick);
+        
         elements.mergeViewContent.addEventListener('click', e => {
             const th = e.target.closest('th:not(.checkbox-cell)');
             const delBtn = e.target.closest('.delete-col-btn');
@@ -1244,7 +1250,21 @@ function bindEvents() {
     function deleteSelectedTables() { const selectedWrappers = Array.from(elements.displayArea.querySelectorAll('.table-select-checkbox:checked')).map(cb => cb.closest('.table-wrapper')); if (selectedWrappers.length === 0) { alert('請先勾選要刪除的表格。'); return; } if (confirm(`確定要永久刪除 ${selectedWrappers.length} 個選定的表格嗎？`)) { selectedWrappers.forEach(wrapper => wrapper.remove()); updateFileStateAfterDeletion(); } }
     function updateFileStateAfterDeletion() { const remainingWrappers = elements.displayArea.querySelectorAll('.table-wrapper'); state.loadedTables = remainingWrappers.length; state.loadedFiles = Array.from(remainingWrappers).map(w => w.querySelector('h4').textContent); if (state.loadedTables === 0) { clearAllFiles(true); } else { updateDropAreaDisplay(); showControls(detectHiddenElements()); } }
     function handleDisplayAreaChange(e) { const target = e.target; if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return; let table; if (target.matches('.table-select-checkbox')) { const wrapper = target.closest('.table-wrapper'); table = wrapper ? wrapper.querySelector('table') : null; if (table) { toggleSelectAll(target.checked, table); } } else if (target.matches('[id^="select-all-checkbox"]')) { table = target.closest('table'); toggleSelectAll(target.checked, table); } else { table = target.closest('table'); } if (table) { syncTableCheckboxState(table); } if (!state.isMergedView) { updateSelectionInfo(); } }
-    function toggleSelectAll(isChecked, table) { if (!table) return; table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked); }
+    function toggleSelectAll(isChecked, table) {
+        if (!table) return;
+        
+        // 1. 更新所有可見資料列的 checkbox
+        table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => {
+            cb.checked = isChecked;
+        });
+
+        // 2. 同步更新表頭內部的全選 checkbox (確保視覺一致)
+        const headerCheckbox = table.querySelector('thead input[type="checkbox"]');
+        if (headerCheckbox) {
+            headerCheckbox.checked = isChecked;
+            headerCheckbox.indeterminate = false;
+        }
+    }
     
     // ▼▼▼ HELPER FUNCTION (MOVED) ▼▼▼
     function getFundSortPriority(fileName) {
@@ -1322,4 +1342,5 @@ function bindEvents() {
 })();
 
 ExcelViewer.init();
+
 
