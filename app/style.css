@@ -512,6 +512,9 @@ table tbody tr:hover {
     margin-top: 5px;
     justify-content: flex-end;
 }
+.column-hidden {
+    display: none;
+}
 
 /* 6.4) 合併檢視表格內容 */
 #merge-view-content {
@@ -679,5 +682,6 @@ table tbody tr:hover {
     flex: 1; /* 讓兩個區塊平分空間 */
     min-width: 300px; /* 每個區塊的最小寬度，觸發換行用 */
 }
+
 
 
