@@ -270,6 +270,15 @@ function bindEvents() {
                 }
             } 
         });
+    // --- NEW: 載入時初始化複雜篩選的輸入框狀態 ---
+        elements.mergeViewModal.dispatchEvent(new Event('change', { bubbles: true }));
+        // 確保在合併檢視打開時，篩選器會重新載入並初始化
+        elements.mergeViewBtn.addEventListener('click', () => {
+            // 需要在 createMergedView 之後執行，確保下拉選單已填充
+            setTimeout(() => {
+                elements.mergeViewModal.dispatchEvent(new Event('change', { bubbles: true }));
+            }, 50); // 短暫延遲，確保DOM更新
+        });
     }
 
     // --- Core Logic (File Processing, Rendering) ---
@@ -1418,6 +1427,7 @@ function toggleEditMode(startEditing) {
 })();
 
 ExcelViewer.init();
+
 
 
 
