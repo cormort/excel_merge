@@ -15,27 +15,20 @@ const ExcelViewer = (() => {
         showSourceColumn: false, 
         mergedData: [],
         mergedHeaders: [],
-        fundSortOrder: [], // <-- NEW: Will hold the sortOrder array
-        fundAliasMap: {},   // <-- NEW: Will hold the aliasMap object
-        fundAliasKeys: []  // <-- NEW: Cached keys for searching
+        fundSortOrder: [], 
+        fundAliasMap: {},   
+        fundAliasKeys: []  
     };
     const elements = {};
 
-    // ▼▼▼ MODIFIED: Made init async ▼▼▼
     async function init() {
         cacheElements();
-        await loadFundConfig(); // <-- NEW: Wait for config before binding events
+        await loadFundConfig(); 
         bindEvents();
     }
-    // ▲▲▲ MODIFIED ▲▲▲
 
-    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
-    /**
-     * Fetches and loads the fund sorting configuration file.
-     */
     async function loadFundConfig() {
         try {
-            // 為了避免瀏覽器快取，加入一個隨機參數
             const response = await fetch(`fund-config.json?v=${Date.now()}`); 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -45,7 +38,6 @@ const ExcelViewer = (() => {
             if (config.sortOrder && config.aliasMap) {
                 state.fundSortOrder = config.sortOrder;
                 state.fundAliasMap = config.aliasMap;
-                // 將 aliasMap 的 key 儲存起來，並依照長度排序，優先比對長的關鍵字
                 state.fundAliasKeys = Object.keys(config.aliasMap).sort((a, b) => b.length - a.length);
                 console.log("基金設定檔 (fund-config.json) 載入成功。");
             } else {
@@ -54,12 +46,9 @@ const ExcelViewer = (() => {
             }
         } catch (err) {
             console.error("載入基金設定檔 (fund-config.json) 失敗:", err);
-            // 允許程式繼續運行，但排序功能會失效
             alert("警告：無法載入基金排序設定檔 (fund-config.json)。\n「依基金名稱排序」功能將無法使用。");
         }
     }
-    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
-
 
     function cacheElements() {
         const mapping = {
@@ -108,18 +97,13 @@ const ExcelViewer = (() => {
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
             exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
             exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
-            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn', // <-- NEW ELEMENT
-            // --- MOVED ELEMENTS (IDs are the same, now inside merge modal) ---
-            viewCheckedCombinedBtn: 'view-checked-combined-btn',
-            columnSelectOps: 'column-select-ops',
-            columnSelectOps2: 'column-select-ops-2', // <--- 新增這行
-            selectByColZeroBtn: 'select-by-col-zero-btn',
-            selectByColEmptyBtn: 'select-by-col-empty-btn',
-            selectByColExistsBtn: 'select-by-col-exists-btn',
-            // --- MODIFIED: 新的篩選介面元件 ---
+            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn',
+            
+            // --- NEW: Complex Filter Elements ---
             colSelect1: 'col-select-1',
             colSelect2: 'col-select-2',
             executeComplexSelectBtn: 'execute-complex-select-btn',
+
             // --- NEW MERGED VIEW CONTROLS ---
             searchInputMerged: 'search-input-merged',
             selectKeywordInputMerged: 'select-keyword-input-merged',
@@ -147,24 +131,19 @@ const ExcelViewer = (() => {
         elements.sortByNameBtn.addEventListener('click', sortTablesByFundName); 
         
         // --- Row Operations (Main View) ---
-        //-- elements.selectByKeywordBtn.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
-        //-- elements.selectEmptyBtn.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
-        //-- elements.selectAllBtn.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
-        //-- elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-        //-- elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
+        elements.selectByKeywordBtn.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
+        elements.selectEmptyBtn.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
+        elements.selectAllBtn.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
+        elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+        elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         
-        // 新的:
+        // --- COMPLEX FILTER EXECUTE ---
         if (elements.executeComplexSelectBtn) {
             elements.executeComplexSelectBtn.addEventListener('click', () => {
                 executeComplexSelection(); 
                 syncCheckboxesInScope();
             });
         }
-        
-        // --- ROW OPERATIONS (Now inside merge view, but events are bound globally) ---
-        elements.selectByColZeroBtn.addEventListener('click', () => { selectByColumn('zero'); syncCheckboxesInScope(); });
-        elements.selectByColEmptyBtn.addEventListener('click', () => { selectByColumn('empty'); syncCheckboxesInScope(); });
-        elements.selectByColExistsBtn.addEventListener('click', () => { selectByColumn('exists'); syncCheckboxesInScope(); });
         
         // --- Global, Export, and Merge Operations ---
         elements.resetViewBtn.addEventListener('click', resetView);
@@ -197,7 +176,6 @@ const ExcelViewer = (() => {
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
         elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
 
-
         // --- Input and Dynamic Content Handling ---
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
@@ -220,14 +198,13 @@ const ExcelViewer = (() => {
             }
         });
 
-        // --- ▼▼▼ NEW BINDINGS FOR MERGE VIEW & ENTER KEY ---
+        // --- NEW BINDINGS FOR MERGE VIEW & ENTER KEY ---
         elements.searchInputMerged.addEventListener('input', debounce(filterTable, 300));
         elements.selectByKeywordBtnMerged.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
 
         const handleKeywordEnter = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                // 觸發目前 scope 對應的按鈕點擊
                 if (state.isMergedView) {
                     elements.selectByKeywordBtnMerged.click();
                 } else {
@@ -237,8 +214,6 @@ const ExcelViewer = (() => {
         };
         elements.selectKeywordInput.addEventListener('keydown', handleKeywordEnter);
         elements.selectKeywordInputMerged.addEventListener('keydown', handleKeywordEnter);
-        // --- ▲▲▲ NEW BINDINGS ---
-
 
         // --- Window/Document Level Events ---
         elements.backToTopBtn.addEventListener('click', scrollToTop);
@@ -270,7 +245,6 @@ const ExcelViewer = (() => {
         elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-// ▼▼▼ MODIFIED: Handle Merged Cells + Filter Hidden Rows/Cols ▼▼▼
     async function processFiles(fileList) { 
         const validation = validateFiles(fileList); 
         if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
@@ -318,27 +292,24 @@ const ExcelViewer = (() => {
                         endCol = range.e.c;
                     }
 
-                    // 2. 轉成 JSON (包含空值)
-                    // 注意：此時 jsonData 的 index 0 對應到 Excel 的 startRow
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                    // 2. 轉成 JSON (使用 format values 並強制 range，避免資料丟失)
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+                        header: 1, 
+                        defval: '',
+                        range: sheet['!ref'], 
+                        raw: false 
+                    });
 
-                    // --- NEW: 處理合併儲存格 (Data Filling) ---
-                    // 在過濾隱藏列之前，先把合併儲存格的值「擴散」到該範圍內的所有格子
+                    // --- 處理合併儲存格 (Data Filling) ---
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
-                            // 計算合併範圍相對於 jsonData 的索引
-                            // merge.s 是 start (左上), merge.e 是 end (右下)
                             const startR = merge.s.r - startRow;
                             const startC = merge.s.c - startCol;
                             const endR = merge.e.r - startRow;
                             const endC = merge.e.c - startCol;
 
-                            // 確保範圍在有效資料內
                             if (startR >= 0 && startC >= 0 && jsonData[startR]) {
-                                // 取得左上角的值 (主要值)
                                 const primaryValue = jsonData[startR][startC];
-
-                                // 將此值填入範圍內的所有格子
                                 for (let r = startR; r <= endR; r++) {
                                     for (let c = startC; c <= endC; c++) {
                                         if (jsonData[r]) {
@@ -371,11 +342,12 @@ const ExcelViewer = (() => {
                         // A. 檢查列是否隱藏
                         const absoluteRowIndex = startRow + index;
                         if (rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden) {
-                            return; // 若列隱藏，直接跳過
+                            return; 
                         }
 
-                        // B. 濾除隱藏欄位 (使用填滿過後的 row 資料)
-                        const newRow = visibleRelativeIndices.map(i => (row[i] !== undefined ? row[i] : ''));
+                        // B. 濾除隱藏欄位
+                        const safeRow = row || [];
+                        const newRow = visibleRelativeIndices.map(i => (safeRow[i] !== undefined ? safeRow[i] : ''));
 
                         // C. 檢查是否變為空白列
                         const hasContent = newRow.some(cell => String(cell).trim() !== '');
@@ -410,7 +382,6 @@ const ExcelViewer = (() => {
             state.isProcessing = false; 
         } 
     }
-    // ▲▲▲ MODIFIED ▲▲▲
     
     function renderTables(tablesToRender) { 
         if (tablesToRender.length === 0) { 
@@ -442,31 +413,21 @@ const ExcelViewer = (() => {
         injectCheckboxes(elements.displayArea); 
         showControls(detectHiddenElements()); 
         
-        // ▼▼▼ NEW: Auto-sort on render ▼▼▼
         sortTablesByFundName();
-        // ▲▲▲ NEW ▲▲▲
     }
     
     function injectCheckboxes(scope) { scope.querySelectorAll('thead tr').forEach((headRow, index) => { if(headRow.querySelector('.checkbox-cell')) return; const th = document.createElement('th'); th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${scope.id}-${index}" title="全選/全不選">`; th.classList.add('checkbox-cell'); headRow.prepend(th); }); scope.querySelectorAll('tbody tr').forEach(row => { if(row.querySelector('.checkbox-cell')) return; const td = document.createElement('td'); td.innerHTML = '<input type="checkbox" class="row-checkbox">'; td.classList.add('checkbox-cell'); row.prepend(td); }); }
     
     // --- Merged View and Column Operations ---
 
-    /**
-     * Creates the merged view modal based on selected tables and mode.
-     * @param {string} mode - 'all' (all visible rows) or 'checked' (only checked rows)
-     */
     function createMergedView(mode = 'all') {
-        
-        // 1. Get ALL visible tables to build a complete header map.
         const allVisibleTables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
         if (allVisibleTables.length === 0) {
             alert('沒有可合併的表格。');
             return;
         }
 
-        // 2. If mode is 'checked', do a pre-check.
         if (mode === 'checked') {
-            // We must check *within* the visible tables.
             let checkedRowsInVisibleTables = 0;
             allVisibleTables.forEach(table => {
                 checkedRowsInVisibleTables += table.querySelectorAll('tbody .row-checkbox:checked').length;
@@ -480,19 +441,17 @@ const ExcelViewer = (() => {
 
         const allHeaders = new Set();
         const tableData = [];
-        const tableHeaderMap = new Map(); // Cache headers per table
+        const tableHeaderMap = new Map();
 
-        // 3. First pass: Iterate over *all visible tables* just to gather ALL headers
         allVisibleTables.forEach(table => {
-            // Get headers for *this* table using the robust logic
             let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'))
                              .map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
             
-            const allDataRowsInTable = Array.from(table.querySelectorAll('tbody tr')); // Used for 'no header' check
+            const allDataRowsInTable = Array.from(table.querySelectorAll('tbody tr'));
             
             if (headers.length === 0 && allDataRowsInTable.length > 0) {
                 let maxCols = 0;
-                allDataRowsInTable.slice(0, 10).forEach(r => { // Sample rows
+                allDataRowsInTable.slice(0, 10).forEach(r => {
                     const colCount = r.querySelectorAll('td:not(.checkbox-cell)').length;
                     if (colCount > maxCols) maxCols = colCount;
                 });
@@ -502,45 +461,36 @@ const ExcelViewer = (() => {
                 }
             }
             
-            // Add this table's headers to the global set
             headers.forEach(h => allHeaders.add(h));
-            // Cache the headers for this specific table
             tableHeaderMap.set(table, headers);
         });
 
-
-        // 4. Second pass: Iterate over tables again to gather data based on mode
         allVisibleTables.forEach(table => {
-            const headers = tableHeaderMap.get(table); // Get cached headers
-            if (!headers) return; // Should not happen
+            const headers = tableHeaderMap.get(table); 
+            if (!headers) return; 
 
             const wrapper = table.closest('.table-wrapper');
             const filename = wrapper?.querySelector('h4')?.textContent || '未知來源';
 
-            // Select which rows to process based on 'mode'
             let rowsToProcess;
             if (mode === 'all') {
-                // Get all rows that are NOT hidden by the search filter
                 rowsToProcess = Array.from(table.querySelectorAll('tbody tr')).filter(row => !row.classList.contains('row-hidden-search'));
-            } else { // mode === 'checked'
-                // Get only rows that are checked
+            } else { 
                 rowsToProcess = Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'));
             }
 
-            // Map the data from *only* the selected rows
             rowsToProcess.forEach(row => {
                 const rowData = {};
-                rowData._sourceFile = filename; // Add the source file property
+                rowData._sourceFile = filename;
                 Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => {
-                    if (headers[i]) { // Use the correct header for this column index
+                    if (headers[i]) {
                         rowData[headers[i]] = td.textContent;
                     }
                 });
-                tableData.push(rowData); // Push directly to the final flat array
+                tableData.push(rowData);
             });
         });
 
-        // 5. Set state and render
         state.mergedHeaders = Array.from(allHeaders);
         state.mergedData = tableData;
         
@@ -567,8 +517,9 @@ const ExcelViewer = (() => {
         state.mergedData = [];
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
-        elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>'; 
-        elements.columnSelectOps2.innerHTML = '<option value="">-- 欄位 2 (選填) --</option>'; // --- NEW: Reset 2nd dropdown
+        
+        elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; 
+        elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
         
         elements.searchInputMerged.value = '';
         elements.selectKeywordInputMerged.value = '';
@@ -577,7 +528,6 @@ const ExcelViewer = (() => {
         toggleEditMode(false);
     }
 
-// ▼▼▼ MODIFIED: Fix data truncation issue in Merged View ▼▼▼
     function renderMergedTable() {
         const table = document.createElement('table');
         const thead = table.createTHead();
@@ -626,11 +576,7 @@ const ExcelViewer = (() => {
                 td.dataset.colHeader = header;
                 const value = rowData[header] || '';
                 
-                // --- 關鍵修正開始 (FIX START) ---
-                // 舊邏輯：!isNaN(parseFloat(...)) 會把 "1.行政院" 判斷成數字 1，導致文字遺失。
-                // 新邏輯：使用 !isNaN(cleanVal) 進行嚴格檢查。
-                // 只有當 "整個字串" 都是數字時 (例如 "1000", "123.45")，才進行格式化。
-                
+                // 嚴格數值判斷
                 const cleanVal = String(value).replace(/,/g, '').trim();
                 const isStrictNumber = cleanVal !== '' && !isNaN(cleanVal);
 
@@ -638,10 +584,8 @@ const ExcelViewer = (() => {
                     td.classList.add('numeric');
                     td.textContent = formatNumber(value);
                 } else {
-                    // 如果不是純數字 (例如 "1.行政院")，就原樣顯示文字
                     td.textContent = value;
                 }
-                // --- 關鍵修正結束 (FIX END) ---
             });
         });
 
@@ -655,7 +599,7 @@ const ExcelViewer = (() => {
             totalRow.insertCell(); 
             
             if (state.showSourceColumn) {
-                totalRow.insertCell().textContent = ''; // Empty cell for source
+                totalRow.insertCell().textContent = ''; 
             }
 
             const totalsCache = calculateTotals();
@@ -691,7 +635,6 @@ const ExcelViewer = (() => {
             });
         }
     }
-    // ▲▲▲ MODIFIED ▲▲▲
     
     function toggleSourceColumn() {
         if (state.isEditing) {
@@ -699,18 +642,15 @@ const ExcelViewer = (() => {
             return;
         }
         state.showSourceColumn = !state.showSourceColumn;
-        renderMergedTable(); // Re-render the table with/without the column
+        renderMergedTable(); 
         
-        // Update button text and style
         elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
         elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
     }
 
     function updateColumnSelects(headers) { 
-        // 1. Checklist (Modal)
         elements.columnChecklist.innerHTML = headers.map(header => `<label><input type="checkbox" value="${header}" checked> ${header}</label>`).join('');
         
-        // 2. Populate Dropdown 1
         elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>';
         headers.forEach(header => {
             const option = document.createElement('option');
@@ -719,7 +659,6 @@ const ExcelViewer = (() => {
             elements.colSelect1.appendChild(option);
         });
 
-        // 3. Populate Dropdown 2
         elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
         headers.forEach(header => {
             const option = document.createElement('option');
@@ -729,25 +668,22 @@ const ExcelViewer = (() => {
         });
     }
     
-// --- NEW FUNCTION: 執行複雜篩選 (雙重條件 + 邏輯判斷) ---
+    // --- EXECUTE COMPLEX SELECTION ---
     function executeComplexSelection() {
         if (!state.isMergedView) return;
 
-        // 1. 取得使用者設定
         const col1 = elements.colSelect1.value;
         const col2 = elements.colSelect2.value;
 
-        // 取得 Radio Button 的值
-        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value; // zero, empty, value
+        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value; 
         const criteria2 = document.querySelector('input[name="criteria-2"]:checked').value;
-        const logicOp = document.querySelector('input[name="logic-op"]:checked').value; // and, or
+        const logicOp = document.querySelector('input[name="logic-op"]:checked').value;
 
         if (!col1 && !col2) {
             alert('請至少選擇一個欄位 (條件 A 或 條件 B)。');
             return;
         }
 
-        // Helper: 判斷單一數值是否符合條件
         const checkValue = (val, criteria) => {
             const strVal = String(val).trim();
             if (criteria === 'empty') return strVal === '';
@@ -763,38 +699,32 @@ const ExcelViewer = (() => {
             const checkbox = row.querySelector('.row-checkbox');
             if (!checkbox) return;
 
-            let result1 = null; // null 代表未啟用該條件
+            let result1 = null; 
             let result2 = null;
 
-            // 檢查條件 A
             if (col1) {
                 const cell = row.querySelector(`td[data-col-header="${col1}"]`);
                 const val = cell ? cell.textContent : '';
                 result1 = checkValue(val, criteria1);
             }
 
-            // 檢查條件 B
             if (col2) {
                 const cell = row.querySelector(`td[data-col-header="${col2}"]`);
                 const val = cell ? cell.textContent : '';
                 result2 = checkValue(val, criteria2);
             }
 
-            // 綜合判斷
             let finalMatch = false;
 
             if (col1 && col2) {
-                // 雙欄位模式
                 if (logicOp === 'and') {
-                    finalMatch = result1 && result2; // 且: 兩者皆 True
+                    finalMatch = result1 && result2; 
                 } else {
-                    finalMatch = result1 || result2; // 或: 任一 True
+                    finalMatch = result1 || result2; 
                 }
             } else if (col1) {
-                // 只選了 A
                 finalMatch = result1;
             } else if (col2) {
-                // 只選了 B
                 finalMatch = result2;
             }
 
@@ -814,37 +744,34 @@ const ExcelViewer = (() => {
     function toggleColumnModal(forceShow) { elements.columnModal.classList.toggle('hidden', forceShow === false || !elements.columnModal.classList.contains('hidden')); }
     function setAllColumnCheckboxes(isChecked) { elements.columnChecklist.querySelectorAll('input').forEach(input => input.checked = isChecked); }
     function applyColumnChanges() {
-        const mergedTable = elements.mergeViewContent.querySelector('table');
-        if (!mergedTable) return;
-        
-        // 1. 從勾選清單中獲取可見性設定
-        const visibility = {};
-        elements.columnChecklist.querySelectorAll('input').forEach(input => {
-            visibility[input.value] = input.checked;
-        });
+        const mergedTable = elements.mergeViewContent.querySelector('table');
+        if (!mergedTable) return;
+        
+        const visibility = {};
+        elements.columnChecklist.querySelectorAll('input').forEach(input => {
+            visibility[input.value] = input.checked;
+        });
 
-        // 2. 遍歷表格的標頭 (th)
         const allHeaders = Array.from(mergedTable.querySelectorAll('thead th'));
         const firstDataColIndex = allHeaders.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
         
-        if (firstDataColIndex === -1) return; // No data headers found
+        if (firstDataColIndex === -1) return; 
         
         const dataHeaders = allHeaders.slice(firstDataColIndex);
 
-        dataHeaders.forEach((th, dataIndex) => {
+        dataHeaders.forEach((th, dataIndex) => {
             const colIndex = dataIndex + firstDataColIndex;
-            const headerText = th.textContent.replace('×', '').trim();
-            const isVisible = visibility[headerText];
-            
-            // nth-child is 1-based, so +1
-            mergedTable.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => {
-                cell.classList.toggle('column-hidden', !isVisible);
-            });
-        });
-    }
+            const headerText = th.textContent.replace('×', '').trim();
+            const isVisible = visibility[headerText];
+            
+            mergedTable.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => {
+                cell.classList.toggle('column-hidden', !isVisible);
+            });
+        });
+    }
     function handleMergedHeaderClick(th) {
         if (state.isEditing) return;
-        if (th.classList.contains('source-col')) return; // Don't sort by source column
+        if (th.classList.contains('source-col')) return; 
         
         const table = th.closest('table');
         const headerText = th.textContent.replace('×','').trim();
@@ -901,17 +828,15 @@ const ExcelViewer = (() => {
         elements.invertSelectionMergedBtn.disabled = state.isEditing; 
         elements.exportSelectedMergedXlsxBtn.disabled = state.isEditing; 
         elements.exportCurrentMergedXlsxBtn.disabled = state.isEditing; 
-        elements.sortMergedByNameBtn.disabled = state.isEditing; // <-- DISABLE BUTTON
+        elements.sortMergedByNameBtn.disabled = state.isEditing;
+        
+        // Disable complex filter inputs
         elements.colSelect1.disabled = state.isEditing;
         elements.colSelect2.disabled = state.isEditing;
-        elements.executeComplexSelectBtn.disabled = state.isEditing; // --- NEW: Disable 2nd dropdown
-        // 禁用所有 Radio Button
+        elements.executeComplexSelectBtn.disabled = state.isEditing;
         document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => {
             r.disabled = state.isEditing;
         });
-        elements.selectByColZeroBtn.disabled = state.isEditing;
-        elements.selectByColEmptyBtn.disabled = state.isEditing;
-        elements.selectByColExistsBtn.disabled = state.isEditing;
         
         elements.searchInputMerged.disabled = state.isEditing;
         elements.selectKeywordInputMerged.disabled = state.isEditing;
@@ -950,7 +875,7 @@ const ExcelViewer = (() => {
         const newRow = {};
         state.mergedHeaders.forEach(header => { newRow[header] = ''; });
         newRow._isNew = true;
-        newRow._sourceFile = ' (新增資料列)'; // <-- Give it a source
+        newRow._sourceFile = ' (新增資料列)'; 
         state.mergedData.unshift(newRow);
         if (!state.isEditing) {
             toggleEditMode(true);
@@ -970,7 +895,7 @@ const ExcelViewer = (() => {
             if (!isNaN(rowIndex) && state.mergedData[rowIndex]) {
                 const newRow = JSON.parse(JSON.stringify(state.mergedData[rowIndex]));
                 newRow._isNew = true;
-                newRow._sourceFile += ' (複製)'; // <-- Tag as copied
+                newRow._sourceFile += ' (複製)'; 
                 rowsToCopy.push(newRow);
             }
         });
@@ -1013,7 +938,6 @@ const ExcelViewer = (() => {
     }
     function selectEmptyRows() { let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (Array.from(row.cells).slice(1).every(c => c.textContent.trim() === '')) { row.querySelector('.row-checkbox').checked = true; count++; } }); if (count === 0) alert('未找到空白列'); }
     
-    // ▼▼▼ MODIFIED: To read from correct input based on scope ▼▼▼
     function selectByKeyword() { 
         const inputEl = state.isMergedView ? elements.selectKeywordInputMerged : elements.selectKeywordInput;
         const regexEl = state.isMergedView ? elements.selectKeywordRegexMerged : elements.selectKeywordRegex;
@@ -1043,7 +967,6 @@ const ExcelViewer = (() => {
         let count = 0; 
         const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; 
         scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { 
-            // Also check sourceFile if it's visible
             let rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)'))
                              .map(c => c.textContent)
                              .join(' ');
@@ -1055,78 +978,13 @@ const ExcelViewer = (() => {
         }); 
         alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); 
     }
-    // ▲▲▲ MODIFIED ▲▲▲
     
-    function selectByColumn(mode) {
-        if (!state.isMergedView) {
-            alert('此功能僅適用於「合併檢視」模式。\n請先點擊「合併檢視」按鈕。');
-            return;
-        }
-
-        const colName1 = elements.columnSelectOps.value;
-        const colName2 = elements.columnSelectOps2.value; // --- NEW ---
-
-        // --- MODIFIED: 檢查至少選了一個欄位 ---
-        if (!colName1 && !colName2) {
-            alert('請至少從下拉選單中指定一個欄位。');
-            return;
-        }
-
-        const scope = elements.mergeViewContent;
-        let count = 0;
-
-        let checkFunction;
-        switch (mode) {
-            case 'zero':   checkFunction = (val) => val === '0'; break;
-            case 'empty':  checkFunction = (val) => val === ''; break;
-            case 'exists': checkFunction = (val) => val !== ''; break;
-            default: return;
-        }
-
-        scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-            const checkbox = row.querySelector('.row-checkbox');
-            if (!checkbox) return;
-
-            // --- NEW LOGIC: Dual Column Check ---
-            let match1 = true;
-            let match2 = true;
-
-            // 檢查欄位 1 (如果有選)
-            if (colName1) {
-                const cell1 = row.querySelector(`td[data-col-header="${colName1}"]`);
-                const val1 = cell1 ? cell1.textContent.trim() : '';
-                match1 = checkFunction(val1);
-            }
-
-            // 檢查欄位 2 (如果有選)
-            if (colName2) {
-                const cell2 = row.querySelector(`td[data-col-header="${colName2}"]`);
-                const val2 = cell2 ? cell2.textContent.trim() : '';
-                match2 = checkFunction(val2);
-            }
-
-            // AND 邏輯：兩個都必須符合 (若未選該欄位則預設為 true)
-            if (match1 && match2) {
-                checkbox.checked = true;
-                count++;
-            }
-        });
-
-        if (count > 0) {
-            alert(`已勾選 ${count} 個符合條件的資料列。`);
-        } else {
-            alert('未找到符合條件的資料列。');
-        }
-    }
-
-    // ▼▼▼ MODIFIED: To read from correct input based on scope ▼▼▼
     function filterTable() { 
         const inputEl = state.isMergedView ? elements.searchInputMerged : elements.searchInput;
         const keywords = inputEl.value.toLowerCase().trim().split(/\s+/).filter(Boolean); 
         
         const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; 
         scope.querySelectorAll('tbody tr').forEach(row => { 
-            // Also check sourceFile if it's visible
             let rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)'))
                              .map(c => c.textContent)
                              .join(' ')
@@ -1144,7 +1002,6 @@ const ExcelViewer = (() => {
         } 
         syncCheckboxesInScope(); 
     }
-    // ▲▲▲ MODIFIED ▲▲▲
 
     // --- Utility and Helper Functions ---
     function formatNumber(value) {
@@ -1160,16 +1017,14 @@ const ExcelViewer = (() => {
     function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
     function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) { cb.click(); } }); }
     
-    // ▼▼▼ CORRECTED: Use readAsBinaryString for this XLSX library version ▼▼▼
     function readFileAsBinary(file) { 
         return new Promise((resolve, reject) => { 
             const reader = new FileReader(); 
             reader.onload = e => resolve(e.target.result); 
             reader.onerror = reject; 
-            reader.readAsBinaryString(file); // <-- This is the correct method
+            reader.readAsBinaryString(file); 
         }); 
     }
-    // ▲▲▲ CORRECTED ▲▲▲
 
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
     async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
@@ -1179,11 +1034,9 @@ const ExcelViewer = (() => {
         const data = []; 
         const headerRow = table.querySelector('thead tr'); 
         if (headerRow) { 
-            // Get *visible* headers
             let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)'))
                                 .map(th => th.textContent.replace('×','').trim()); 
             
-            // This is for MAIN view export
             if (includeFilename) { 
                 headerData.unshift('Source File'); 
             }
@@ -1192,13 +1045,12 @@ const ExcelViewer = (() => {
         
         const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; 
         
-        // Determine which rows to process
         let rows;
-        if (onlySelected === true) { // Explicitly true: only checked
+        if (onlySelected === true) { 
             rows = Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'));
-        } else if (onlySelected === false) { // Explicitly false: only UNCHECKED (and not hidden by search)
+        } else if (onlySelected === false) { 
              rows = Array.from(table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox:not(:checked)')).map(cb => cb.closest('tr'));
-        } else { // null or undefined: ALL (and not hidden by search)
+        } else { 
             rows = table.querySelectorAll('tbody tr:not(.row-hidden-search)');
         }
             
@@ -1214,10 +1066,6 @@ const ExcelViewer = (() => {
         return data; 
     }
     
-    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
-    /**
-     * Exports ALL visible data from the MERGED view.
-     */
     function exportCurrentMergedXlsx() {
         if (!state.isMergedView) {
             alert('此功能僅限合併檢視模式使用。');
@@ -1230,29 +1078,26 @@ const ExcelViewer = (() => {
             return;
         }
         
-        // 1. Get visible headers
         const headerData = extractTableData(table, { 
-            onlySelected: null, // We pass null to get ALL headers
+            onlySelected: null, 
             includeSourceCol: state.showSourceColumn 
-        })[0]; // Get only the header row
+        })[0]; 
         
         if (!headerData) {
             alert('無法讀取表頭。');
             return;
         }
 
-        // 2. Get data for *all* rows that are *not hidden by search*
         const data = extractTableData(table, {
-            onlySelected: null, // null means get ALL visible
+            onlySelected: null, 
             includeSourceCol: state.showSourceColumn
-        }).slice(1); // Get data rows (slice(1) skips header)
+        }).slice(1); 
         
         if (data.length === 0) {
             alert('沒有可見的資料列可匯出。');
             return;
         }
 
-        // 3. Create and download workbook
         try {
             const ws_data = [headerData].concat(data);
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -1265,7 +1110,6 @@ const ExcelViewer = (() => {
             alert('匯出時發生錯誤：' + err.message);
         }
     }
-    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
 
     function exportSelectedMergedXlsx() {
         if (!state.isMergedView) {
@@ -1279,29 +1123,26 @@ const ExcelViewer = (() => {
             return;
         }
         
-        // 1. Get visible headers
         const headerData = extractTableData(table, { 
-            onlySelected: null, // We pass null to get ALL headers
+            onlySelected: null, 
             includeSourceCol: state.showSourceColumn 
-        })[0]; // Get only the header row
+        })[0]; 
         
         if (!headerData) {
             alert('無法讀取表頭。');
             return;
         }
 
-        // 2. Get data for *unselected* rows that are *not hidden by search*
         const data = extractTableData(table, {
-            onlySelected: false, // false means get UNCHECKED
+            onlySelected: false, 
             includeSourceCol: state.showSourceColumn
-        }).slice(1); // Get data rows (slice(1) skips header)
+        }).slice(1); 
         
         if (data.length === 0) {
             alert('沒有剩餘的(未勾選)資料列可匯出。\n(注意：搜尋結果外的資料列不會被匯出)');
             return;
         }
 
-        // 3. Create and download workbook
         try {
             const ws_data = [headerData].concat(data);
             const ws = XLSX.utils.aoa_to_sheet(ws_data);
@@ -1355,7 +1196,8 @@ const ExcelViewer = (() => {
         elements.fileInput.value = ''; 
         ['specificSheetNameInput', 'specificSheetPositionInput'].forEach(id => elements[id].value = ''); 
         elements.gridScaleSlider.value = 3; 
-        elements.columnSelectOps.innerHTML = '<option value="">-- 請選擇欄位 --</option>'; 
+        elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; 
+        elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
         updateGridScale(); 
         updateDropAreaDisplay(); 
         resetControls(true); 
@@ -1372,8 +1214,8 @@ const ExcelViewer = (() => {
             'selectAllBtn', 
             'exportMergedXlsxBtn', 'resetViewBtn', 
             'tableLevelControls', 'listViewBtn', 'gridViewBtn', 'showHiddenBtn',
-            'viewCheckedCombinedBtn', // New
-            'sortByNameBtn' // New
+            'viewCheckedCombinedBtn', 
+            'sortByNameBtn' 
         ];
         buttonsToShow.forEach(id => {
             if(elements[id]) elements[id].classList.remove('hidden');
@@ -1408,38 +1250,28 @@ const ExcelViewer = (() => {
     function getFundSortPriority(fileName) {
         if (state.fundSortOrder.length === 0) return { index: Infinity, name: fileName };
         
-        // 1. 根據檔名 (別名) 找到標準名稱
-        // state.fundAliasKeys 已經依長度排序 (長的優先)
         const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
         const canonicalName = foundAlias ? state.fundAliasMap[foundAlias] : null;
 
-        // 2. 從標準名稱找到排序順序
         const index = canonicalName ? state.fundSortOrder.indexOf(canonicalName) : -1;
 
-        // 3. 決定優先級 (找不到的排最後)
         const priority = (index === -1) ? Infinity : index;
 
         return { index: priority, name: fileName };
     }
-    // ▲▲▲ HELPER FUNCTION (MOVED) ▲▲▲
 
-
-    // ▼▼▼ MODIFIED FUNCTION (Using new state properties) ▼▼▼
     function sortTablesByFundName() {
         if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) {
-            // 由於 init() 是 async，在 loadFundConfig() 完成前，renderTables() 可能會先執行
-            // 所以這裡不要 alert，而是靜默失敗
             console.warn('基金順序列表尚未載入，暫不執行自動排序。');
             return;
         }
 
         const wrappers = Array.from(elements.displayArea.querySelectorAll('.table-wrapper'));
 
-        // Helper: 從卡片標題 "檔名 (工作表名稱)" 中提取 "檔名"
         const getFileName = (wrapper) => {
             const text = wrapper.querySelector('h4').textContent;
-            const match = text.match(/(.*)\s\(.*\)$/); // 抓取開頭到第一個 ( 之前的內容
-            return match ? match[1].trim() : text.trim(); // 找不到括號就回傳完整名稱
+            const match = text.match(/(.*)\s\(.*\)$/); 
+            return match ? match[1].trim() : text.trim(); 
         };
 
         wrappers.sort((a, b) => {
@@ -1447,25 +1279,18 @@ const ExcelViewer = (() => {
             const fileB = getFundSortPriority(getFileName(b));
 
             if (fileA.index === fileB.index) {
-                // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
                 return fileA.name.localeCompare(fileB.name);
             }
             
             return fileA.index - fileB.index;
         });
 
-        // Re-append sorted wrappers to the display area
         elements.displayArea.innerHTML = '';
         wrappers.forEach(wrapper => {
             elements.displayArea.appendChild(wrapper);
         });
     }
-    // ▲▲▲ MODIFIED FUNCTION ▲▲▲
 
-    // --- ▼▼▼ NEW FUNCTION ▼▼▼ ---
-    /**
-     * Sorts the data currently in the MERGED VIEW by fund name
-     */
     function sortMergedTableByFundName() {
         if (state.isEditing) {
             alert('請先儲存或取消編輯。');
@@ -1477,38 +1302,23 @@ const ExcelViewer = (() => {
         }
 
         state.mergedData.sort((a, b) => {
-            // 1. Get the source filename from the row data
             const fileNameA = a._sourceFile || '';
             const fileNameB = b._sourceFile || '';
 
-            // 2. Get sort priority
             const fileA = getFundSortPriority(fileNameA);
             const fileB = getFundSortPriority(fileNameB);
             
             if (fileA.index === fileB.index) {
-                // 如果順序相同 (例如兩個都找不到)，則維持字母/筆劃順序
                 return fileNameA.localeCompare(fileNameB);
             }
             
             return fileA.index - fileB.index;
         });
 
-        // Re-render the merged table
         renderMergedTable();
     }
-    // --- ▲▲▲ NEW FUNCTION ▲▲▲ ---
-
 
     return { init };
 })();
 
 ExcelViewer.init();
-
-
-
-
-
-
-
-
-
