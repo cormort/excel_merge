@@ -420,3 +420,9 @@ body.no-scroll .controls { display: none !important; }
     margin-bottom: 0; /* Override any default margins */
 }
 /* --- ▲▲▲ END NEW ▲▲▲ --- */
+
+/* 簡單的美化樣式 */
+.radio-group, .logic-radio { display: flex; gap: 10px; align-items: center; }
+.radio-btn { cursor: pointer; padding: 2px 8px; border-radius: 4px; background: #fff; border: 1px solid #ccc; }
+.radio-btn:has(input:checked) { background-color: #e7f1ff; border-color: #0d6efd; color: #0d6efd; font-weight: bold; }
+.logic-radio { cursor: pointer; }
