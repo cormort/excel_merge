@@ -472,3 +472,54 @@ body.no-scroll .controls { display: none !important; }
     align-items: center;
     gap: 6px;
 }
+
+/* --- [更新] 複雜篩選區塊的樣式 --- */
+.complex-filter-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* 增加行間距 */
+}
+.filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap; /* 換行以適應小螢幕 */
+}
+.filter-label {
+    font-weight: bold;
+    min-width: 50px;
+    margin-bottom: 0;
+}
+.logic-row {
+    padding-left: 60px; /* 縮排 */
+}
+.complex-filter-box .radio-group {
+    border: 1px solid #ced4da;
+    background-color: #fff;
+    padding: 2px;
+}
+.complex-filter-box .radio-btn {
+    border: 1px solid transparent; /* 修正邊框 */
+    background: #fff;
+    margin: 2px;
+}
+.complex-filter-box .radio-btn:has(input:checked) {
+    border-color: #0d6efd;
+}
+.criteria-input {
+    padding: 4px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+.criteria-input:disabled {
+    background-color: #e9ecef;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.execute-row {
+    border-top: 1px solid #dee2e6;
+    padding-top: 10px;
+    margin-top: 5px;
+}
