@@ -153,22 +153,41 @@
                 </div>
             </div>
 
-            <div id="merge-view-column-ops" class="button-group" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; gap: 10px; align-items: center;">
-                <label for="column-select-ops" style="font-weight: 600; font-size: 0.95rem; color: #495057;">▶️ 依指定欄位勾選:</label>
+<div id="merge-view-column-ops" class="complex-filter-box" style="padding: 10px; background-color: #f1f3f5; border-bottom: 1px solid #dee2e6;">
                 
-                <select id="column-select-ops" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇一個欄位以進行勾選操作">
-                    <option value="">-- 請選擇欄位 --</option>
-                </select>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <label style="font-weight: bold; min-width: 50px;">條件 A:</label>
+                    <select id="col-select-1" class="form-select" style="width: 180px; padding: 4px;">
+                        <option value="">-- 選擇欄位 1 --</option>
+                    </select>
+                    
+                    <div class="radio-group">
+                        <label class="radio-btn"><input type="radio" name="criteria-1" value="zero"> 為零 (0)</label>
+                        <label class="radio-btn"><input type="radio" name="criteria-1" value="empty" checked> 為空</label>
+                        <label class="radio-btn"><input type="radio" name="criteria-1" value="value"> 有值</label>
+                    </div>
+                </div>
 
-                <span style="font-weight: bold; color: #6c757d;">+</span>
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 8px; padding-left: 60px;">
+                    <span style="font-size: 0.9rem; color: #666;">邏輯連接:</span>
+                    <label class="logic-radio"><input type="radio" name="logic-op" value="and" checked> <b>且 (AND)</b> <span style="font-size:0.8em; color:#888;">(同時符合)</span></label>
+                    <label class="logic-radio"><input type="radio" name="logic-op" value="or"> <b>或 (OR)</b> <span style="font-size:0.8em; color:#888;">(任一符合)</span></label>
+                </div>
 
-                <select id="column-select-ops-2" style="flex: 1; padding: 6px 8px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; min-width: 150px;" title="選擇第二個欄位 (選填，若選擇則需同時符合兩個欄位的條件)">
-                    <option value="">-- 欄位 2 (選填) --</option>
-                </select>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: bold; min-width: 50px;">條件 B:</label>
+                    <select id="col-select-2" class="form-select" style="width: 180px; padding: 4px;">
+                        <option value="">-- 選擇欄位 2 (選填) --</option>
+                    </select>
+                    
+                    <div class="radio-group">
+                        <label class="radio-btn"><input type="radio" name="criteria-2" value="zero"> 為零 (0)</label>
+                        <label class="radio-btn"><input type="radio" name="criteria-2" value="empty" checked> 為空</label>
+                        <label class="radio-btn"><input type="radio" name="criteria-2" value="value"> 有值</label>
+                    </div>
 
-                <button class="btn btn-primary" id="select-by-col-zero-btn" title="勾選指定欄位中，內容為 '0' 的資料列">勾選為零</button>
-                <button class="btn btn-primary" id="select-by-col-empty-btn" title="勾選指定欄位中，內容為空白的資料列">勾選為空</button>
-                <button class="btn btn-primary" id="select-by-col-exists-btn" title="勾選指定欄位中，內容非空白的資料列">勾選有值</button>
+                    <button id="execute-complex-select-btn" class="btn btn-primary" style="margin-left: auto;">🚀 執行勾選</button>
+                </div>
             </div>
 
             <div id="merge-view-content">
@@ -198,4 +217,5 @@
     <script src="script.js"></script>
 </body>
 </html>
+
 
