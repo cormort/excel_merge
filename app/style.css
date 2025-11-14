@@ -67,18 +67,20 @@ body.no-scroll {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 400px; /* <-- 已加高 */
+    min-height: 400px; /* 初始狀態的高度 */
 }
 #drop-area.compact {
-    padding: 10px;
+    padding: 10px 15px; /* 調整為更適合的內距 */
     flex-direction: row;
     justify-content: space-between;
     text-align: left;
+    min-height: auto; /* <-- 關鍵修改：讓高度自動適應內容 */
 }
 #drop-area:hover, #drop-area.highlight {
     background: #e9ecef;
     border-color: #764ba2;
 }
+
 #drop-area h3 {
     color: #667eea;
     margin-bottom: 8px;
@@ -619,5 +621,6 @@ table tbody tr:hover {
     .merge-view-overlay { padding: 5px; }
     table th, table td { padding: 6px; font-size: 0.85rem; }
 }
+
 
 
