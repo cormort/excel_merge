@@ -112,8 +112,6 @@
     </div>
     
     
-<!-- ... 其他 HTML ... -->
-    
     <div id="merge-view-modal" class="merge-view-overlay hidden">
         <div class="merge-view-container">
             <header id="merge-view-header">
@@ -131,8 +129,6 @@
                     <button class="btn btn-warning btn-sm" id="toggle-total-row-btn" title="顯示或隱藏最下方的合計列">合計列</button>
                     <button class="btn btn-warning btn-sm" id="invert-selection-merged-btn" title="反轉此表格中所有資料列的勾選狀態">反向選取</button>
                     <button class="btn btn-success btn-sm" id="export-current-merged-xlsx-btn" title="將目前合併檢視中的 *所有可見* 資料列匯出為 XLSX">匯出檢視</button>
-                    <!-- ▼▼▼ "匯出剩餘" 按鈕已刪除 ▼▼▼ -->
-                    <!-- ▼▼▼ "刪除勾選" 按鈕已移走 ▼▼▼ -->
                 </div>
                 
                 <button id="toggle-toolbar-btn" class="btn btn-warning btn-sm" title="收合/展開工具列">收合工具列</button>
@@ -141,14 +137,62 @@
 
             <div id="collapsible-toolbar-area">
                 <div id="merge-view-search-controls" style="padding: 10px 20px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
-                    <!-- ... 搜尋和關鍵字輸入框 ... -->
+                    <div class="control-group">
+                        <label for="search-input-merged">🔍 即時搜尋篩選</label>
+                        <input type="text" id="search-input-merged" placeholder="輸入關鍵字以篩選資料列..." title="即時篩選合併表格中的資料列">
+                    </div>
+                    <div class="control-group">
+                        <label>✅ 依關鍵字勾選</label>
+                        <div class="input-with-checkbox-group">
+                            <input type="text" id="select-keyword-input-merged" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">                            
+                            <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex-merged" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="merge-view-column-ops" class="complex-filter-box" style="padding: 10px; background-color: #f1f3f5; border-bottom: 1px solid #dee2e6;">
-                    <!-- ... 條件 A 和 B 的內容 ... -->
+                    <div class="filter-row">
+                        <div class="filter-section">
+                            <label>條件 A：</label>
+                            <select id="col-select-1" class="filter-select">
+                                <option value="">-- 選擇欄位 1 --</option>
+                            </select>
+                            <div class="radio-group" data-target="inputCriteria1">
+                                <label><input type="radio" name="criteria-1" value="empty" checked> 空值</label>
+                                <label><input type="radio" name="criteria-1" value="zero"> 為零</label>
+                                <label><input type="radio" name="criteria-1" value="value"> 有值</label>
+                                <label><input type="radio" name="criteria-1" value="exact"> 等於</label>
+                                <label><input type="radio" name="criteria-1" value="includes"> 包含</label>
+                            </div>
+                            <input type="text" id="input-criteria-1" class="filter-input" placeholder="輸入比對值" disabled>
+                        </div>
+                    </div>
+
+                    <div class="filter-row">
+                        <div class="logic-operator">
+                            <label><input type="radio" name="logic-op" value="and" checked> AND (且)</label>
+                            <label><input type="radio" name="logic-op" value="or"> OR (或)</label>
+                        </div>
+                    </div>
+
+                    <div class="filter-row">
+                        <div class="filter-section">
+                            <label>條件 B：</label>
+                            <select id="col-select-2" class="filter-select">
+                                <option value="">-- 選擇欄位 2 (選填) --</option>
+                            </select>
+                            <div class="radio-group" data-target="inputCriteria2">
+                                <label><input type="radio" name="criteria-2" value="empty" checked> 空值</label>
+                                <label><input type="radio" name="criteria-2" value="zero"> 為零</label>
+                                <label><input type="radio" name="criteria-2" value="value"> 有值</label>
+                                <label><input type="radio" name="criteria-2" value="exact"> 等於</label>
+                                <label><input type="radio" name="criteria-2" value="includes"> 包含</label>
+                            </div>
+                            <input type="text" id="input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled>
+                        </div>
+                    </div>
                     
                     <div class="filter-row execute-row">
-                        <!-- ▼▼▼ 新的按鈕群組 ▼▼▼ -->
                         <div class="button-group" style="margin-left: auto;">
                             <button id="unselect-merged-rows-btn" class="btn btn-secondary">取消勾選</button>
                             <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選</button>
@@ -162,8 +206,6 @@
             </div>
         </div>
     </div>
-
-    <!-- ... 其他 HTML ... -->
 
     <div id="column-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
@@ -187,10 +229,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
