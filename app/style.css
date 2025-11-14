@@ -387,15 +387,18 @@ table tbody tr:hover {
 #merge-view-header {
     display: flex;
     align-items: center;
-    padding: 10px 20px;
+    gap: 10px; /* Add gap between header items */
+    padding: 10px 15px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     flex-shrink: 0;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
 }
 #merge-view-header h3 {
     margin: 0;
     font-size: 1.2rem;
     margin-right: auto; /* Push other items to the right */
+    white-space: nowrap;
 }
 .close-btn {
     border: none;
@@ -405,33 +408,50 @@ table tbody tr:hover {
     color: white;
     padding: 0 5px;
     line-height: 1;
+    order: 3; /* Ensure close button is always last */
 }
 
-/* 6.1) 工具列收合功能 */
+/* 6.1) 標題列中的按鈕容器 */
+#merge-view-header-actions {
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+    gap: 6px;
+    justify-content: flex-start;
+    order: 1;
+}
 #toggle-toolbar-btn {
-    margin-right: 15px;
+    margin-left: 10px; /* Space between main actions and toggle button */
     padding: 4px 10px;
     font-size: 0.85em;
+    order: 2;
+    white-space: nowrap;
 }
+
+/* 6.2) 工具列收合功能 */
 #collapsible-toolbar-area {
     max-height: 500px; /* Sufficient initial height */
     overflow: hidden;
-    transition: max-height 0.4s ease-out, padding 0.4s ease-out;
+    transition: max-height 0.4s ease-out, padding 0.4s ease-out, border 0.4s;
     flex-shrink: 0;
+    border-bottom: 1px solid #dee2e6;
 }
 #collapsible-toolbar-area.collapsed {
     max-height: 0;
     padding-top: 0;
     padding-bottom: 0;
     overflow: hidden;
+    border-bottom-color: transparent;
 }
-#merge-view-controls, #merge-view-search-controls, .complex-filter-box {
+#merge-view-search-controls, .complex-filter-box {
     padding: 10px 20px;
     background-color: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
 }
+.complex-filter-box {
+    border-bottom: none; /* Last item doesn't need a bottom border */
+}
 
-/* 6.2) 複雜篩選 */
+/* 6.3) 複雜篩選 */
 .complex-filter-box {
     display: flex;
     flex-direction: column;
@@ -490,7 +510,7 @@ table tbody tr:hover {
     justify-content: flex-end;
 }
 
-/* 6.3) 合併檢視表格內容 */
+/* 6.4) 合併檢視表格內容 */
 #merge-view-content {
     flex-grow: 1;
     overflow: auto;
@@ -598,3 +618,4 @@ table tbody tr:hover {
     .merge-view-overlay { padding: 5px; }
     table th, table td { padding: 6px; font-size: 0.85rem; }
 }
+
