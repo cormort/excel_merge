@@ -114,7 +114,7 @@ function cacheElements() {
             searchInputMerged: 'search-input-merged',
             selectKeywordInputMerged: 'select-keyword-input-merged',
             selectKeywordRegexMerged: 'select-keyword-regex-merged',
-            selectByKeywordBtnMerged: 'select-by-keyword-btn-merged'
+            selectByKeywordBtnMerged: 'select-by-keyword-btn-merged',
             // --- NEW: Toolbar Collapse Elements ---
             toggleToolbarBtn: 'toggle-toolbar-btn',
             collapsibleToolbar: 'collapsible-toolbar-area'
@@ -1450,6 +1450,7 @@ function toggleEditMode(startEditing) {
 })();
 
 ExcelViewer.init();
+
 
 
 
