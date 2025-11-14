@@ -96,7 +96,6 @@ const ExcelViewer = (() => {
             toggleTotalRowBtn: 'toggle-total-row-btn', 
             toggleSourceColBtn: 'toggle-source-col-btn', 
             invertSelectionMergedBtn: 'invert-selection-merged-btn',
-            exportSelectedMergedXlsxBtn: 'export-selected-merged-xlsx-btn', 
             exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
             sortMergedByNameBtn: 'sort-merged-by-fund-name-btn',
             
@@ -109,8 +108,8 @@ const ExcelViewer = (() => {
             selectKeywordInputMerged: 'select-keyword-input-merged',
             selectKeywordRegexMerged: 'select-keyword-regex-merged',
             
-            // --- MODIFIED: Combined Button ---
             executeFilterSelectionBtn: 'execute-filter-selection-btn',
+            unselectMergedRowsBtn: 'unselect-merged-rows-btn', // <-- 新增
 
             toggleToolbarBtn: 'toggle-toolbar-btn',
             collapsibleToolbar: 'collapsible-toolbar-area'
@@ -157,7 +156,6 @@ const ExcelViewer = (() => {
         elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
         
-        // --- MODIFIED: Event for combined button ---
         if (elements.executeFilterSelectionBtn) {
             elements.executeFilterSelectionBtn.addEventListener('click', () => {
                 executeCombinedSelection(); 
@@ -190,9 +188,9 @@ const ExcelViewer = (() => {
         
         elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-        elements.exportSelectedMergedXlsxBtn.addEventListener('click', exportSelectedMergedXlsx); 
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
         elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
+        elements.unselectMergedRowsBtn.addEventListener('click', unselectAllMergedRows); // <-- 新增事件
 
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
@@ -229,7 +227,7 @@ const ExcelViewer = (() => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (state.isMergedView) {
-                    elements.executeFilterSelectionBtn.click(); // Trigger combined button
+                    elements.executeFilterSelectionBtn.click();
                 } else {
                     elements.selectByKeywordBtn.click();
                 }
@@ -262,16 +260,12 @@ const ExcelViewer = (() => {
         });
     }
 
-    // --- [NEW] Combined selection function ---
     function executeCombinedSelection() {
         if (!state.isMergedView) return;
-
-        // --- Part 1: Get Keyword Filter Settings ---
         const keywordInput = elements.selectKeywordInputMerged.value.trim();
         const isRegex = elements.selectKeywordRegexMerged.checked;
-        let keywordMatchLogic = () => false; // Default to no match
+        let keywordMatchLogic = () => false;
         let hasKeywordCriteria = false;
-
         if (keywordInput) {
             hasKeywordCriteria = true;
             try {
@@ -290,8 +284,6 @@ const ExcelViewer = (() => {
                 return;
             }
         }
-
-        // --- Part 2: Get Complex Filter Settings ---
         const col1 = elements.colSelect1.value;
         const col2 = elements.colSelect2.value;
         const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value;
@@ -300,12 +292,10 @@ const ExcelViewer = (() => {
         const inputVal1 = elements.inputCriteria1.value;
         const inputVal2 = elements.inputCriteria2.value;
         const hasComplexCriteria = col1 || col2;
-
         if (!hasKeywordCriteria && !hasComplexCriteria) {
             alert('請至少輸入關鍵字或設定一個欄位篩選條件。');
             return;
         }
-
         const checkValue = (cellVal, criteria, inputVal) => {
             const strCellVal = String(cellVal).trim();
             const strInputVal = String(inputVal).trim();
@@ -318,21 +308,15 @@ const ExcelViewer = (() => {
                 default: return false;
             }
         };
-
-        // --- Part 3: Iterate and Apply Logic ---
         let count = 0;
         elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
             const checkbox = row.querySelector('.row-checkbox');
             if (!checkbox) return;
-
-            // Check keyword match
             let keywordMatch = false;
             if (hasKeywordCriteria) {
                 const rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).map(c => c.textContent).join(' ');
                 keywordMatch = keywordMatchLogic(rowText);
             }
-
-            // Check complex filter match
             let complexMatch = false;
             if (hasComplexCriteria) {
                 let result1 = null, result2 = null;
@@ -352,21 +336,28 @@ const ExcelViewer = (() => {
                     complexMatch = result2;
                 }
             }
-
-            // Combine results (OR logic)
             if (keywordMatch || complexMatch) {
                 checkbox.checked = true;
                 count++;
             }
         });
-
         alert(count > 0 ? `已勾選 ${count} 筆符合條件的資料。` : '未找到符合條件的資料。');
     }
 
-    // ... (The rest of the code from processFiles down to the end remains largely the same)
-    // ... I will paste the full, correct code below for clarity and to avoid errors.
-    
-    // --- Core Logic (File Processing, Rendering) ---
+    // --- [新增] 取消勾選合併視窗中所有列的函式 ---
+    function unselectAllMergedRows() {
+        if (!state.isMergedView) return;
+        const scope = elements.mergeViewContent;
+        scope.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
+        const headerCheckbox = scope.querySelector('thead input[type="checkbox"]');
+        if (headerCheckbox) {
+            headerCheckbox.checked = false;
+            headerCheckbox.indeterminate = false;
+        }
+    }
+
+    // ... (以下程式碼保持不變)
+
     function setupDragAndDrop() {
         elements.dropArea.addEventListener('click', e => {
             if (e.target.id === 'clear-files-btn' || e.target.closest('.btn-clear') || e.target.id === 'file-input') {
@@ -682,7 +673,7 @@ const ExcelViewer = (() => {
         elements.editDataBtn.classList.toggle('hidden', state.isEditing);
         elements.saveEditsBtn.classList.toggle('hidden', !state.isEditing);
         elements.cancelEditsBtn.classList.toggle('hidden', !state.isEditing);
-        const disableOnEdit = ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportSelectedMergedXlsxBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged'];
+        const disableOnEdit = ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged', 'unselectMergedRowsBtn'];
         disableOnEdit.forEach(elId => { if (elements[elId]) elements[elId].disabled = state.isEditing; });
         elements.inputCriteria1.disabled = true; elements.inputCriteria2.disabled = true;
         document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => r.disabled = state.isEditing);
@@ -796,7 +787,6 @@ const ExcelViewer = (() => {
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) headerData.unshift('Source File'); data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; let rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) rowData.unshift(filename); data.push(rowData); }); return data; }
     function exportToXlsx(data, filename, sheetName) { if (data.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } try { const ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = calculateColumnWidths(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheetName); XLSX.writeFile(wb, filename); } catch (err) { console.error('匯出 XLSX 時發生錯誤:', err); alert('匯出時發生錯誤：' + err.message); } }
     function exportCurrentMergedXlsx() { if (!state.isMergedView) return; const table = elements.mergeViewContent.querySelector('table'); if (!table) return; const data = extractTableData(table, { onlySelected: false, includeFilename: state.showSourceColumn }); exportToXlsx(data, `merged_view_export_${new Date().toISOString().slice(0, 10)}.xlsx`, "Merged View Data"); }
-    function exportSelectedMergedXlsx() { if (!state.isMergedView) return; const table = elements.mergeViewContent.querySelector('table'); if (!table) return; const data = extractTableData(table, { onlySelected: true, includeFilename: state.showSourceColumn }); exportToXlsx(data, `merged_selected_export_${new Date().toISOString().slice(0, 10)}.xlsx`, "Merged Selected Data"); }
     function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); exportToXlsx(allData, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Merged Data'); }
     function calculateColumnWidths(data) { if (data.length === 0) return []; return data[0].map((_, col) => ({ wch: Math.min(50, Math.max(10, ...data.map(row => row[col] ? String(row[col]).length : 0)) + 2) })); }
     
