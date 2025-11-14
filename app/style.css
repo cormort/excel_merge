@@ -666,5 +666,18 @@ table tbody tr:hover {
     margin-bottom: 5px;
 }
 
+/* --- 合併檢視搜尋列排版優化 (水平並列) --- */
+
+#merge-view-search-controls {
+    display: flex;
+    flex-wrap: wrap; /* 當空間不足時換行 */
+    gap: 20px; /* 兩個區塊之間的間距 */
+    align-items: flex-start; /* 讓標籤頂端對齊 */
+}
+
+#merge-view-search-controls .control-group {
+    flex: 1; /* 讓兩個區塊平分空間 */
+    min-width: 300px; /* 每個區塊的最小寬度，觸發換行用 */
+}
 
 
