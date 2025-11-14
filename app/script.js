@@ -115,6 +115,9 @@ function cacheElements() {
             selectKeywordInputMerged: 'select-keyword-input-merged',
             selectKeywordRegexMerged: 'select-keyword-regex-merged',
             selectByKeywordBtnMerged: 'select-by-keyword-btn-merged'
+            // --- NEW: Toolbar Collapse Elements ---
+            toggleToolbarBtn: 'toggle-toolbar-btn',
+            collapsibleToolbar: 'collapsible-toolbar-area'
         };
         Object.keys(mapping).forEach(key => {
             elements[key] = document.getElementById(mapping[key]);
@@ -255,6 +258,8 @@ function bindEvents() {
         };
         elements.selectKeywordInput.addEventListener('keydown', handleKeywordEnter);
         elements.selectKeywordInputMerged.addEventListener('keydown', handleKeywordEnter);
+        // --- NEW: Bind Toolbar Toggle Event ---
+        elements.toggleToolbarBtn.addEventListener('click', toggleToolbar);
 
         // --- Window/Document Level Events ---
         elements.backToTopBtn.addEventListener('click', scrollToTop);
@@ -567,6 +572,11 @@ function closeMergeView() {
         state.mergedData = [];
         state.mergedHeaders = [];
         elements.mergeViewContent.innerHTML = '';
+
+            // --- [NEW] Reset toolbar state on close ---
+        elements.collapsibleToolbar.classList.remove('collapsed');
+        elements.toggleToolbarBtn.textContent = '收合工具列';
+        elements.toggleToolbarBtn.title = '收合工具列';
         
         // --- [NEW] 重置新元件 ---
         elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; 
@@ -1120,7 +1130,20 @@ function toggleEditMode(startEditing) {
     function parsePositionString(str) { const indices = new Set(); const parts = str.split(',').map(p => p.trim()).filter(Boolean); for (const part of parts) { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) { for (let i = start; i <= end; i++) indices.add(i - 1); } } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } } return Array.from(indices).sort((a, b) => a - b); }
     async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
     function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox')).filter(cb => cb.checked).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
-    
+
+    // --- NEW: Toolbar Collapse Function ---
+    function toggleToolbar() {
+        const isCollapsed = elements.collapsibleToolbar.classList.toggle('collapsed');
+        if (isCollapsed) {
+            elements.toggleToolbarBtn.textContent = '展開工具列';
+            elements.toggleToolbarBtn.title = '展開工具列';
+        } else {
+            elements.toggleToolbarBtn.textContent = '收合工具列';
+            elements.toggleToolbarBtn.title = '收合工具列';
+        }
+    }
+
+
     function extractTableData(table, { onlySelected = false, includeFilename = false, includeSourceCol = false } = {}) { 
         const data = []; 
         const headerRow = table.querySelector('thead tr'); 
@@ -1427,6 +1450,7 @@ function toggleEditMode(startEditing) {
 })();
 
 ExcelViewer.init();
+
 
 
 
