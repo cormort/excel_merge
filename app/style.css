@@ -426,3 +426,49 @@ body.no-scroll .controls { display: none !important; }
 .radio-btn { cursor: pointer; padding: 2px 8px; border-radius: 4px; background: #fff; border: 1px solid #ccc; }
 .radio-btn:has(input:checked) { background-color: #e7f1ff; border-color: #0d6efd; color: #0d6efd; font-weight: bold; }
 .logic-radio { cursor: pointer; }
+
+
+/* --- [補強] 合併檢視：複雜篩選區塊佈局 --- */
+.complex-filter-box {
+    display: flex;
+    flex-direction: column; /* 讓三行垂直排列 */
+    gap: 10px; /* 行與行之間的間距 */
+}
+
+/* 讓每一行都滿版且對齊 */
+.complex-filter-box > div {
+    width: 100%;
+    flex-wrap: wrap; /* 小螢幕自動換行 */
+}
+
+/* 標籤文字 */
+.complex-filter-box label {
+    font-size: 0.95rem;
+    color: #495057;
+    white-space: nowrap; /* 防止文字折行 */
+    margin-bottom: 0; /* 修正預設 margin */
+}
+
+/* 下拉選單美化 */
+.complex-filter-box select.form-select {
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-width: 160px;
+    background-color: #fff;
+    font-size: 0.9rem;
+}
+.complex-filter-box select.form-select:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+/* 執行按鈕特別樣式 */
+#execute-complex-select-btn {
+    padding: 4px 16px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
