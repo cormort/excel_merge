@@ -29,7 +29,7 @@ body.no-scroll {
 
 /* --- 2. 主要佈局 --- */
 .page-container {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
     background: white;
     border-radius: 8px;
@@ -67,6 +67,7 @@ body.no-scroll {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    min-height: 400px; /* <-- 已加高 */
 }
 #drop-area.compact {
     padding: 10px;
@@ -618,4 +619,5 @@ table tbody tr:hover {
     .merge-view-overlay { padding: 5px; }
     table th, table td { padding: 6px; font-size: 0.85rem; }
 }
+
 
