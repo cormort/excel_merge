@@ -109,7 +109,7 @@ const ExcelViewer = (() => {
             selectKeywordRegexMerged: 'select-keyword-regex-merged',
             
             executeFilterSelectionBtn: 'execute-filter-selection-btn',
-            unselectMergedRowsBtn: 'unselect-merged-rows-btn', // <-- 新增
+            unselectMergedRowsBtn: 'unselect-merged-rows-btn',
 
             toggleToolbarBtn: 'toggle-toolbar-btn',
             collapsibleToolbar: 'collapsible-toolbar-area'
@@ -190,7 +190,7 @@ const ExcelViewer = (() => {
         elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
         elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
         elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
-        elements.unselectMergedRowsBtn.addEventListener('click', unselectAllMergedRows); // <-- 新增事件
+        elements.unselectMergedRowsBtn.addEventListener('click', unselectAllMergedRows);
 
         elements.searchInput.addEventListener('input', debounce(filterTable, 300));
         elements.displayArea.addEventListener('change', handleDisplayAreaChange);
@@ -344,7 +344,6 @@ const ExcelViewer = (() => {
         alert(count > 0 ? `已勾選 ${count} 筆符合條件的資料。` : '未找到符合條件的資料。');
     }
 
-    // --- [新增] 取消勾選合併視窗中所有列的函式 ---
     function unselectAllMergedRows() {
         if (!state.isMergedView) return;
         const scope = elements.mergeViewContent;
@@ -355,8 +354,6 @@ const ExcelViewer = (() => {
             headerCheckbox.indeterminate = false;
         }
     }
-
-    // ... (以下程式碼保持不變)
 
     function setupDragAndDrop() {
         elements.dropArea.addEventListener('click', e => {
