@@ -1,1295 +1,845 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金資料彙總報告產生器 v13.0</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        #app-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        
-        /* 頂部標題區 */
-        .app-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px 40px;
-            text-align: center;
-        }
-        
-        .app-header h1 {
-            font-size: 2em;
-            font-weight: 700;
-            margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .app-header .version {
-            font-size: 0.9em;
-            opacity: 0.9;
-        }
-        
-        /* 進度指示器 */
-        .progress-steps {
-            display: flex;
-            justify-content: space-between;
-            padding: 30px 40px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .step {
-            flex: 1;
-            text-align: center;
-            position: relative;
-            padding: 0 10px;
-        }
-        
-        .step:not(:last-child)::after {
-            content: '';
-            position: absolute;
-            top: 20px;
-            right: -50%;
-            width: 100%;
-            height: 2px;
-            background: #ddd;
-            z-index: 0;
-        }
-        
-        .step.active:not(:last-child)::after {
-            background: #667eea;
-        }
-        
-        .step-number {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #ddd;
-            color: #999;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            margin-bottom: 8px;
-            position: relative;
-            z-index: 1;
-            transition: all 0.3s;
-        }
-        
-        .step.active .step-number {
-            background: #667eea;
-            color: white;
-            transform: scale(1.1);
-        }
-        
-        .step.completed .step-number {
-            background: #28a745;
-            color: white;
-        }
-        
-        .step-label {
-            font-size: 0.85em;
-            color: #666;
-            font-weight: 500;
-        }
-        
-        .step.active .step-label {
-            color: #667eea;
-            font-weight: 600;
-        }
-        
-        /* 內容區域 */
-        .app-content {
-            padding: 40px;
-        }
-        
-        .section {
-            margin-bottom: 40px;
-            animation: fadeIn 0.5s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .section-title {
-            font-size: 1.4em;
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
-            display: inline-block;
-        }
-        
-        /* 檔案上傳區 */
-        #drop-area {
-            border: 3px dashed #667eea;
-            border-radius: 12px;
-            padding: 60px 40px;
-            text-align: center;
-            background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        #drop-area::before {
-            content: '📁';
-            font-size: 4em;
-            display: block;
-            margin-bottom: 15px;
-            animation: bounce 2s infinite;
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        #drop-area:hover {
-            background: linear-gradient(135deg, #e8ebff 0%, #dce0ff 100%);
-            border-color: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-        
-        #drop-area.drag-over {
-            background: linear-gradient(135deg, #d0d8ff 0%, #c0cbff 100%);
-            border-color: #4050bf;
-            transform: scale(1.02);
-        }
-        
-        .drop-text {
-            font-size: 1.2em;
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .drop-hint {
-            color: #888;
-            font-size: 0.9em;
-        }
-        
-        #file-input { display: none; }
-        
-        /* 檔案列表 */
-        .file-list {
-            margin-top: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-        }
-        
-        .file-item {
-            display: flex;
-            align-items: center;
-            padding: 10px 15px;
-            background: white;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        .file-item::before {
-            content: '📄';
-            margin-right: 10px;
-            font-size: 1.2em;
-        }
-        
-        .file-item span {
-            flex: 1;
-            color: #333;
-            font-size: 0.9em;
-        }
-        
-        /* 預覽區 */
-        #preview-area {
-            background: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 20px;
-            max-height: 450px;
-            overflow: auto;
-        }
-        
-        #preview-area::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        #preview-area::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        
-        #preview-area::-webkit-scrollbar-thumb {
-            background: #667eea;
-            border-radius: 4px;
-        }
-        
-        #preview-area table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 0.85em;
-        }
-        
-        #preview-area th, #preview-area td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }
-        
-        #preview-area thead th {
-            background: #667eea;
-            color: white;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            font-weight: 600;
-        }
-        
-        #preview-area tbody th {
-            background: #f1f3f5;
-            font-weight: 600;
-        }
-        
-        /* 表單控制項 */
-        .form-row {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-            align-items: flex-end;
-            flex-wrap: wrap;
-        }
-        
-        .form-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .form-label {
-            display: block;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 8px;
-            font-size: 0.9em;
-        }
-        
-        input[type="text"],
-        input[type="number"],
-        select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: all 0.3s;
-            background: white;
-        }
-        
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        /* 按鈕樣式 */
-        .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-        }
-        
-        .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }
-        
-        .btn-success:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.5);
-        }
-        
-        .btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .btn::before {
-            content: attr(data-icon);
-            font-size: 1.2em;
-        }
-        
-        /* 映射表格 */
-        .mapping-table-wrapper {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            overflow-x: auto;
-        }
-        
-        .mapping-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .mapping-table thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .mapping-table th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.9em;
-        }
-        
-        .mapping-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .mapping-table tr:hover {
-            background: #f8f9ff;
-        }
-        
-        .mapping-table input[type="text"],
-        .mapping-table select {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-        }
-        
-        .mapping-table input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #667eea;
-        }
-        
-        .excel-col {
-            font-family: 'Courier New', monospace;
-            font-weight: 700;
-            color: #667eea;
-            font-size: 1.1em;
-        }
-        
-        /* 輸出區域 */
-        .output-section {
-            display: none;
-            animation: fadeIn 0.5s;
-        }
-        
-        .view-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 0;
-        }
-        
-        .tab-btn {
-            padding: 12px 24px;
-            border: none;
-            background: transparent;
-            color: #666;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-            margin-bottom: -2px;
-        }
-        
-        .tab-btn:hover {
-            color: #667eea;
-            background: #f8f9ff;
-        }
-        
-        .tab-btn.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            background: #f8f9ff;
-        }
-        
-        .view-pane {
-            display: none;
-            animation: fadeIn 0.3s;
-        }
-        
-        .view-pane.active {
-            display: block;
-        }
-        
-        /* 報表表格 */
-        .report-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .report-table thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .report-table th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-        }
-        
-        .report-table td {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .report-table tbody tr:hover {
-            background: #f8f9ff;
-        }
-        
-        .report-table td.number {
-            text-align: right;
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
-            color: #667eea;
-        }
-        
-        .report-table .total-row {
-            background: #fff3cd !important;
-            font-weight: 700;
-        }
-        
-        .report-table .total-row td {
-            border-top: 3px solid #ffc107;
-            border-bottom: 3px solid #ffc107;
-        }
-        
-        /* 提示訊息 */
-        .alert {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .alert-info {
-            background: #d1ecf1;
-            border-left: 4px solid #17a2b8;
-            color: #0c5460;
-        }
-        
-        .alert-success {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-        
-        .alert::before {
-            content: 'ℹ️';
-            font-size: 1.5em;
-        }
-        
-        .alert-success::before {
-            content: '✅';
-        }
-        
-        /* 空狀態 */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-        
-        .empty-state::before {
-            content: '📊';
-            font-size: 4em;
-            display: block;
-            margin-bottom: 15px;
-            opacity: 0.5;
-        }
-        
-        /* 查詢下拉選單 */
-        .query-select {
-            width: 100%;
-            max-width: 500px;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1.1em;
-            margin-bottom: 20px;
-            background: white;
-            cursor: pointer;
-        }
-        
-        .query-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        /* 響應式 */
-        @media (max-width: 768px) {
-            .app-content {
-                padding: 20px;
+// --- 移除了頂部的 FUND_ORDER_LIST ---
+
+const ExcelViewer = (() => {
+    'use strict';
+    const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
+    const state = { 
+        originalHtmlString: '', 
+        isProcessing: false, 
+        loadedFiles: [], 
+        loadedTables: 0, 
+        zoomedCard: null,
+        isMergedView: false,
+        isEditing: false,
+        showTotalRow: false,
+        showSourceColumn: false, 
+        mergedData: [],
+        mergedHeaders: [],
+        fundSortOrder: [], 
+        fundAliasMap: {},   
+        fundAliasKeys: []  
+    };
+    const elements = {};
+
+    async function init() {
+        cacheElements();
+        await loadFundConfig(); 
+        bindEvents();
+    }
+
+    async function loadFundConfig() {
+        try {
+            const response = await fetch(`fund-config.json?v=${Date.now()}`); 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+            const config = await response.json();
             
-            .progress-steps {
-                flex-wrap: wrap;
+            if (config.sortOrder && config.aliasMap) {
+                state.fundSortOrder = config.sortOrder;
+                state.fundAliasMap = config.aliasMap;
+                state.fundAliasKeys = Object.keys(config.aliasMap).sort((a, b) => b.length - a.length);
+                console.log("基金設定檔 (fund-config.json) 載入成功。");
+            } else {
+                console.error("基金設定檔格式錯誤：缺少 sortOrder 或 aliasMap。");
+                alert("錯誤：基金設定檔 (fund-config.json) 格式不正確。");
             }
-            
-            .step {
-                flex-basis: 50%;
-                margin-bottom: 20px;
-            }
-            
-            .form-row {
-                flex-direction: column;
-            }
-            
-            .app-header h1 {
-                font-size: 1.5em;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div id="app-container">
-        <!-- 頂部標題 -->
-        <div class="app-header">
-            <h1>📊 基金資料彙總報告產生器</h1>
-            <div class="version">Version 13.0 - UX Enhanced</div>
-        </div>
-        
-        <!-- 進度指示器 -->
-        <div class="progress-steps">
-            <div class="step" id="step-1">
-                <div class="step-number">1</div>
-                <div class="step-label">上傳檔案</div>
-            </div>
-            <div class="step" id="step-2">
-                <div class="step-number">2</div>
-                <div class="step-label">偵測範圍</div>
-            </div>
-            <div class="step" id="step-3">
-                <div class="step-number">3</div>
-                <div class="step-label">設定欄位</div>
-            </div>
-            <div class="step" id="step-4">
-                <div class="step-number">4</div>
-                <div class="step-label">查看報告</div>
-            </div>
-        </div>
-        
-        <!-- 主要內容 -->
-        <div class="app-content">
-            <!-- 步驟 1: 上傳檔案 -->
-            <div class="section" id="section-upload">
-                <h2 class="section-title">上傳 Excel 檔案</h2>
-                <div id="drop-area">
-                    <input type="file" id="file-input" accept=".xlsx,.xls" multiple>
-                    <div class="drop-text">拖曳多個 Excel 檔案至此</div>
-                    <div class="drop-hint">或點擊選擇檔案 (支援 .xlsx, .xls)</div>
-                </div>
-                <div id="file-list-container"></div>
-            </div>
-            
-            <!-- 步驟 2: 預覽與偵測 -->
-            <div class="section" id="section-preview" style="display:none;">
-                <h2 class="section-title">檔案預覽與範圍偵測</h2>
-                <div id="preview-area">
-                    <div class="empty-state">尚未載入檔案</div>
-                </div>
-                <div class="form-row" style="margin-top:20px;">
-                    <button class="btn btn-success" id="auto-detect-btn" data-icon="🔍">自動偵測範圍</button>
-                </div>
-            </div>
-            
-            <!-- 步驟 3: 設定範圍 -->
-            <div class="section" id="section-range" style="display:none;">
-                <h2 class="section-title">確認資料範圍</h2>
-                <div id="detect-result"></div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">資料範圍 (含標頭)</label>
-                        <input type="text" id="data-range-input" placeholder="例如: A5:G50">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">標頭佔用列數</label>
-                        <input type="number" id="header-rows-input" value="1" min="1">
-                    </div>
-                    <button class="btn btn-primary" id="load-headers-btn" data-icon="📋">讀取欄位</button>
-                </div>
-            </div>
-            
-            <!-- 步驟 4: 欄位映射 -->
-            <div class="section" id="section-mapping" style="display:none;">
-                <h2 class="section-title">欄位設定與對應</h2>
-                <div class="alert alert-info">
-                    💡 請選擇一個<strong>主鍵欄位</strong>（項目/科目），並選擇要<strong>加總的數值欄位</strong>。可自訂報表中的欄位名稱。
-                </div>
-                <div id="mapping-fields"></div>
-                <div class="form-row" style="margin-top:20px;">
-                    <button class="btn btn-primary" id="process-btn" data-icon="⚡">開始彙總處理</button>
-                </div>
-            </div>
-            
-            <!-- 步驟 5: 輸出結果 -->
-            <div class="output-section" id="output-area">
-                <h2 class="section-title">彙總報告結果</h2>
-                <div class="view-tabs">
-                    <button class="tab-btn active" data-view="summary-view">📊 加總總表</button>
-                    <button class="tab-btn" data-view="file-query-view">📁 檔案查詢</button>
-                    <button class="tab-btn" data-view="item-view">🔍 項目查詢</button>
-                </div>
-                <div id="view-content">
-                    <div id="summary-view" class="view-pane active"></div>
-                    <div id="file-query-view" class="view-pane">
-                        <select class="query-select" id="file-dropdown">
-                            <option value="">--- 請選擇要查詢的檔案 ---</option>
-                        </select>
-                        <div id="file-detail-table"></div>
-                    </div>
-                    <div id="item-view" class="view-pane">
-                        <select class="query-select" id="item-dropdown">
-                            <option value="">--- 請選擇要查詢的項目 ---</option>
-                        </select>
-                        <div id="item-detail-table"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<script>
-const state = { workbooks: [], columnMappings: [], allFileData:[], summaryData:new Map(), orderedItemKeys: [] };
-
-// DOM Elements
-const dropArea = document.getElementById('drop-area');
-const fileInput = document.getElementById('file-input');
-const fileListContainer = document.getElementById('file-list-container');
-const previewArea = document.getElementById('preview-area');
-const mappingFields = document.getElementById('mapping-fields');
-const processBtn = document.getElementById('process-btn');
-const outputArea = document.getElementById('output-area');
-const itemDropdown = document.getElementById('item-dropdown');
-const autoDetectBtn = document.getElementById('auto-detect-btn');
-const dataRangeInput = document.getElementById('data-range-input');
-const headerRowsInput = document.getElementById('header-rows-input');
-const loadHeadersBtn = document.getElementById('load-headers-btn');
-const fileDropdown = document.getElementById('file-dropdown');
-const fileDetailTable = document.getElementById('file-detail-table');
-const detectResult = document.getElementById('detect-result');
-
-// 進度步驟更新
-function updateStep(stepNum, status = 'active') {
-    document.querySelectorAll('.step').forEach((step, i) => {
-        step.classList.remove('active', 'completed');
-        if (i + 1 < stepNum) step.classList.add('completed');
-        if (i + 1 === stepNum) step.classList.add(status);
-    });
-}
-
-// 事件監聽
-dropArea.addEventListener('click', () => fileInput.click());
-['dragenter', 'dragover'].forEach(e => dropArea.addEventListener(e, evt => {
-    evt.preventDefault();
-    dropArea.classList.add('drag-over');
-}));
-['dragleave', 'drop'].forEach(e => dropArea.addEventListener(e, evt => {
-    evt.preventDefault();
-    dropArea.classList.remove('drag-over');
-}));
-dropArea.addEventListener('drop', e => { 
-    if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); 
-});
-fileInput.addEventListener('change', e => { 
-    if(e.target.files.length) handleFiles(e.target.files); 
-});
-autoDetectBtn.addEventListener('click', autoDetectBestRange);
-loadHeadersBtn.addEventListener('click', loadHeadersAndMapping);
-processBtn.addEventListener('click', processData);
-itemDropdown.addEventListener('change', renderItemDetailView);
-fileDropdown.addEventListener('change', renderFileDetailView);
-[dataRangeInput, headerRowsInput].forEach(input => input.addEventListener('input', resetMappings));
-
-function resetUI() {
-    resetMappings();
-    dataRangeInput.value = '';
-    headerRowsInput.value = '1';
-    detectResult.innerHTML = '';
-    document.getElementById('section-preview').style.display = 'none';
-    document.getElementById('section-range').style.display = 'none';
-    document.getElementById('section-mapping').style.display = 'none';
-    updateStep(1);
-}
-
-function resetMappings() {
-    document.getElementById('section-mapping').style.display = 'none';
-    state.columnMappings = [];
-    processBtn.disabled = true;
-    outputArea.style.display = 'none';
-}
-
-async function handleFiles(fileList) {
-    resetUI();
-    previewArea.innerHTML = '<div class="empty-state">正在讀取檔案...</div>';
-    
-    try {
-        state.workbooks = await Promise.all(Array.from(fileList).map(readFile));
-        
-        const fileListHtml = `
-            <div class="file-list">
-                <div style="font-weight:600; margin-bottom:10px; color:#667eea;">
-                    ✓ 已載入 ${state.workbooks.length} 個檔案
-                </div>
-                ${state.workbooks.map(wb => 
-                    `<div class="file-item"><span>${wb.file.name}</span></div>`
-                ).join('')}
-            </div>
-        `;
-        fileListContainer.innerHTML = fileListHtml;
-        
-        generatePreview(state.workbooks[0].workbook.Sheets[state.workbooks[0].workbook.SheetNames[0]]);
-        document.getElementById('section-preview').style.display = 'block';
-        updateStep(2);
-        
-    } catch(err) {
-        previewArea.innerHTML = `<div class="empty-state" style="color:#dc3545;">檔案解析失敗：${err.message}</div>`;
-    }
-}
-
-function readFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve({file, workbook: XLSX.read(e.target.result, {type: 'array'})});
-        reader.onerror = err => reject(err);
-        reader.readAsArrayBuffer(file);
-    });
-}
-
-function generatePreview(sheet) {
-    if (!sheet || !sheet['!ref']) {
-        previewArea.innerHTML = '<div class="empty-state">工作表為空</div>';
-        return;
-    }
-    
-    const range = XLSX.utils.decode_range(sheet['!ref']);
-    range.e.r = Math.min(range.e.r, range.s.r + 100);
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, range: range, defval: '' });
-    
-    let html = '<table><thead><tr><th></th>';
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-        html += `<th>${XLSX.utils.encode_col(C)}</th>`;
-    }
-    html += '</tr></thead><tbody>';
-    
-    data.forEach((row, i) => {
-        html += `<tr><th>${range.s.r + i + 1}</th>`;
-        (row || []).forEach(cell => html += `<td>${cell ?? ''}</td>`);
-        html += '</tr>';
-    });
-    
-    previewArea.innerHTML = html + '</tbody></table>';
-}
-
-const isRowEmpty = (row) => !row || row.every(cell => cell == null || String(cell).trim() === '');
-
-function autoDetectBestRange() {
-    if (state.workbooks.length === 0) return;
-    resetMappings();
-    
-    const sheet = state.workbooks[0].workbook.Sheets[state.workbooks[0].workbook.SheetNames[0]];
-    if (!sheet || !sheet['!ref']) {
-        showDetectResult('工作表為空', 'error');
-        return;
-    }
-    
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-    if (rows.length === 0) {
-        showDetectResult('工作表內沒有資料', 'error');
-        return;
-    }
-
-    let headerRowIdx = -1;
-    for (let i = 0; i < Math.min(rows.length, 30); i++) {
-        if ((rows[i]?.filter(c => c != null && String(c).trim() !== '').length || 0) > 2) {
-            headerRowIdx = i;
-            break;
-        }
-    }
-    
-    if (headerRowIdx === -1) {
-        showDetectResult('找不到有效的標頭列', 'error');
-        return;
-    }
-
-    let lastDataRowIdx = headerRowIdx;
-    for (let i = rows.length - 1; i > headerRowIdx; i--) {
-        if (!isRowEmpty(rows[i])) {
-            lastDataRowIdx = i;
-            break;
+        } catch (err) {
+            console.error("載入基金設定檔 (fund-config.json) 失敗:", err);
+            alert("警告：無法載入基金排序設定檔 (fund-config.json)。\n「依基金名稱排序」功能將無法使用。");
         }
     }
 
-    let firstCol = Infinity, lastCol = -1;
-    for (let r = headerRowIdx; r <= lastDataRowIdx; r++) {
-        if (!rows[r]) continue;
-        rows[r].forEach((cell, c) => {
-            if (cell != null && String(cell).trim() !== '') {
-                firstCol = Math.min(firstCol, c);
-                lastCol = Math.max(lastCol, c);
-            }
+    function cacheElements() {
+        const mapping = {
+            fileInput: 'file-input', displayArea: 'excel-display-area', searchInput: 'search-input',
+            dropArea: 'drop-area', deleteSelectedBtn: 'delete-selected-btn', invertSelectionBtn: 'invert-selection-btn',
+            resetViewBtn: 'reset-view-btn', selectEmptyBtn: 'select-empty-btn',
+            showHiddenBtn: 'show-hidden-btn',
+            exportMergedXlsxBtn: 'export-merged-xlsx-btn',
+            selectByKeywordGroup: 'select-by-keyword-group', selectKeywordInput: 'select-keyword-input',
+            selectByKeywordBtn: 'select-by-keyword-btn', selectKeywordRegex: 'select-keyword-regex',
+            loadStatusMessage: 'load-status-message', controlPanel: 'control-panel',
+            dropAreaInitial: 'drop-area-initial', dropAreaLoaded: 'drop-area-loaded',
+            fileCount: 'file-count', fileNames: 'file-names', clearFilesBtn: 'clear-files-btn',
+            selectAllBtn: 'select-all-btn',
+            importOptionsContainer: 'import-options-container', specificSheetNameGroup: 'specific-sheet-name-group',
+            specificSheetNameInput: 'specific-sheet-name-input', specificSheetPositionGroup: 'specific-sheet-position-group',
+            specificSheetPositionInput: 'specific-sheet-position-input', selectAllTablesBtn: 'select-all-tables-btn',
+            unselectAllTablesBtn: 'unselect-all-tables-btn', deleteSelectedTablesBtn: 'delete-selected-tables-btn',
+            sortByNameBtn: 'sort-by-fund-name-btn', 
+            tableLevelControls: 'table-level-controls', selectedTablesInfo: 'selected-tables-info',
+            selectedTablesList: 'selected-tables-list', listViewBtn: 'list-view-btn',
+            gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
+            gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
+            
+            mergeViewModal: 'merge-view-modal',
+            closeMergeViewBtn: 'close-merge-view-btn',
+            mergeViewContent: 'merge-view-content',
+            mergeViewBtn: 'merge-view-btn',
+            viewCheckedCombinedBtn: 'view-checked-combined-btn', 
+            
+            columnOperationsBtn: 'column-operations-btn',
+            columnModal: 'column-modal',
+            closeColumnModalBtn: 'close-column-modal-btn',
+            columnChecklist: 'column-checklist',
+            applyColumnChangesBtn: 'apply-column-changes-btn',
+            modalCheckAll: 'modal-check-all',
+            modalUncheckAll: 'modal-uncheck-all',
+            
+            editDataBtn: 'edit-data-btn',
+            saveEditsBtn: 'save-edits-btn',
+            cancelEditsBtn: 'cancel-edits-btn',
+            addNewRowBtn: 'add-new-row-btn',
+            copySelectedRowsBtn: 'copy-selected-rows-btn',
+            deleteMergedRowsBtn: 'delete-merged-rows-btn',
+            toggleTotalRowBtn: 'toggle-total-row-btn', 
+            toggleSourceColBtn: 'toggle-source-col-btn', 
+            invertSelectionMergedBtn: 'invert-selection-merged-btn',
+            exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn', 
+            sortMergedByNameBtn: 'sort-merged-by-fund-name-btn',
+            
+            colSelect1: 'col-select-1',
+            colSelect2: 'col-select-2',
+            inputCriteria1: 'input-criteria-1',
+            inputCriteria2: 'input-criteria-2',
+
+            searchInputMerged: 'search-input-merged',
+            selectKeywordInputMerged: 'select-keyword-input-merged',
+            selectKeywordRegexMerged: 'select-keyword-regex-merged',
+            
+            executeFilterSelectionBtn: 'execute-filter-selection-btn',
+            unselectMergedRowsBtn: 'unselect-merged-rows-btn',
+
+            toggleToolbarBtn: 'toggle-toolbar-btn',
+            collapsibleToolbar: 'collapsible-toolbar-area'
+        };
+        Object.keys(mapping).forEach(key => {
+            elements[key] = document.getElementById(mapping[key]);
         });
     }
     
-    if (firstCol > lastCol) {
-        showDetectResult('找不到有效的資料欄', 'error');
-        return;
-    }
-    
-    const detectedRange = { s: { r: headerRowIdx, c: firstCol }, e: { r: lastDataRowIdx, c: lastCol } };
-    const rangeStr = XLSX.utils.encode_range(detectedRange);
-    dataRangeInput.value = rangeStr;
-
-    const blockRows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: detectedRange, defval: null });
-    let firstDataRowIndex = -1;
-    for (let i = 1; i < blockRows.length; i++) {
-        if (blockRows[i] && blockRows[i].slice(1).some(cell => cell != null && !isNaN(Number(cell)))) {
-            firstDataRowIndex = i;
-            break;
+    function handleCriteriaChange(e) {
+        const radio = e.target;
+        if (radio.type !== 'radio') return;
+        const group = radio.closest('.radio-group');
+        if (!group) return;
+        const targetInputId = group.dataset.target;
+        const targetInput = elements[targetInputId];
+        if (!targetInput) return;
+        const newValue = radio.value;
+        if (newValue === 'exact' || newValue === 'includes') {
+            targetInput.disabled = false;
+            targetInput.focus();
+        } else {
+            targetInput.disabled = true;
+            targetInput.value = '';
         }
     }
-    const headerCount = (firstDataRowIndex > 0) ? firstDataRowIndex : 1;
-    headerRowsInput.value = headerCount;
+    
+    function bindEvents() {
+        elements.fileInput.addEventListener('change', e => processFiles(e.target.files));
+        setupDragAndDrop();
+        elements.clearFilesBtn.addEventListener('click', () => clearAllFiles(false));
 
-    showDetectResult(`成功偵測到範圍：${rangeStr}，標頭佔 ${headerCount} 列`, 'success');
-    document.getElementById('section-range').style.display = 'block';
-    updateStep(2, 'completed');
-    updateStep(3);
-}
+        elements.listViewBtn.addEventListener('click', () => setViewMode('list'));
+        elements.gridViewBtn.addEventListener('click', () => setViewMode('grid'));
+        elements.gridScaleSlider.addEventListener('input', updateGridScale);
+        elements.selectAllTablesBtn.addEventListener('click', () => { selectAllTables(true); updateSelectionInfo(); });
+        elements.unselectAllTablesBtn.addEventListener('click', () => { selectAllTables(false); updateSelectionInfo(); });
+        elements.deleteSelectedTablesBtn.addEventListener('click', deleteSelectedTables);
+        elements.sortByNameBtn.addEventListener('click', sortTablesByFundName); 
+        
+        elements.selectByKeywordBtn.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
+        elements.selectEmptyBtn.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
+        elements.selectAllBtn.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
+        elements.invertSelectionBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+        elements.deleteSelectedBtn.addEventListener('click', deleteSelectedRows);
+        
+        if (elements.executeFilterSelectionBtn) {
+            elements.executeFilterSelectionBtn.addEventListener('click', () => {
+                executeCombinedSelection(); 
+                syncCheckboxesInScope();
+            });
+        }
+        
+        elements.resetViewBtn.addEventListener('click', resetView);
+        elements.showHiddenBtn.addEventListener('click', showAllHiddenElements);
+        elements.exportMergedXlsxBtn.addEventListener('click', exportMergedXlsx);
+        
+        elements.mergeViewBtn.addEventListener('click', () => createMergedView('all')); 
+        elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
+        elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
+        elements.columnOperationsBtn.addEventListener('click', () => toggleColumnModal(true));
+        elements.closeColumnModalBtn.addEventListener('click', () => toggleColumnModal(false));
+        elements.applyColumnChangesBtn.addEventListener('click', () => { applyColumnChanges(); toggleColumnModal(false); });
+        elements.modalCheckAll.addEventListener('click', () => setAllColumnCheckboxes(true));
+        elements.modalUncheckAll.addEventListener('click', () => setAllColumnCheckboxes(false));
+        elements.editDataBtn.addEventListener('click', () => toggleEditMode(true));
+        elements.saveEditsBtn.addEventListener('click', saveEdits);
+        elements.cancelEditsBtn.addEventListener('click', () => toggleEditMode(false));
+        elements.addNewRowBtn.addEventListener('click', addNewRow);
+        elements.copySelectedRowsBtn.addEventListener('click', copySelectedRows);
+        elements.deleteMergedRowsBtn.addEventListener('click', deleteSelectedRows);
+        elements.toggleTotalRowBtn.addEventListener('click', () => {
+            state.showTotalRow = !state.showTotalRow;
+            renderMergedTable();
+        });
+        
+        elements.toggleSourceColBtn.addEventListener('click', toggleSourceColumn); 
+        elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+        elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx); 
+        elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName); 
+        elements.unselectMergedRowsBtn.addEventListener('click', unselectAllMergedRows);
 
-function showDetectResult(message, type) {
-    const className = type === 'success' ? 'alert-success' : 'alert-info';
-    detectResult.innerHTML = `<div class="alert ${className}">${message}</div>`;
-}
+        elements.searchInput.addEventListener('input', debounce(filterTable, 300));
+        elements.displayArea.addEventListener('change', handleDisplayAreaChange);
+        elements.displayArea.addEventListener('click', handleCardClick);
+        
+        elements.mergeViewContent.addEventListener('click', e => {
+            const th = e.target.closest('th:not(.checkbox-cell)');
+            const delBtn = e.target.closest('.delete-col-btn');
+            if (delBtn && th) {
+                e.stopPropagation();
+                deleteColumn(delBtn.dataset.header);
+            } else if (th) {
+                handleMergedHeaderClick(th);
+            }
+        });
+        
+        elements.mergeViewModal.addEventListener('change', e => {
+            if (e.target.name === 'criteria-1' || e.target.name === 'criteria-2') {
+                handleCriteriaChange(e);
+            }
+        });
+        
+        elements.importOptionsContainer.addEventListener('change', e => {
+            if (e.target.name === 'import-mode') {
+                const selectedMode = e.target.value;
+                elements.specificSheetNameGroup.classList.toggle('hidden', selectedMode !== 'specific');
+                elements.specificSheetPositionGroup.classList.toggle('hidden', selectedMode !== 'position');
+            }
+        });
 
-function unmergeAndFill(data, sheet, range) {
-    (sheet['!merges'] || []).forEach(merge => {
-        if (merge.s.c > range.e.c || merge.e.c < range.s.c || merge.s.r > range.e.r || merge.e.r < range.s.r) return;
-        const s = { r: merge.s.r - range.s.r, c: merge.s.c - range.s.c };
-        if (s.r < 0 || s.c < 0 || s.r >= data.length || !data[s.r]) return;
-        const val = data[s.r][s.c];
-        for (let r = s.r; r <= merge.e.r - range.s.r; r++) {
-            if (r >= data.length) break;
-            if (!data[r]) data[r] = [];
-            for (let c = s.c; c <= merge.e.c - range.s.c; c++) {
-                data[r][c] = val;
+        elements.searchInputMerged.addEventListener('input', debounce(filterTable, 300));
+
+        const handleKeywordEnter = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (state.isMergedView) {
+                    elements.executeFilterSelectionBtn.click();
+                } else {
+                    elements.selectByKeywordBtn.click();
+                }
+            }
+        };
+        elements.selectKeywordInput.addEventListener('keydown', handleKeywordEnter);
+        elements.selectKeywordInputMerged.addEventListener('keydown', handleKeywordEnter);
+
+        elements.toggleToolbarBtn.addEventListener('click', toggleToolbar);
+
+        elements.backToTopBtn.addEventListener('click', scrollToTop);
+        window.addEventListener('scroll', handleScroll);
+        document.addEventListener('keydown', e => { 
+            if (e.key === 'Escape') { 
+                if (!elements.columnModal.classList.contains('hidden')) {
+                    toggleColumnModal(false);
+                } else if (state.isMergedView) {
+                    closeMergeView();
+                } else if (state.zoomedCard) {
+                    closePreview();
+                }
+            } 
+        });
+        
+        elements.mergeViewModal.dispatchEvent(new Event('change', { bubbles: true }));
+        elements.mergeViewBtn.addEventListener('click', () => {
+            setTimeout(() => {
+                elements.mergeViewModal.dispatchEvent(new Event('change', { bubbles: true }));
+            }, 50);
+        });
+    }
+
+    function executeCombinedSelection() {
+        if (!state.isMergedView) return;
+        const keywordInput = elements.selectKeywordInputMerged.value.trim();
+        const isRegex = elements.selectKeywordRegexMerged.checked;
+        let keywordMatchLogic = () => false;
+        let hasKeywordCriteria = false;
+        if (keywordInput) {
+            hasKeywordCriteria = true;
+            try {
+                if (isRegex) {
+                    const regex = new RegExp(keywordInput, 'i');
+                    keywordMatchLogic = text => regex.test(text);
+                } else if (keywordInput.includes(',')) {
+                    const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+                    keywordMatchLogic = text => keywords.some(k => text.toLowerCase().includes(k));
+                } else {
+                    const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean);
+                    keywordMatchLogic = text => keywords.every(k => text.toLowerCase().includes(k));
+                }
+            } catch (e) {
+                alert('無效的 Regex 表示式：\n' + e.message);
+                return;
             }
         }
-    });
-    return data;
-}
-
-function loadHeadersAndMapping() {
-    const rangeStr = dataRangeInput.value.trim().toUpperCase();
-    const headerRowCount = parseInt(headerRowsInput.value, 10);
-    
-    if (!rangeStr || isNaN(headerRowCount) || headerRowCount < 1) {
-        showDetectResult('請輸入有效的範圍和標頭列數', 'error');
-        return;
-    }
-    
-    try {
-        const sheet = state.workbooks[0].workbook.Sheets[state.workbooks[0].workbook.SheetNames[0]];
-        const range = XLSX.utils.decode_range(rangeStr);
-        
-        if (headerRowCount > (range.e.r - range.s.r + 1)) {
-            showDetectResult('標頭列數過大', 'error');
+        const col1 = elements.colSelect1.value;
+        const col2 = elements.colSelect2.value;
+        const criteria1 = document.querySelector('input[name="criteria-1"]:checked').value;
+        const criteria2 = document.querySelector('input[name="criteria-2"]:checked').value;
+        const logicOp = document.querySelector('input[name="logic-op"]:checked').value;
+        const inputVal1 = elements.inputCriteria1.value;
+        const inputVal2 = elements.inputCriteria2.value;
+        const hasComplexCriteria = col1 || col2;
+        if (!hasKeywordCriteria && !hasComplexCriteria) {
+            alert('請至少輸入關鍵字或設定一個欄位篩選條件。');
             return;
         }
-        
-        const headerBlockRange = { s: range.s, e: { c: range.e.c, r: range.s.r + headerRowCount - 1 } };
-        let headerData = XLSX.utils.sheet_to_json(sheet, { header: 1, range: headerBlockRange, defval: null });
-        headerData = unmergeAndFill(headerData, sheet, headerBlockRange);
-        
-        const finalHeaders = Array.from({ length: range.e.c - range.s.c + 1 }, (_, c) => 
-            Array.from({ length: headerRowCount }, (_, r) => headerData[r]?.[c] || '')
-            .map(s => String(s).trim())
-            .filter((v, i, a) => v && a.indexOf(v) === i)
-            .join(' ')
-        );
-        
-        state.columnMappings = finalHeaders.map((header, i) => {
-            const excelCol = XLSX.utils.encode_col(range.s.c + i);
-            const autoRole = (i === 0) ? 'key' : (!header ? 'ignore' : 'value');
-            return { 
-                excelCol, 
-                autoHeader: header || `(空白欄 ${excelCol})`, 
-                customName: header || '', 
-                role: autoRole, 
-                include: autoRole !== 'ignore' 
-            };
-        });
-        
-        renderMappingTable();
-        document.getElementById('section-mapping').style.display = 'block';
-        updateStep(3, 'completed');
-        
-    } catch(err) {
-        showDetectResult(`讀取欄位失敗：${err.message}`, 'error');
-        resetMappings();
-    }
-}
-
-function renderMappingTable() {
-    let html = `
-    <div class="mapping-table-wrapper">
-        <table class="mapping-table">
-            <thead>
-                <tr>
-                    <th style="width:100px;">Excel 欄位</th>
-                    <th>原始標頭</th>
-                    <th>報表欄位名稱</th>
-                    <th style="width:150px;">欄位角色</th>
-                    <th style="width:80px;">使用</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    state.columnMappings.forEach((col, idx) => {
-        html += `
-            <tr>
-                <td><span class="excel-col">${col.excelCol}</span></td>
-                <td>${col.autoHeader}</td>
-                <td>
-                    <input type="text" 
-                           data-idx="${idx}" 
-                           class="custom-name-input"
-                           value="${col.customName}"
-                           placeholder="輸入自訂名稱">
-                </td>
-                <td>
-                    <select data-idx="${idx}" class="role-select">
-                        <option value="ignore" ${col.role === 'ignore' ? 'selected' : ''}>忽略</option>
-                        <option value="key" ${col.role === 'key' ? 'selected' : ''}>主鍵欄位</option>
-                        <option value="value" ${col.role === 'value' ? 'selected' : ''}>加總欄位</option>
-                    </select>
-                </td>
-                <td style="text-align:center;">
-                    <input type="checkbox" 
-                           data-idx="${idx}" 
-                           class="include-checkbox"
-                           ${col.include ? 'checked' : ''}>
-                </td>
-            </tr>
-        `;
-    });
-    
-    mappingFields.innerHTML = html + `</tbody></table></div>`;
-    
-    mappingFields.querySelectorAll('.custom-name-input').forEach(i => 
-        i.addEventListener('input', e => state.columnMappings[e.target.dataset.idx].customName = e.target.value.trim())
-    );
-    
-    mappingFields.querySelectorAll('.include-checkbox').forEach(c => 
-        c.addEventListener('change', e => state.columnMappings[e.target.dataset.idx].include = e.target.checked)
-    );
-    
-    mappingFields.querySelectorAll('.role-select').forEach(s => 
-        s.addEventListener('change', e => {
-            const idx = e.target.dataset.idx;
-            const isIgnored = e.target.value === 'ignore';
-            state.columnMappings[idx].role = e.target.value;
-            state.columnMappings[idx].include = !isIgnored;
-            mappingFields.querySelector(`.include-checkbox[data-idx="${idx}"]`).checked = !isIgnored;
-        })
-    );
-    
-    processBtn.disabled = false;
-}
-
-function processData() {
-    const keyColumns = state.columnMappings.filter(c => c.role === 'key' && c.include);
-    const valueColumns = state.columnMappings.filter(c => c.role === 'value' && c.include);
-    
-    if (keyColumns.length !== 1) {
-        alert('⚠️ 必須選擇一個主鍵欄位！');
-        return;
-    }
-    
-    if (valueColumns.length === 0) {
-        alert('⚠️ 請至少選擇一個加總欄位！');
-        return;
-    }
-    
-    const keyCol = keyColumns[0];
-    const keyName = keyCol.customName || keyCol.autoHeader;
-    const rangeStr = dataRangeInput.value.trim();
-    
-    if (!rangeStr) {
-        alert('⚠️ 請輸入資料範圍！');
-        return;
-    }
-    
-    state.allFileData = [];
-    state.summaryData = new Map();
-    state.orderedItemKeys = [];
-    
-    try {
-        const range = XLSX.utils.decode_range(rangeStr);
-        const dataRange = { 
-            s: { r: range.s.r + parseInt(headerRowsInput.value, 10), c: range.s.c }, 
-            e: range.e 
-        };
-        
-        state.workbooks.forEach(wb => {
-            const sheet = wb.workbook.Sheets[wb.workbook.SheetNames[0]];
-            if (!sheet || !sheet['!ref']) return;
-            
-            let dataRows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: dataRange, defval: null });
-            dataRows = unmergeAndFill(dataRows, sheet, dataRange);
-            
-            const keyColIndex = XLSX.utils.decode_col(keyCol.excelCol) - range.s.c;
-            
-            const transformedData = dataRows.map(row => {
-                if (isRowEmpty(row)) return null;
-                const keyValue = row[keyColIndex];
-                if (keyValue == null || String(keyValue).trim() === '') return null;
-                
-                const dataRow = { [keyName]: String(keyValue).trim() };
-                valueColumns.forEach(valCol => {
-                    const colIdx = XLSX.utils.decode_col(valCol.excelCol) - range.s.c;
-                    dataRow[valCol.customName || valCol.autoHeader] = toNumber(row[colIdx]);
-                });
-                return dataRow;
-            }).filter(Boolean);
-            
-            state.allFileData.push({ fileName: wb.file.name, data: transformedData });
-        });
-        
-        const seenKeys = new Set();
-        state.allFileData.forEach(file => {
-            file.data.forEach(row => {
-                const key = row[keyName];
-                if (!seenKeys.has(key)) {
-                    seenKeys.add(key);
-                    state.orderedItemKeys.push(key);
-                }
-            });
-        });
-
-        state.allFileData.forEach(file => {
-            file.data.forEach(row => {
-                const key = row[keyName];
-                let summaryRow = state.summaryData.get(key) || { 
-                    [keyName]: key, 
-                    ...Object.fromEntries(valueColumns.map(c => [c.customName || c.autoHeader, 0])) 
-                };
-                valueColumns.forEach(c => {
-                    summaryRow[c.customName || c.autoHeader] += row[c.customName || c.autoHeader] || 0;
-                });
-                state.summaryData.set(key, summaryRow);
-            });
-        });
-        
-        renderSummaryView(keyName, valueColumns);
-        renderFileQueryView(keyName, valueColumns);
-        renderItemView(keyName, valueColumns);
-        
-        outputArea.style.display = 'block';
-        updateStep(4, 'completed');
-        
-        // 滾動到結果區域
-        outputArea.scrollIntoView({ behavior: 'smooth' });
-        
-        alert(`✅ 處理完成！\n\n共處理 ${state.workbooks.length} 個檔案\n彙總了 ${state.summaryData.size} 個項目`);
-        
-    } catch(err) {
-        alert(`❌ 處理資料錯誤：${err.message}`);
-        console.error(err);
-    }
-}
-
-function toNumber(val) {
-    if (val == null || val === '') return 0;
-    if (typeof val === 'number') return val;
-    return parseFloat(String(val).replace(/,/g, '')) || 0;
-}
-
-function generateHtmlTable(data, headers, formatNumbers = false, firstRowClass = '') {
-    let html = '<table class="report-table"><thead><tr>';
-    html += headers.map(h => `<th>${h}</th>`).join('');
-    html += '</tr></thead><tbody>';
-    
-    data.forEach((row, index) => {
-        const rowClass = (index === 0 && firstRowClass) ? ` class="${firstRowClass}"` : '';
-        html += `<tr${rowClass}>`;
-        html += headers.map(h => {
-            const val = row[h];
-            if (formatNumbers && h !== '檔案名稱' && typeof val === 'number') {
-                return `<td class="number">${val.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</td>`;
+        const checkValue = (cellVal, criteria, inputVal) => {
+            const strCellVal = String(cellVal).trim();
+            const strInputVal = String(inputVal).trim();
+            switch (criteria) {
+                case 'empty': return strCellVal === '';
+                case 'zero': return strCellVal === '0';
+                case 'value': return strCellVal !== '';
+                case 'exact': return strCellVal === strInputVal;
+                case 'includes': return strInputVal !== '' && strCellVal.toLowerCase().includes(strInputVal.toLowerCase());
+                default: return false;
             }
-            return `<td>${val ?? ''}</td>`;
-        }).join('');
-        html += '</tr>';
-    });
-    
-    return html + '</tbody></table>';
-}
-
-function renderSummaryView(keyName, valueColumns) {
-    const headers = [keyName, ...valueColumns.map(c => c.customName || c.autoHeader)];
-    const data = Array.from(state.summaryData.values());
-    document.getElementById('summary-view').innerHTML = 
-        `<h3 style="margin-bottom:20px; color:#667eea;">📊 所有檔案加總結果 (共 ${data.length} 項)</h3>` + 
-        generateHtmlTable(data, headers, true);
-}
-
-function renderFileQueryView(keyName, valueColumns) {
-    fileDropdown.innerHTML = '<option value="">--- 請選擇要查詢的檔案 ---</option>' + 
-        state.workbooks.map(wb => `<option value="${wb.file.name}">${wb.file.name}</option>`).join('');
-    fileDetailTable.innerHTML = '';
-    fileDropdown.dataset.keyName = keyName;
-    fileDropdown.dataset.valueColumns = JSON.stringify(valueColumns.map(c => c.customName || c.autoHeader));
-}
-
-function renderFileDetailView() {
-    const selectedFilename = fileDropdown.value;
-    const container = fileDetailTable;
-    
-    if (!selectedFilename) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    const keyName = fileDropdown.dataset.keyName;
-    const valueColNames = JSON.parse(fileDropdown.dataset.valueColumns);
-    const headers = [keyName, ...valueColNames];
-    const fileData = state.allFileData.find(file => file.fileName === selectedFilename);
-    
-    if (!fileData) {
-        container.innerHTML = '<div class="empty-state">找不到該檔案的處理後資料</div>';
-        return;
-    }
-    
-    container.innerHTML = 
-        `<h3 style="margin-bottom:20px; color:#667eea;">📁 ${selectedFilename} (共 ${fileData.data.length} 項)</h3>` + 
-        generateHtmlTable(fileData.data, headers, true);
-}
-
-function renderItemView(keyName, valueColumns) {
-    itemDropdown.innerHTML = '<option value="">--- 請選擇要查詢的項目 ---</option>' + 
-        state.orderedItemKeys.map(item => `<option value="${item}">${item}</option>`).join('');
-    document.getElementById('item-detail-table').innerHTML = '';
-    itemDropdown.dataset.keyName = keyName;
-    itemDropdown.dataset.valueColumns = JSON.stringify(valueColumns.map(c => c.customName || c.autoHeader));
-}
-
-function renderItemDetailView() {
-    const selectedItem = itemDropdown.value;
-    const container = document.getElementById('item-detail-table');
-    
-    if (!selectedItem) {
-        container.innerHTML = '';
-        return;
-    }
-    
-    const keyName = itemDropdown.dataset.keyName;
-    const valueColNames = JSON.parse(itemDropdown.dataset.valueColumns);
-    const headers = ['檔案名稱', ...valueColNames];
-    
-    const data = state.allFileData.map(file => {
-        const row = file.data.find(r => r[keyName] === selectedItem);
-        const dataRow = { '檔案名稱': file.fileName };
-        valueColNames.forEach(colName => {
-            dataRow[colName] = row ? (row[colName] || 0) : 0;
+        };
+        let count = 0;
+        elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
+            const checkbox = row.querySelector('.row-checkbox');
+            if (!checkbox) return;
+            let keywordMatch = false;
+            if (hasKeywordCriteria) {
+                const rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).map(c => c.textContent).join(' ');
+                keywordMatch = keywordMatchLogic(rowText);
+            }
+            let complexMatch = false;
+            if (hasComplexCriteria) {
+                let result1 = null, result2 = null;
+                if (col1) {
+                    const cell = row.querySelector(`td[data-col-header="${col1}"]`);
+                    result1 = checkValue(cell ? cell.textContent : '', criteria1, inputVal1);
+                }
+                if (col2) {
+                    const cell = row.querySelector(`td[data-col-header="${col2}"]`);
+                    result2 = checkValue(cell ? cell.textContent : '', criteria2, inputVal2);
+                }
+                if (col1 && col2) {
+                    complexMatch = (logicOp === 'and') ? (result1 && result2) : (result1 || result2);
+                } else if (col1) {
+                    complexMatch = result1;
+                } else if (col2) {
+                    complexMatch = result2;
+                }
+            }
+            if (keywordMatch || complexMatch) {
+                checkbox.checked = true;
+                count++;
+            }
         });
-        return dataRow;
-    });
-    
-    const summaryRow = state.summaryData.get(selectedItem);
-    if (summaryRow) {
-        const totalRow = { '檔案名稱': '<strong>📊 合計</strong>' };
-        valueColNames.forEach(colName => {
-            totalRow[colName] = summaryRow[colName] || 0;
+        alert(count > 0 ? `已勾選 ${count} 筆符合條件的資料。` : '未找到符合條件的資料。');
+    }
+
+    function unselectAllMergedRows() {
+        if (!state.isMergedView) return;
+        const scope = elements.mergeViewContent;
+        scope.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
+        const headerCheckbox = scope.querySelector('thead input[type="checkbox"]');
+        if (headerCheckbox) {
+            headerCheckbox.checked = false;
+            headerCheckbox.indeterminate = false;
+        }
+    }
+
+    function setupDragAndDrop() {
+        elements.dropArea.addEventListener('click', e => {
+            if (e.target.id === 'clear-files-btn' || e.target.closest('.btn-clear') || e.target.id === 'file-input') {
+                return;
+            }
+            elements.fileInput.click();
         });
-        data.unshift(totalRow);
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { elements.dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }); });
+        ['dragenter', 'dragover'].forEach(eventName => { elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.add('highlight')); });
+        ['dragleave', 'drop'].forEach(eventName => { elements.dropArea.addEventListener(eventName, () => elements.dropArea.classList.remove('highlight')); });
+        elements.dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
     }
     
-    container.innerHTML = 
-        `<h3 style="margin-bottom:20px; color:#667eea;">🔍 項目查詢：${selectedItem}</h3>` + 
-        generateHtmlTable(data, headers, true, 'total-row');
-}
-
-function setupTabs() {
-    document.querySelector('.view-tabs').addEventListener('click', e => {
-        if (e.target.classList.contains('tab-btn')) {
-            const targetView = e.target.dataset.view;
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.view === targetView);
+    async function processFiles(fileList) { 
+        const validation = validateFiles(fileList); 
+        if (!validation.valid) { alert(`錯誤：${validation.error}`); return; } 
+        if (state.isProcessing) { alert('正在處理檔案...'); return; } 
+        const importMode = document.querySelector('input[name="import-mode"]:checked').value; 
+        const specificSheetName = elements.specificSheetNameInput.value.trim(); 
+        const specificSheetPosition = elements.specificSheetPositionInput.value.trim(); 
+        if (importMode === 'specific' && !specificSheetName) { alert('請輸入工作表名稱！'); return; } 
+        if (importMode === 'position' && !specificSheetPosition) { alert('請輸入工作表位置！'); return; } 
+        
+        state.isProcessing = true; 
+        elements.displayArea.innerHTML = '<div class="loading">讀取中...</div>'; 
+        resetControls(true); 
+        const tablesToRender = []; 
+        const missedFiles = []; 
+        state.loadedFiles = []; 
+        
+        try { 
+            for (let index = 0; index < validation.files.length; index++) { 
+                const file = validation.files[index]; 
+                elements.displayArea.innerHTML = `<div class="loading">讀取中... (${index + 1}/${validation.files.length})</div>`; 
+                const binaryData = await readFileAsBinary(file); 
+                const workbook = XLSX.read(binaryData, { type: 'binary', cellStyles: true }); 
+                const sheetNames = await getSelectedSheetNames(file.name, workbook, importMode, { name: specificSheetName, position: specificSheetPosition }); 
+                
+                if ((importMode === 'specific' || importMode === 'position') && sheetNames.length === 0 && workbook.SheetNames.length > 0) { 
+                    missedFiles.push(file.name); 
+                } 
+                
+                for (const sheetName of sheetNames) { 
+                    const sheet = workbook.Sheets[sheetName];
+                    let startRow = 0, startCol = 0, endCol = 0;
+                    if (sheet['!ref']) {
+                        const range = XLSX.utils.decode_range(sheet['!ref']);
+                        startRow = range.s.r; startCol = range.s.c; endCol = range.e.c;
+                    }
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', range: sheet['!ref'], raw: false });
+                    if (sheet['!merges']) {
+                        sheet['!merges'].forEach(merge => {
+                            const startR = merge.s.r - startRow, startC = merge.s.c - startCol, endR = merge.e.r - startRow, endC = merge.e.c - startCol;
+                            if (startR >= 0 && startC >= 0 && jsonData[startR]) {
+                                const primaryValue = jsonData[startR][startC];
+                                for (let r = startR; r <= endR; r++) for (let c = startC; c <= endC; c++) if (jsonData[r]) jsonData[r][c] = primaryValue;
+                            }
+                        });
+                    }
+                    const rowProps = sheet['!rows'] || [], colProps = sheet['!cols'] || []; 
+                    const visibleRelativeIndices = [];
+                    for (let c = startCol; c <= endCol; c++) if (!(colProps[c] && colProps[c].hidden)) visibleRelativeIndices.push(c - startCol);
+                    const filteredData = [];
+                    jsonData.forEach((row, index) => {
+                        const absoluteRowIndex = startRow + index;
+                        if (rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden) return; 
+                        const safeRow = row || [];
+                        const newRow = visibleRelativeIndices.map(i => (safeRow[i] !== undefined ? safeRow[i] : ''));
+                        if (newRow.some(cell => String(cell).trim() !== '')) filteredData.push(newRow);
+                    });
+                    if (filteredData.length > 0) {
+                        const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
+                        const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
+                        tablesToRender.push({ html: htmlString, filename: `${file.name} (${sheetName})` }); 
+                        state.loadedFiles.push(`${file.name} (${sheetName})`); 
+                    }
+                } 
+            } 
+            if (missedFiles.length > 0) { 
+                const criteria = importMode === 'specific' ? `名稱包含 "${specificSheetName}"` : `位置符合 "${specificSheetPosition}"`; 
+                alert(`以下檔案找不到 ${criteria} 的工作表：\n\n- ${missedFiles.join('\n- ')}`); 
+            } 
+            state.loadedTables = tablesToRender.length; 
+            renderTables(tablesToRender); 
+            updateDropAreaDisplay(); 
+        } catch (err) { 
+            console.error("處理檔案時發生錯誤:", err); 
+            elements.displayArea.innerHTML = `<p style="color: red;">處理檔案錯誤：${err.message || '未知錯誤'}</p>`; 
+            resetControls(true); 
+        } finally { 
+            state.isProcessing = false; 
+        } 
+    }
+    
+    function renderTables(tablesToRender) { 
+        if (tablesToRender.length === 0) { 
+            elements.displayArea.innerHTML = `<p>沒有找到符合條件的工作表。</p>`; 
+            return; 
+        } 
+        const fragment = document.createDocumentFragment(); 
+        tablesToRender.forEach(({ html, filename }) => { 
+            const wrapper = document.createElement('div'); 
+            wrapper.className = 'table-wrapper'; 
+            const header = document.createElement('div'); 
+            header.className = 'table-header'; 
+            header.innerHTML = `<input type="checkbox" class="table-select-checkbox" title="選取此表格"><h4>${filename}</h4><div class="header-actions"><button class="btn btn-danger btn-sm delete-rows-btn">刪除選取列</button><button class="btn btn-danger btn-sm delete-table-btn">刪除此表</button></div><button class="close-zoom">&times;</button>`; 
+            const tableContent = document.createElement('div'); 
+            tableContent.className = 'table-content'; 
+            const tempDiv = document.createElement('div'); 
+            tempDiv.innerHTML = html; 
+            const table = tempDiv.querySelector('table'); 
+            if (table) { 
+                tableContent.appendChild(table); 
+                wrapper.appendChild(header); 
+                wrapper.appendChild(tableContent); 
+                fragment.appendChild(wrapper); 
+            } 
+        }); 
+        elements.displayArea.innerHTML = ''; 
+        elements.displayArea.appendChild(fragment); 
+        state.originalHtmlString = elements.displayArea.innerHTML; 
+        injectCheckboxes(elements.displayArea); 
+        showControls(detectHiddenElements()); 
+        sortTablesByFundName();
+    }
+    
+    function injectCheckboxes(scope) { scope.querySelectorAll('thead tr').forEach((headRow, index) => { if(headRow.querySelector('.checkbox-cell')) return; const th = document.createElement('th'); th.innerHTML = `<input type="checkbox" id="select-all-checkbox-${scope.id}-${index}" title="全選/全不選">`; th.classList.add('checkbox-cell'); headRow.prepend(th); }); scope.querySelectorAll('tbody tr').forEach(row => { if(row.querySelector('.checkbox-cell')) return; const td = document.createElement('td'); td.innerHTML = '<input type="checkbox" class="row-checkbox">'; td.classList.add('checkbox-cell'); row.prepend(td); }); }
+    
+    function createMergedView(mode = 'all') {
+        const allVisibleTables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
+        if (allVisibleTables.length === 0) { alert('沒有可合併的表格。'); return; }
+        if (mode === 'checked') {
+            let checkedRowsInVisibleTables = 0;
+            allVisibleTables.forEach(table => { checkedRowsInVisibleTables += table.querySelectorAll('tbody .row-checkbox:checked').length; });
+            if (checkedRowsInVisibleTables === 0) { alert('請先在 *可見* 的表格中勾選至少一個資料列。'); return; }
+        }
+        const allHeaders = new Set(), tableData = [], tableHeaderMap = new Map();
+        allVisibleTables.forEach(table => {
+            let headers = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)')).map((th, i) => th.textContent.trim() || `(欄位 ${i + 1})`);
+            const allDataRowsInTable = Array.from(table.querySelectorAll('tbody tr'));
+            if (headers.length === 0 && allDataRowsInTable.length > 0) {
+                let maxCols = 0;
+                allDataRowsInTable.slice(0, 10).forEach(r => { const colCount = r.querySelectorAll('td:not(.checkbox-cell)').length; if (colCount > maxCols) maxCols = colCount; });
+                headers = Array.from({ length: maxCols }, (_, i) => `(欄位 ${i + 1})`);
+            }
+            headers.forEach(h => allHeaders.add(h));
+            tableHeaderMap.set(table, headers);
+        });
+        allVisibleTables.forEach(table => {
+            const headers = tableHeaderMap.get(table); if (!headers) return; 
+            const filename = table.closest('.table-wrapper')?.querySelector('h4')?.textContent || '未知來源';
+            let rowsToProcess = (mode === 'all') ? Array.from(table.querySelectorAll('tbody tr')).filter(row => !row.classList.contains('row-hidden-search')) : Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr'));
+            rowsToProcess.forEach(row => {
+                const rowData = { _sourceFile: filename };
+                Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).forEach((td, i) => { if (headers[i]) rowData[headers[i]] = td.textContent; });
+                tableData.push(rowData);
             });
-            document.querySelectorAll('.view-pane').forEach(pane => {
-                pane.classList.toggle('active', pane.id === targetView);
+        });
+        state.mergedHeaders = Array.from(allHeaders);
+        state.mergedData = tableData;
+        renderMergedTable();
+        updateColumnSelects(state.mergedHeaders); 
+        state.isMergedView = true;
+        elements.mergeViewModal.classList.remove('hidden');
+        document.body.classList.add('no-scroll');
+    }
+
+    function closeMergeView() {
+        if (state.isEditing && !confirm("您有未儲存的編輯，確定要關閉並捨棄變更嗎？")) return;
+        elements.mergeViewModal.classList.add('hidden');
+        document.body.classList.remove('no-scroll');
+        state.isMergedView = false; state.isEditing = false; state.showTotalRow = false; state.showSourceColumn = false; 
+        elements.toggleSourceColBtn.textContent = '新增來源欄位'; 
+        elements.toggleSourceColBtn.classList.remove('active'); 
+        state.mergedData = []; state.mergedHeaders = [];
+        elements.mergeViewContent.innerHTML = '';
+        
+        elements.collapsibleToolbar.classList.remove('collapsed');
+        elements.toggleToolbarBtn.textContent = '收合工具列';
+        elements.toggleToolbarBtn.title = '收合工具列';
+        
+        elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; 
+        elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>';
+        elements.inputCriteria1.value = ''; elements.inputCriteria2.value = '';
+        elements.inputCriteria1.disabled = true; elements.inputCriteria2.disabled = true;
+        document.querySelector('input[name="criteria-1"][value="empty"]').checked = true;
+        document.querySelector('input[name="criteria-2"][value="empty"]').checked = true;
+        document.querySelector('input[name="logic-op"][value="and"]').checked = true;
+
+        elements.searchInputMerged.value = '';
+        elements.selectKeywordInputMerged.value = '';
+        elements.selectKeywordRegexMerged.checked = false;
+        toggleEditMode(false);
+    }
+
+    function renderMergedTable() {
+        const table = document.createElement('table'), thead = table.createTHead(), headerRow = thead.insertRow();
+        if (state.showSourceColumn) {
+            const thSource = document.createElement('th');
+            thSource.textContent = '來源檔案'; thSource.classList.add('source-col'); headerRow.prepend(thSource);
+        }
+        state.mergedHeaders.forEach(header => {
+            const th = document.createElement('th'); th.textContent = header;
+            const deleteBtn = document.createElement('span');
+            deleteBtn.className = 'delete-col-btn'; deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = `刪除 ${header}`; deleteBtn.dataset.header = header;
+            th.appendChild(deleteBtn); headerRow.appendChild(th); 
+        });
+        const tbody = table.createTBody();
+        state.mergedData.forEach((rowData, index) => {
+            const tr = tbody.insertRow(); tr.dataset.rowIndex = index;
+            if (rowData._sourceFile) tr.title = `來源: ${rowData._sourceFile}`;
+            if (state.showSourceColumn) {
+                const tdSource = document.createElement('td');
+                tdSource.textContent = rowData._sourceFile || ''; tdSource.classList.add('source-col'); tr.prepend(tdSource);
+            }
+            if (rowData._isNew) tr.classList.add('new-row-highlight');
+            state.mergedHeaders.forEach(header => {
+                const td = tr.insertCell(); td.contentEditable = state.isEditing; td.dataset.colHeader = header;
+                const value = rowData[header] || '';
+                const cleanVal = String(value).replace(/,/g, '').trim();
+                const isStrictNumber = cleanVal !== '' && !isNaN(cleanVal);
+                td.classList.toggle('numeric', isStrictNumber);
+                td.textContent = isStrictNumber ? formatNumber(value) : value;
+            });
+        });
+        if (state.showTotalRow) {
+            const tfoot = table.createTFoot(), totalRow = tfoot.insertRow();
+            totalRow.className = 'total-row'; totalRow.innerHTML = ''; totalRow.insertCell(); 
+            if (state.showSourceColumn) totalRow.insertCell().textContent = ''; 
+            const totalsCache = calculateTotals(); let totalLabelApplied = false;
+            state.mergedHeaders.forEach(header => {
+                const td = totalRow.insertCell(), totalVal = totalsCache[header];
+                if (totalVal) { td.textContent = formatNumber(totalVal); td.classList.add('numeric'); } 
+                else if (!totalLabelApplied) { td.textContent = '合計'; totalLabelApplied = true; } 
+                else { td.textContent = ''; }
             });
         }
-    });
-}
+        elements.mergeViewContent.innerHTML = '';
+        elements.mergeViewContent.appendChild(table);
+        elements.mergeViewContent.classList.toggle('is-editing', state.isEditing);
+        injectCheckboxes(elements.mergeViewContent); 
+        const selectAllCheckbox = elements.mergeViewContent.querySelector('thead input[type="checkbox"]');
+        if (selectAllCheckbox) selectAllCheckbox.addEventListener('change', (e) => {
+            elements.mergeViewContent.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    function toggleSourceColumn() {
+        if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
+        state.showSourceColumn = !state.showSourceColumn;
+        renderMergedTable(); 
+        elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
+        elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
+    }
 
-setupTabs();
-</script>
-</body>
-</html>
+    function updateColumnSelects(headers) { 
+        elements.columnChecklist.innerHTML = headers.map(header => `<label><input type="checkbox" value="${header}" checked> ${header}</label>`).join('');
+        const createOption = (value, text) => { const opt = document.createElement('option'); opt.value = value; opt.textContent = text; return opt; };
+        elements.colSelect1.innerHTML = ''; elements.colSelect1.appendChild(createOption('', '-- 選擇欄位 1 --'));
+        headers.forEach(h => elements.colSelect1.appendChild(createOption(h, h)));
+        elements.colSelect2.innerHTML = ''; elements.colSelect2.appendChild(createOption('', '-- 選擇欄位 2 (選填) --'));
+        headers.forEach(h => elements.colSelect2.appendChild(createOption(h, h)));
+    }
+    
+    function toggleColumnModal(forceShow) { elements.columnModal.classList.toggle('hidden', forceShow === false || !elements.columnModal.classList.contains('hidden')); }
+    function setAllColumnCheckboxes(isChecked) { elements.columnChecklist.querySelectorAll('input').forEach(input => input.checked = isChecked); }
+    function applyColumnChanges() {
+        const mergedTable = elements.mergeViewContent.querySelector('table'); if (!mergedTable) return;
+        const visibility = {};
+        elements.columnChecklist.querySelectorAll('input').forEach(input => { visibility[input.value] = input.checked; });
+        const allHeaders = Array.from(mergedTable.querySelectorAll('thead th'));
+        const firstDataColIndex = allHeaders.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
+        if (firstDataColIndex === -1) return; 
+        const dataHeaders = allHeaders.slice(firstDataColIndex);
+        dataHeaders.forEach((th, dataIndex) => {
+            const colIndex = dataIndex + firstDataColIndex, headerText = th.textContent.replace('×', '').trim();
+            mergedTable.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => cell.classList.toggle('column-hidden', !visibility[headerText]));
+        });
+    }
+    function handleMergedHeaderClick(th) {
+        if (state.isEditing || th.classList.contains('source-col')) return;
+        const table = th.closest('table'), headerText = th.textContent.replace('×','').trim(), isAsc = th.classList.contains('sort-asc');
+        table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+        th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+        state.mergedData.sort((a, b) => {
+            const valA = a[headerText] || '', valB = b[headerText] || '';
+            const numA = parseFloat(String(valA).replace(/,/g, '')), numB = parseFloat(String(valB).replace(/,/g, ''));
+            const comparison = (!isNaN(numA) && !isNaN(numB)) ? numA - numB : valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+            return isAsc ? -comparison : comparison;
+        });
+        renderMergedTable();
+    }
+    function deleteColumn(headerToDelete) {
+        if (confirm(`確定要刪除「${headerToDelete}」這個欄位嗎？此操作無法復原。`)) {
+            state.mergedHeaders = state.mergedHeaders.filter(h => h !== headerToDelete);
+            state.mergedData.forEach(row => { delete row[headerToDelete]; });
+            renderMergedTable();
+            updateColumnSelects(state.mergedHeaders); 
+        }
+    }
+    function calculateTotals() {
+        const totals = {};
+        state.mergedHeaders.forEach(header => {
+            const sum = state.mergedData.reduce((acc, row) => acc + (isNaN(parseFloat(String(row[header]).replace(/,/g, ''))) ? 0 : parseFloat(String(row[header]).replace(/,/g, ''))), 0);
+            if (sum !== 0 || state.mergedData.some(row => !isNaN(parseFloat(String(row[header]).replace(/,/g, ''))))) totals[header] = sum;
+        });
+        return totals;
+    }
+
+    function toggleEditMode(startEditing) {
+        state.isEditing = startEditing;
+        elements.editDataBtn.classList.toggle('hidden', state.isEditing);
+        elements.saveEditsBtn.classList.toggle('hidden', !state.isEditing);
+        elements.cancelEditsBtn.classList.toggle('hidden', !state.isEditing);
+        const disableOnEdit = ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged', 'unselectMergedRowsBtn'];
+        disableOnEdit.forEach(elId => { if (elements[elId]) elements[elId].disabled = state.isEditing; });
+        elements.inputCriteria1.disabled = true; elements.inputCriteria2.disabled = true;
+        document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => r.disabled = state.isEditing);
+        renderMergedTable();
+    }
+    function saveEdits() {
+        const newData = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr')).map(tr => {
+            const newRowData = {};
+            const sourceCell = tr.querySelector('.source-col');
+            if (sourceCell) newRowData._sourceFile = sourceCell.textContent;
+            else {
+                const originalIndex = parseInt(tr.dataset.rowIndex, 10);
+                newRowData._sourceFile = (!isNaN(originalIndex) && state.mergedData[originalIndex]) ? state.mergedData[originalIndex]._sourceFile : ' (新增資料列)';
+            }
+            tr.querySelectorAll('td[data-col-header]').forEach(cell => newRowData[cell.dataset.colHeader] = cell.textContent);
+            return newRowData;
+        });
+        state.mergedData = newData;
+        toggleEditMode(false);
+    }
+    function addNewRow() {
+        const newRow = { _isNew: true, _sourceFile: ' (新增資料列)' };
+        state.mergedHeaders.forEach(header => { newRow[header] = ''; });
+        state.mergedData.unshift(newRow);
+        toggleEditMode(true);
+    }
+    function copySelectedRows() {
+        const selectedCheckboxes = elements.mergeViewContent.querySelectorAll('.row-checkbox:checked');
+        if (selectedCheckboxes.length === 0) { alert("請先勾選要複製的資料列。"); return; }
+        const rowsToCopy = Array.from(selectedCheckboxes).map(cb => {
+            const rowIndex = parseInt(cb.closest('tr').dataset.rowIndex, 10);
+            if (!isNaN(rowIndex) && state.mergedData[rowIndex]) {
+                const newRow = JSON.parse(JSON.stringify(state.mergedData[rowIndex]));
+                newRow._isNew = true; newRow._sourceFile += ' (複製)'; return newRow;
+            }
+            return null;
+        }).filter(Boolean);
+        state.mergedData.unshift(...rowsToCopy);
+        toggleEditMode(true);
+    }
+
+    function syncCheckboxesInScope() { setTimeout(() => { const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('table').forEach(syncTableCheckboxState); if (!state.isMergedView) updateSelectionInfo(); }, 0); }
+    function selectAllRows() { const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; const rows = scope.querySelectorAll('tbody tr:not(.row-hidden-search)'); if (rows.length === 0) { alert('沒有可勾選的列'); return; } rows.forEach(row => row.querySelector('.row-checkbox').checked = true); scope.querySelectorAll('thead input[type="checkbox"]').forEach(cb => cb.checked = true); }
+    function invertSelection() { const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = !cb.checked); }
+    function deleteSelectedRows() {
+        const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea;
+        const selected = scope.querySelectorAll('tbody .row-checkbox:checked');
+        if (selected.length === 0) { alert('請先勾選要刪除的列'); return; }
+        if (confirm(`確定要刪除 ${selected.length} 筆資料列嗎？`)) {
+            if (state.isMergedView) {
+                const indicesToDelete = new Set(Array.from(selected).map(cb => parseInt(cb.closest('tr').dataset.rowIndex, 10)).filter(i => !isNaN(i)));
+                state.mergedData = state.mergedData.filter((_, index) => !indicesToDelete.has(index));
+                renderMergedTable();
+            } else {
+                selected.forEach(cb => cb.closest('tr').remove());
+            }
+        }
+        syncCheckboxesInScope();
+    }
+    function selectEmptyRows() { let count = 0; const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { if (Array.from(row.cells).slice(1).every(c => c.textContent.trim() === '')) { row.querySelector('.row-checkbox').checked = true; count++; } }); if (count === 0) alert('未找到空白列'); }
+    
+    function selectByKeyword() { 
+        const inputEl = state.isMergedView ? elements.selectKeywordInputMerged : elements.selectKeywordInput;
+        const regexEl = state.isMergedView ? elements.selectKeywordRegexMerged : elements.selectKeywordRegex;
+        const keywordInput = inputEl.value.trim(); 
+        if (!keywordInput) { alert('請先輸入關鍵字'); return; } 
+        let matchLogic; 
+        try { 
+            if (regexEl.checked) matchLogic = text => new RegExp(keywordInput, 'i').test(text); 
+            else if (keywordInput.includes(',')) { const keywords = keywordInput.split(',').map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.some(k => text.includes(k)); } 
+            else { const keywords = keywordInput.split(/\s+/).map(k => k.trim().toLowerCase()).filter(Boolean); matchLogic = text => keywords.every(k => text.includes(k)); } 
+        } catch (e) { alert('無效的 Regex 表示式：\n' + e.message); return; } 
+        let count = 0; 
+        const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; 
+        scope.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => { 
+            let rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).map(c => c.textContent).join(' ');
+            if (matchLogic(rowText.toLowerCase())) { row.querySelector('.row-checkbox').checked = true; count++; } 
+        }); 
+        alert(count > 0 ? `已勾選 ${count} 個符合條件的列` : `未找到符合條件的列`); 
+    }
+    
+    function filterTable() { 
+        const inputEl = state.isMergedView ? elements.searchInputMerged : elements.searchInput;
+        const keywords = inputEl.value.toLowerCase().trim().split(/\s+/).filter(Boolean); 
+        const scope = state.isMergedView ? elements.mergeViewContent : elements.displayArea; 
+        scope.querySelectorAll('tbody tr').forEach(row => { 
+            let rowText = Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).map(c => c.textContent).join(' ').toLowerCase();
+            row.classList.toggle('row-hidden-search', !keywords.every(k => rowText.includes(k))); 
+        }); 
+        if (!state.isMergedView) { 
+            elements.displayArea.querySelectorAll('.table-wrapper').forEach(wrapper => { 
+                wrapper.style.display = wrapper.querySelectorAll('tbody tr:not(.row-hidden-search)').length > 0 ? '' : 'none'; 
+            }); 
+        } 
+        syncCheckboxesInScope(); 
+    }
+
+    function toggleToolbar() {
+        const isCollapsed = elements.collapsibleToolbar.classList.toggle('collapsed');
+        elements.toggleToolbarBtn.textContent = isCollapsed ? '展開工具列' : '收合工具列';
+        elements.toggleToolbarBtn.title = isCollapsed ? '展開工具列' : '收合工具列';
+    }
+    function formatNumber(value) { try { const num = parseFloat(String(value).replace(/,/g, '')); return isNaN(num) ? value : new Intl.NumberFormat('en-US').format(num); } catch (e) { return value; } }
+    function detectHiddenElements() { return elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length; }
+    function showAllHiddenElements() { const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]'); if (hidden.length === 0) { alert('沒有需要顯示的隱藏行列。'); return; } hidden.forEach(el => el.style.display = ''); alert(`已顯示 ${hidden.length} 個隱藏的行列。`); elements.showHiddenBtn.classList.add('hidden'); elements.loadStatusMessage.classList.add('hidden'); }
+    function selectAllTables(isChecked) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => { if (cb.checked !== isChecked) cb.click(); }); }
+    function readFileAsBinary(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => resolve(e.target.result); reader.onerror = reject; reader.readAsBinaryString(file); }); }
+    function parsePositionString(str) { const indices = new Set(); str.split(',').map(p => p.trim()).filter(Boolean).forEach(part => { if (part.includes('-')) { const [start, end] = part.split('-').map(Number); if (!isNaN(start) && !isNaN(end) && start <= end) for (let i = start; i <= end; i++) indices.add(i - 1); } else { const num = Number(part); if (!isNaN(num)) indices.add(num - 1); } }); return Array.from(indices).sort((a, b) => a - b); }
+    async function getSelectedSheetNames(filename, workbook, mode, criteria) { const sheetNames = workbook.SheetNames; if (sheetNames.length === 0) return []; switch (mode) { case 'all': return sheetNames; case 'first': return sheetNames.length > 0 ? [sheetNames[0]] : []; case 'specific': return sheetNames.filter(name => name.toLowerCase().includes(criteria.name.toLowerCase())); case 'position': return parsePositionString(criteria.position).map(index => sheetNames[index]).filter(Boolean); case 'manual': return await showWorksheetSelectionModal(filename, sheetNames); default: return []; } }
+    function showWorksheetSelectionModal(filename, sheetNames) { return new Promise(resolve => { if (sheetNames.length <= 1) { resolve(sheetNames); return; } const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; const dialog = document.createElement('div'); dialog.className = 'modal-dialog'; dialog.innerHTML = `<div class="modal-header"><h3>選擇工作表 (手動模式)</h3><p>檔案 "<strong>${filename}</strong>"</p></div><div class="modal-body"><ul class="sheet-list">${sheetNames.map(name => `<li class="sheet-item"><label><input type="checkbox" class="sheet-checkbox" value="${name}" checked> ${name}</label></li>`).join('')}</ul></div><div class="modal-footer"><button class="btn btn-secondary" id="modal-skip">跳過</button><button class="btn btn-success" id="modal-confirm">確認</button></div>`; overlay.appendChild(dialog); document.body.appendChild(overlay); const closeModal = () => document.body.removeChild(overlay); dialog.querySelector('#modal-confirm').addEventListener('click', () => { resolve(Array.from(dialog.querySelectorAll('.sheet-checkbox:checked')).map(cb => cb.value)); closeModal(); }); dialog.querySelector('#modal-skip').addEventListener('click', () => { resolve([]); closeModal(); }); }); }
+    function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) { const data = []; const headerRow = table.querySelector('thead tr'); if (headerRow) { let headerData = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)')).map(th => th.textContent.replace('×','').trim()); if (includeFilename) headerData.unshift('Source File'); data.push(headerData); } const filename = includeFilename ? (table.closest('.table-wrapper')?.querySelector('h4')?.textContent || 'Merged Table') : null; let rows = onlySelected ? Array.from(table.querySelectorAll('tbody .row-checkbox:checked')).map(cb => cb.closest('tr')) : table.querySelectorAll('tbody tr:not(.row-hidden-search)'); rows.forEach(row => { let rowData = Array.from(row.querySelectorAll('td:not(.checkbox-cell):not(.column-hidden)')).map(td => td.textContent.trim()); if (includeFilename) rowData.unshift(filename); data.push(rowData); }); return data; }
+    function exportToXlsx(data, filename, sheetName) { if (data.length <= 1) { alert('沒有足夠的資料可以匯出。'); return; } try { const ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = calculateColumnWidths(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheetName); XLSX.writeFile(wb, filename); } catch (err) { console.error('匯出 XLSX 時發生錯誤:', err); alert('匯出時發生錯誤：' + err.message); } }
+    function exportCurrentMergedXlsx() { if (!state.isMergedView) return; const table = elements.mergeViewContent.querySelector('table'); if (!table) return; const data = extractTableData(table, { onlySelected: false, includeFilename: state.showSourceColumn }); exportToXlsx(data, `merged_view_export_${new Date().toISOString().slice(0, 10)}.xlsx`, "Merged View Data"); }
+    function exportMergedXlsx() { const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table')); if (tables.length === 0) { alert('沒有可匯出的表格。'); return; } const allData = []; tables.forEach((table, i) => { const data = extractTableData(table, { includeFilename: true }); if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1))); }); exportToXlsx(allData, `report_merged_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Merged Data'); }
+    function calculateColumnWidths(data) { if (data.length === 0) return []; return data[0].map((_, col) => ({ wch: Math.min(50, Math.max(10, ...data.map(row => row[col] ? String(row[col]).length : 0)) + 2) })); }
+    
+    function resetView() { if(state.isMergedView) closeMergeView(); if (!state.originalHtmlString) return; elements.displayArea.innerHTML = state.originalHtmlString; injectCheckboxes(elements.displayArea); ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = ''); elements.selectKeywordRegex.checked = false; filterTable(); elements.loadStatusMessage.classList.add('hidden'); const hiddenCount = detectHiddenElements(); if (hiddenCount > 0) { elements.loadStatusMessage.textContent = `注意：已重設表格，${hiddenCount} 個隱藏的行列已還原。`; elements.loadStatusMessage.classList.remove('hidden'); elements.showHiddenBtn.classList.remove('hidden'); } else { elements.showHiddenBtn.classList.add('hidden'); } updateSelectionInfo(); setViewMode('list'); }
+    function resetControls(isNewFile) { if (!isNewFile) return; if(state.isMergedView) closeMergeView(); state.originalHtmlString = ''; ['searchInput', 'selectKeywordInput'].forEach(id => elements[id].value = ''); elements.selectKeywordRegex.checked = false; elements.controlPanel.classList.add('hidden'); updateSelectionInfo(); }
+    function clearAllFiles(silent = false) { if (!silent && !confirm('確定要清除所有已載入的檔案嗎？')) return; if(state.isMergedView) closeMergeView(); state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; elements.displayArea.innerHTML = ''; elements.fileInput.value = ''; ['specificSheetNameInput', 'specificSheetPositionInput'].forEach(id => elements[id].value = ''); elements.gridScaleSlider.value = 3; elements.colSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>'; elements.colSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>'; updateGridScale(); updateDropAreaDisplay(); resetControls(true); setViewMode('list'); }
+    function updateDropAreaDisplay() { const hasFiles = state.loadedTables > 0; elements.dropArea.classList.toggle('compact', hasFiles); elements.dropAreaInitial.classList.toggle('hidden', hasFiles); elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles); elements.importOptionsContainer.classList.toggle('hidden', hasFiles); if (hasFiles) { elements.fileCount.textContent = state.loadedTables; const names = state.loadedFiles.slice(0, 3).join(', '); const more = state.loadedFiles.length > 3 ? ` 及其他 ${state.loadedFiles.length - 3} 個...` : ''; elements.fileNames.textContent = names + more; } }
+    function showControls(hiddenCount) { elements.controlPanel.classList.remove('hidden'); const buttonsToShow = ['selectByKeywordGroup', 'selectByKeywordBtn', 'selectEmptyBtn', 'deleteSelectedBtn', 'invertSelectionBtn', 'selectAllBtn', 'exportMergedXlsxBtn', 'resetViewBtn', 'tableLevelControls', 'listViewBtn', 'gridViewBtn', 'showHiddenBtn', 'viewCheckedCombinedBtn', 'sortByNameBtn']; buttonsToShow.forEach(id => { if(elements[id]) elements[id].classList.remove('hidden'); }); elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); const showHiddenStuff = hiddenCount > 0; elements.loadStatusMessage.classList.toggle('hidden', !showHiddenStuff); elements.showHiddenBtn.classList.toggle('hidden', !showHiddenStuff); if (showHiddenStuff) elements.loadStatusMessage.textContent = `注意：檔案中包含 ${hiddenCount} 個被隱藏的行列。`; }
+    function setViewMode(mode) { if (mode === 'grid') { elements.displayArea.classList.remove('list-view'); elements.displayArea.classList.add('grid-view'); elements.gridViewBtn.classList.add('active'); elements.listViewBtn.classList.remove('active'); elements.gridScaleControl.classList.remove('hidden'); } else { elements.displayArea.classList.remove('grid-view'); elements.displayArea.classList.add('list-view'); elements.listViewBtn.classList.add('active'); elements.gridViewBtn.classList.remove('active'); elements.gridScaleControl.classList.add('hidden'); } }
+    function updateGridScale() { elements.displayArea.style.setProperty('--grid-columns', elements.gridScaleSlider.value); }
+    function validateFiles(fileList) { if (!fileList || fileList.length === 0) return { valid: false, error: '沒有選擇檔案' }; const validFiles = Array.from(fileList).filter(file => CONSTANTS.VALID_FILE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext))); if (validFiles.length === 0) return { valid: false, error: '請上傳 .xls 或 .xlsx 格式的檔案' }; return { valid: true, files: validFiles }; }
+    function debounce(func, wait) { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), wait); }; }
+    function handleScroll() { elements.backToTopBtn.classList.toggle('visible', window.scrollY > window.innerHeight / 2); }
+    function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    function handleCardClick(e) { const card = e.target.closest('.table-wrapper'); if (!card) return; if (e.target.classList.contains('close-zoom')) { closePreview(); return; } if (e.target.classList.contains('delete-rows-btn')) { deleteSelectedRowsInScope(e.target.closest('.table-wrapper')); return; } if (e.target.classList.contains('delete-table-btn')) { if (confirm(`確定要永久刪除此工作表 (${card.querySelector('h4').textContent}) 嗎？`)) { closePreview(); setTimeout(() => { card.remove(); updateFileStateAfterDeletion(); }, 300); } return; } if (elements.displayArea.classList.contains('grid-view') && !card.classList.contains('is-zoomed') && !e.target.matches('input, a, button, .btn')) openPreview(card); }
+    function deleteSelectedRowsInScope(scope) { const selected = scope.querySelectorAll('tbody .row-checkbox:checked'); if (selected.length === 0) { alert('請先勾選要刪除的列'); return; } if (confirm(`確定要在此表格內刪除 ${selected.length} 筆資料列嗎？`)) selected.forEach(cb => cb.closest('tr').remove()); syncCheckboxesInScope(); }
+    function openPreview(card) { if (state.zoomedCard) return; card.classList.add('is-zoomed'); state.zoomedCard = card; document.body.classList.add('no-scroll'); }
+    function closePreview() { if (!state.zoomedCard) return; state.zoomedCard.classList.remove('is-zoomed'); state.zoomedCard = null; document.body.classList.remove('no-scroll'); }
+    function syncTableCheckboxState(table) { const headerCheckbox = table.closest('.table-wrapper')?.querySelector('.table-select-checkbox') || table.querySelector('thead input[type="checkbox"]'); if (!headerCheckbox) return; const rowCheckboxes = table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox'); if (rowCheckboxes.length === 0) { headerCheckbox.checked = false; headerCheckbox.indeterminate = false; return; } const checkedCount = Array.from(rowCheckboxes).filter(cb => cb.checked).length; if (checkedCount === 0) { headerCheckbox.checked = false; headerCheckbox.indeterminate = false; } else if (checkedCount === rowCheckboxes.length) { headerCheckbox.checked = true; headerCheckbox.indeterminate = false; } else { headerCheckbox.checked = false; headerCheckbox.indeterminate = true; } }
+    function updateSelectionInfo() { const selectedCheckboxes = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate'); if (selectedCheckboxes.length > 0) { elements.selectedTablesList.textContent = Array.from(selectedCheckboxes).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; '); elements.selectedTablesInfo.classList.remove('hidden'); } else { elements.selectedTablesInfo.classList.add('hidden'); } }
+    function deleteSelectedTables() { const selectedWrappers = Array.from(elements.displayArea.querySelectorAll('.table-select-checkbox:checked')).map(cb => cb.closest('.table-wrapper')); if (selectedWrappers.length === 0) { alert('請先勾選要刪除的表格。'); return; } if (confirm(`確定要永久刪除 ${selectedWrappers.length} 個選定的表格嗎？`)) { selectedWrappers.forEach(wrapper => wrapper.remove()); updateFileStateAfterDeletion(); } }
+    function updateFileStateAfterDeletion() { const remainingWrappers = elements.displayArea.querySelectorAll('.table-wrapper'); state.loadedTables = remainingWrappers.length; state.loadedFiles = Array.from(remainingWrappers).map(w => w.querySelector('h4').textContent); if (state.loadedTables === 0) clearAllFiles(true); else { updateDropAreaDisplay(); showControls(detectHiddenElements()); } }
+    function handleDisplayAreaChange(e) { const target = e.target; if (!target.matches('.table-select-checkbox, [id^="select-all-checkbox"], .row-checkbox')) return; let table; if (target.matches('.table-select-checkbox')) { table = target.closest('.table-wrapper')?.querySelector('table'); if (table) toggleSelectAll(target.checked, table); } else { table = target.closest('table'); if (target.matches('[id^="select-all-checkbox"]')) toggleSelectAll(target.checked, table); } if (table) syncTableCheckboxState(table); if (!state.isMergedView) updateSelectionInfo(); }
+    function toggleSelectAll(isChecked, table) { if (!table) return; table.querySelectorAll('tbody tr:not(.row-hidden-search) .row-checkbox').forEach(cb => cb.checked = isChecked); const headerCheckbox = table.querySelector('thead input[type="checkbox"]'); if (headerCheckbox) { headerCheckbox.checked = isChecked; headerCheckbox.indeterminate = false; } }
+    
+    function getFundSortPriority(fileName) {
+        if (state.fundSortOrder.length === 0) return { index: Infinity, name: fileName };
+        const foundAlias = state.fundAliasKeys.find(alias => fileName.includes(alias));
+        const canonicalName = foundAlias ? state.fundAliasMap[foundAlias] : null;
+        const index = canonicalName ? state.fundSortOrder.indexOf(canonicalName) : -1;
+        return { index: (index === -1) ? Infinity : index, name: fileName };
+    }
+
+    function sortTablesByFundName() {
+        if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) { console.warn('基金順序列表尚未載入，暫不執行自動排序。'); return; }
+        const wrappers = Array.from(elements.displayArea.querySelectorAll('.table-wrapper'));
+        const getFileName = (wrapper) => { const text = wrapper.querySelector('h4').textContent; const match = text.match(/(.*)\s\(.*\)$/); return match ? match[1].trim() : text.trim(); };
+        wrappers.sort((a, b) => {
+            const fileA = getFundSortPriority(getFileName(a)), fileB = getFundSortPriority(getFileName(b));
+            return (fileA.index === fileB.index) ? fileA.name.localeCompare(fileB.name) : fileA.index - fileB.index;
+        });
+        elements.displayArea.innerHTML = '';
+        wrappers.forEach(wrapper => elements.displayArea.appendChild(wrapper));
+    }
+
+    function sortMergedTableByFundName() {
+        if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
+        if (state.fundSortOrder.length === 0 || Object.keys(state.fundAliasMap).length === 0) { alert('錯誤：基金順序列表尚未載入或為空。\n請檢查 fund-config.json 檔案。'); return; }
+        state.mergedData.sort((a, b) => {
+            const fileA = getFundSortPriority(a._sourceFile || ''), fileB = getFundSortPriority(b._sourceFile || '');
+            return (fileA.index === fileB.index) ? (a._sourceFile || '').localeCompare(b._sourceFile || '') : fileA.index - fileB.index;
+        });
+        renderMergedTable();
+    }
+
+    return { init };
+})();
+
+ExcelViewer.init();
