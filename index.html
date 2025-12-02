@@ -3,28 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel 檢視器與說明文件</title>
+    <title>整合型 Excel 資料處理平台</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 針對 iframe 的額外樣式，確保填滿視窗 */
+        .app-frame {
+            width: 100%;
+            height: calc(100vh - 80px); /* 扣除導覽列高度 */
+            border: none;
+            display: block;
+        }
+    </style>
 </head>
 <body>
 
     <div class="tab-container">
         <nav class="tab-nav">
             <button class="tab-btn" data-tab="tab-guide-pane" data-source="guide.html">📖 使用說明</button>
-            <button class="tab-btn active" data-tab="tab-app-pane">🚀 Excel 檢視器</button>
+            
+            <button class="tab-btn active" data-tab="tab-viewer-pane">🚀 Excel 檢視與合併</button>
+            
+            <button class="tab-btn" data-tab="tab-project-a-pane">📊 基金矩陣分析 (Project A)</button>
+            
             <button class="tab-btn" data-tab="tab-code-pane" data-source="maintenance.html">🛠️ 程式碼維護</button>
         </nav>
 
         <main class="tab-content">
-            <!-- 說明文件內容將被動態載入到這裡 -->
             <section id="tab-guide-pane" class="tab-pane doc-page"></section>
 
-            <!-- Excel 檢視器應用程式 -->
-            <section id="tab-app-pane" class="tab-pane active">
-                <iframe id="app-iframe" title="Excel 檢視器應用程式" src="./app/index.html"></iframe>
+            <section id="tab-viewer-pane" class="tab-pane active">
+                <iframe class="app-frame" title="Excel 檢視器" src="./app_viewer/index.html"></iframe>
             </section>
 
-            <!-- 程式碼維護內容將被動態載入到這裡 -->
+            <section id="tab-project-a-pane" class="tab-pane">
+                <iframe class="app-frame" title="Project A 分析" src="./app_project_a/index.html"></iframe>
+            </section>
+
             <section id="tab-code-pane" class="tab-pane doc-page"></section>
         </main>
     </div>
