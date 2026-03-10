@@ -683,5 +683,44 @@ table tbody tr:hover {
     min-width: 300px; /* 每個區塊的最小寬度，觸發換行用 */
 }
 
+/* =========================================
+   🧹 視覺減壓：簡化匯入後的 HTML 表格介面
+========================================= */
+
+/* 1. 防止文字換行，讓表格看起來像真正的 Excel 一樣整齊 */
+.table-content table {
+    font-size: 0.85rem; /* 字體微調小一點 */
+    white-space: nowrap; /* 強制文字不換行，避免列高不一致 */
+}
+
+/* 2. 讓個別表格的卡片變緊湊 */
+.table-wrapper {
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* 減弱陰影厚重感 */
+}
+
+.table-header {
+    padding: 8px 12px;
+    background-color: #f8fafc; /* 柔和的標題背景 */
+}
+
+/* 3. 🌟 魔法：把每張卡片上煩人的「刪除」按鈕隱藏起來，滑鼠移過去才顯示 */
+.table-header .header-actions {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
+}
+.table-wrapper:hover .table-header .header-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 4. 縮小每一列前方的核取方塊 (Checkbox) 佔用空間 */
+.table-content table td.checkbox-cell,
+.table-content table th.checkbox-cell {
+    width: 30px;
+    padding: 2px 4px;
+    text-align: center;
+}
 
 
