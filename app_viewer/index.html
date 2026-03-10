@@ -29,25 +29,12 @@
 
                     <hr style="margin: 15px 0 10px 0; border: 0; border-top: 1px dashed #dee2e6;">
                     <div style="background-color: #e9ecef; padding: 10px; border-radius: 6px;">
-                        <label style="font-weight: 600; color: #495057; display: block; margin-bottom: 6px;">📐 進階：指定讀取範圍 (去除複雜表頭)</label>
-                        <select id="template-select" style="width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 4px; margin-bottom: 8px;">
-                            <option value="auto">自動讀取 (整頁讀取)</option>
-                            <option value="op_income">作業基金 - 收支餘絀表 (A4:I38, 表頭2列)</option>
-                            <option value="special_cash">特別收入基金 - 現金流量表 (A4:E48, 表頭2列)</option>
-                            <option value="op_cash">作業基金 - 現金流量表 (A4:E49, 表頭2列)</option>
-                            <option value="op_surplus">作業基金 - 餘絀撥補表 (A4:G29, 表頭2列)</option>
-                            <option value="custom">✍️ 自訂範圍與表頭</option>
-                        </select>
-                        
-                        <div id="custom-range-group" class="hidden" style="display: flex; gap: 10px; align-items: center;">
-                            <div style="flex: 1;">
-                                <input type="text" id="data-range-input" placeholder="範圍 (例: A4:I38)" style="width: 100%; padding: 4px 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="font-size: 0.85rem;">表頭列數：</label>
-                                <input type="number" id="header-rows-input" value="1" min="1" style="width: 50px; padding: 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;">
-                            </div>
-                        </div>
+                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="skip-top-rows-checkbox" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
+                            ✂️ 匯入時自動刪除前 
+                            <input type="number" id="skip-top-rows-input" value="3" min="1" disabled style="width: 50px; margin: 0 8px; padding: 2px 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;"> 
+                            列 (去除垃圾標題)
+                        </label>
                     </div>
                 </fieldset>
             </div>
