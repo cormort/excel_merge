@@ -1,7 +1,14 @@
-// --- 移除了頂部的 FUND_ORDER_LIST ---
-
 const ExcelViewer = (() => {
     'use strict';
+    
+    // --- 🌟 新增：版型設定檔 ---
+    const TEMPLATE_CONFIG = {
+        'op_income': { range: 'A4:I38', headerRows: 2 },
+        'special_cash': { range: 'A4:E48', headerRows: 2 },
+        'op_cash': { range: 'A4:E49', headerRows: 2 },
+        'op_surplus': { range: 'A4:G29', headerRows: 2 }
+    };
+
     const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
     const state = { 
         originalHtmlString: '', 
@@ -73,6 +80,12 @@ const ExcelViewer = (() => {
             gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
             
+            // 🌟 新增：範圍設定的 UI 元素 🌟
+            templateSelect: 'template-select',
+            customRangeGroup: 'custom-range-group',
+            dataRangeInput: 'data-range-input',
+            headerRowsInput: 'header-rows-input',
+
             mergeViewModal: 'merge-view-modal',
             closeMergeViewBtn: 'close-merge-view-btn',
             mergeViewContent: 'merge-view-content',
@@ -220,6 +233,24 @@ const ExcelViewer = (() => {
                 elements.specificSheetPositionGroup.classList.toggle('hidden', selectedMode !== 'position');
             }
         });
+
+        // 🌟 新增：監聽版型選單切換 🌟
+        if (elements.templateSelect) {
+            elements.templateSelect.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'custom') {
+                    elements.customRangeGroup.classList.remove('hidden');
+                    elements.dataRangeInput.value = '';
+                    elements.headerRowsInput.value = '1';
+                } else if (val !== 'auto' && TEMPLATE_CONFIG[val]) {
+                    elements.customRangeGroup.classList.remove('hidden');
+                    elements.dataRangeInput.value = TEMPLATE_CONFIG[val].range;
+                    elements.headerRowsInput.value = TEMPLATE_CONFIG[val].headerRows;
+                } else {
+                    elements.customRangeGroup.classList.add('hidden');
+                }
+            });
+        }
 
         elements.searchInputMerged.addEventListener('input', debounce(filterTable, 300));
 
@@ -399,32 +430,88 @@ const ExcelViewer = (() => {
                 
                 for (const sheetName of sheetNames) { 
                     const sheet = workbook.Sheets[sheetName];
-                    let startRow = 0, startCol = 0, endCol = 0;
-                    if (sheet['!ref']) {
-                        const range = XLSX.utils.decode_range(sheet['!ref']);
-                        startRow = range.s.r; startCol = range.s.c; endCol = range.e.c;
+                    
+                    // --- 🌟 核心修改區塊開始：處理指定範圍與表頭壓縮 🌟 ---
+                    let readRange = sheet['!ref'];
+                    let headerRowsCount = 1;
+
+                    const tmplVal = elements.templateSelect ? elements.templateSelect.value : 'auto';
+                    if (tmplVal !== 'auto') {
+                        const rangeStr = elements.dataRangeInput.value.trim().toUpperCase();
+                        if (rangeStr) readRange = rangeStr;
+                        headerRowsCount = parseInt(elements.headerRowsInput.value, 10) || 1;
                     }
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', range: sheet['!ref'], raw: false });
+
+                    let startRow = 0, startCol = 0, endCol = 0;
+                    if (readRange) {
+                        try {
+                            const range = XLSX.utils.decode_range(readRange);
+                            startRow = range.s.r; startCol = range.s.c; endCol = range.e.c;
+                        } catch(e) { console.warn("範圍解析錯誤，使用預設", e); }
+                    }
+
+                    if (!readRange) continue; // 如果是空的sheet跳過
+
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', range: readRange, raw: false });
+                    
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
                             const startR = merge.s.r - startRow, startC = merge.s.c - startCol, endR = merge.e.r - startRow, endC = merge.e.c - startCol;
                             if (startR >= 0 && startC >= 0 && jsonData[startR]) {
                                 const primaryValue = jsonData[startR][startC];
-                                for (let r = startR; r <= endR; r++) for (let c = startC; c <= endC; c++) if (jsonData[r]) jsonData[r][c] = primaryValue;
+                                for (let r = startR; r <= endR; r++) {
+                                    for (let c = startC; c <= endC; c++) {
+                                        if (jsonData[r]) jsonData[r][c] = primaryValue;
+                                    }
+                                }
                             }
                         });
                     }
+
+                    // 表頭壓縮魔法：如果指定表頭有 2 列以上，把它們合併成 1 列
+                    if (headerRowsCount > 1 && jsonData.length >= headerRowsCount) {
+                        const combinedHeader = [];
+                        const maxColWidth = Math.max(...jsonData.slice(0, headerRowsCount).map(r => r.length));
+                        
+                        for (let c = 0; c < maxColWidth; c++) {
+                            const colTexts = [];
+                            for (let r = 0; r < headerRowsCount; r++) {
+                                const cellVal = jsonData[r][c];
+                                if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
+                                    colTexts.push(String(cellVal).trim());
+                                }
+                            }
+                            const uniqueTexts = [...new Set(colTexts)];
+                            combinedHeader.push(uniqueTexts.join(' ')); 
+                        }
+                        
+                        jsonData[0] = combinedHeader;
+                        jsonData.splice(1, headerRowsCount - 1);
+                    }
+                    // --- 🌟 核心修改區塊結束 🌟 ---
+
                     const rowProps = sheet['!rows'] || [], colProps = sheet['!cols'] || []; 
                     const visibleRelativeIndices = [];
-                    for (let c = startCol; c <= endCol; c++) if (!(colProps[c] && colProps[c].hidden)) visibleRelativeIndices.push(c - startCol);
+                    for (let c = startCol; c <= endCol; c++) {
+                        if (!(colProps[c] && colProps[c].hidden)) visibleRelativeIndices.push(c - startCol);
+                    }
+                    
                     const filteredData = [];
                     jsonData.forEach((row, index) => {
-                        const absoluteRowIndex = startRow + index;
+                        // 計算原始的絕對行數以判斷是否被隱藏
+                        let originalIndex = index;
+                        if (headerRowsCount > 1 && index > 0) {
+                            originalIndex = index + headerRowsCount - 1;
+                        }
+                        const absoluteRowIndex = startRow + originalIndex;
+
                         if (rowProps[absoluteRowIndex] && rowProps[absoluteRowIndex].hidden) return; 
+                        
                         const safeRow = row || [];
                         const newRow = visibleRelativeIndices.map(i => (safeRow[i] !== undefined ? safeRow[i] : ''));
                         if (newRow.some(cell => String(cell).trim() !== '')) filteredData.push(newRow);
                     });
+                    
                     if (filteredData.length > 0) {
                         const cleanedSheet = XLSX.utils.aoa_to_sheet(filteredData);
                         const htmlString = XLSX.utils.sheet_to_html(cleanedSheet); 
