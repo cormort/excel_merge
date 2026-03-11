@@ -906,3 +906,27 @@ td.checkbox-cell, th.checkbox-cell {
     margin: 0;
     cursor: pointer;
 }
+/* =========================================
+   🌟 修正：核取方塊對齊與雙向固定 (Sticky)
+========================================= */
+th.checkbox-cell, td.checkbox-cell {
+    vertical-align: middle !important; /* 解決方塊沉底問題，強制垂直置中 */
+    position: sticky !important;       /* 讓它在水平捲動時釘選 */
+    left: 0;                           /* 固定在最左側 */
+    text-align: center !important;
+}
+
+/* 表頭的全選方塊需要同時釘選上下與左右，並給予最高層級 */
+thead th.checkbox-cell {
+    top: 0;
+    z-index: 30 !important; 
+    background-color: #f1f5f9 !important; /* 確保背景不透明，蓋過下方資料 */
+}
+
+/* 資料列的方塊給予適當層級，並配合斑馬紋背景避免透明看穿 */
+tbody td.checkbox-cell {
+    z-index: 20 !important;
+}
+tbody tr:nth-child(even) td.checkbox-cell { background-color: #f8fafc !important; }
+tbody tr:nth-child(odd) td.checkbox-cell { background-color: #ffffff !important; }
+tbody tr:hover td.checkbox-cell { background-color: #ebf4ff !important; }
