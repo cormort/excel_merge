@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極完整版 (包含分離拋棄列、標題換行、智慧去重)
+ * ExcelViewer — 終極完整版 (主畫面與合併畫面雙軌全功能：編輯、複製、進階篩選、智慧去重)
  */
 
 const ExcelViewer = (() => {
@@ -18,6 +18,12 @@ const ExcelViewer = (() => {
         isSettingsDirty: false,
         undoStack: [],
 
+        // 追蹤當前操作環境
+        columnModalContext: 'main', 
+        dedupContext: 'main',
+        mainViewHiddenColumns: new Set(),
+        isMainEditing: false,
+
         isMergedView: false,
         isEditing: false,
         showTotalRow: false,
@@ -26,7 +32,7 @@ const ExcelViewer = (() => {
         mergedHeaders: [],
 
         fundSortOrder: [],
-        fundAliasMap: {},
+        fundAliasMap: [],
         fundAliasKeys: [],
     };
 
@@ -130,13 +136,21 @@ const ExcelViewer = (() => {
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
             
-            // 🌟 清洗設定相關
-            skipTopRowsCheckbox: 'skip-top-rows-checkbox', 
-            discardRowsInput: 'discard-rows-input', 
-            headerRowsInput: 'header-rows-input',
-            removeEmptyRowsCheckbox: 'remove-empty-rows-checkbox', 
-            removeKeywordRowsCheckbox: 'remove-keyword-rows-checkbox', 
-            removeKeywordRowsInput: 'remove-keyword-rows-input', 
+            // 🌟 主畫面專屬進階功能 
+            mainColumnOperationsBtn: 'main-column-operations-btn',
+            mainSmartDedupBtn: 'main-smart-dedup-btn',
+            mainEditDataBtn: 'main-edit-data-btn',
+            mainSaveEditsBtn: 'main-save-edits-btn',
+            mainCopyRowsBtn: 'main-copy-rows-btn',
+            mainColSelect1: 'main-col-select-1',
+            mainColSelect2: 'main-col-select-2',
+            mainInputCriteria1: 'main-input-criteria-1',
+            mainInputCriteria2: 'main-input-criteria-2',
+            mainExecuteFilterBtn: 'main-execute-filter-btn',
+
+            skipTopRowsCheckbox: 'skip-top-rows-checkbox', discardRowsInput: 'discard-rows-input', 
+            headerRowsInput: 'header-rows-input', removeEmptyRowsCheckbox: 'remove-empty-rows-checkbox', 
+            removeKeywordRowsCheckbox: 'remove-keyword-rows-checkbox', removeKeywordRowsInput: 'remove-keyword-rows-input', 
             reapplyBanner: 'reapply-banner', reapplySettingsBtn: 'reapply-settings-btn',
             
             mergeViewModal: 'merge-view-modal', closeMergeViewBtn: 'close-merge-view-btn', mergeViewContent: 'merge-view-content',
@@ -206,7 +220,6 @@ const ExcelViewer = (() => {
         });
     }
 
-    // 🌟 核心：清洗與換行標題壓縮 
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -241,10 +254,8 @@ const ExcelViewer = (() => {
                 }
                 
                 const uniqueParts = [...new Set(headerParts)];
-                // 🌟 使用 \n 換行符號結合
                 let baseName = uniqueParts.join('\n') || `(空白欄位)`;
                 
-                // 防重複命名機制
                 let uniqueName = baseName;
                 let counter = 2;
                 while (usedNames.has(uniqueName)) {
@@ -414,8 +425,6 @@ const ExcelViewer = (() => {
                     if (firstRow) {
                         const thead = document.createElement('thead');
                         thead.appendChild(firstRow);
-                        
-                        // 🌟 關鍵修復：將 SheetJS 產生的 <br> 轉回實體 \n 換行符號
                         firstRow.querySelectorAll('td').forEach(td => {
                             const th = document.createElement('th');
                             td.innerHTML = td.innerHTML.replace(/<br\s*[\/]?>/gi, '___NEWLINE___');
@@ -446,7 +455,13 @@ const ExcelViewer = (() => {
         elements.displayArea.innerHTML = '';
         elements.displayArea.appendChild(fragment);
         state.originalHtmlString = elements.displayArea.innerHTML;
+        
         injectCheckboxes(elements.displayArea);
+        if (state.mainViewHiddenColumns.size > 0) applyMainViewColumnState();
+        
+        // 🌟 生成主畫面的進階篩選下拉選單
+        populateMainDropdowns();
+
         showControls(detectHiddenElements());
         sortTablesByFundName();
     }
@@ -462,6 +477,204 @@ const ExcelViewer = (() => {
         });
     }
 
+    // ─────────────────────────────────────────────
+    // 🌟 雙軌操作：主畫面專用函式
+    // ─────────────────────────────────────────────
+    
+    // 匯集主畫面所有表格的欄位，生成下拉選單
+    function populateMainDropdowns() {
+        const allHeaders = new Set();
+        elements.displayArea.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => {
+            allHeaders.add(th.textContent.trim().replace(/\n/g, ' '));
+        });
+        const options = Array.from(allHeaders).map(h => `<option value="${h}">${h}</option>`).join('');
+        if (elements.mainColSelect1) elements.mainColSelect1.innerHTML = '<option value="">-- 選擇欄位 1 --</option>' + options;
+        if (elements.mainColSelect2) elements.mainColSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>' + options;
+    }
+
+    // 主畫面：編輯資料開關
+    function toggleMainEditMode(startEditing) {
+        state.isMainEditing = startEditing;
+        if(elements.mainEditDataBtn) elements.mainEditDataBtn.classList.toggle('hidden', startEditing);
+        if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.classList.toggle('hidden', !startEditing);
+        
+        elements.displayArea.querySelectorAll('td:not(.checkbox-cell)').forEach(td => {
+            td.contentEditable = startEditing;
+            td.style.backgroundColor = startEditing ? '#fffbeb' : ''; 
+        });
+        
+        ['mainCopyRowsBtn', 'mainSmartDedupBtn', 'mainExecuteFilterBtn', 'deleteSelectedBtn', 'mainColumnOperationsBtn'].forEach(id => {
+            if (elements[id]) elements[id].disabled = startEditing;
+        });
+    }
+
+    // 主畫面：儲存編輯
+    function saveMainEdits() {
+        elements.displayArea.querySelectorAll('td:not(.checkbox-cell)').forEach(td => {
+            td.contentEditable = false;
+            td.style.backgroundColor = '';
+        });
+        state.isMainEditing = false;
+        if(elements.mainEditDataBtn) elements.mainEditDataBtn.classList.remove('hidden');
+        if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.classList.add('hidden');
+        
+        ['mainCopyRowsBtn', 'mainSmartDedupBtn', 'mainExecuteFilterBtn', 'deleteSelectedBtn', 'mainColumnOperationsBtn'].forEach(id => {
+            if (elements[id]) elements[id].disabled = false;
+        });
+
+        // 覆寫原始字串，讓 Reset 不會洗掉這些編輯
+        state.originalHtmlString = elements.displayArea.innerHTML;
+        undoManager.showToast('儲存主畫面編輯');
+    }
+
+    // 主畫面：複製列 (直接在 DOM 複製)
+    function copyMainSelectedRows() {
+        const selected = elements.displayArea.querySelectorAll('tbody .row-checkbox:checked');
+        if (!selected.length) { alert('請先勾選要複製的資料列。'); return; }
+        
+        selected.forEach(cb => {
+            const tr = cb.closest('tr');
+            const clone = tr.cloneNode(true);
+            clone.querySelector('.row-checkbox').checked = false;
+            clone.classList.add('new-row-highlight'); 
+            tr.parentNode.insertBefore(clone, tr.nextSibling);
+        });
+        syncCheckboxesInScope();
+        // 更新狀態以保存在記憶中
+        state.originalHtmlString = elements.displayArea.innerHTML;
+    }
+
+    // 主畫面：執行複合篩選
+    function executeMainComplexFilter() {
+        const col1 = elements.mainColSelect1?.value;
+        const col2 = elements.mainColSelect2?.value;
+        const criteria1 = document.querySelector('input[name="main-criteria-1"]:checked')?.value;
+        const criteria2 = document.querySelector('input[name="main-criteria-2"]:checked')?.value;
+        const logicOp = document.querySelector('input[name="main-logic-op"]:checked')?.value ?? 'and';
+        const inputVal1 = elements.mainInputCriteria1?.value;
+        const inputVal2 = elements.mainInputCriteria2?.value;
+
+        if (!col1 && !col2) { alert('請輸入至少一個條件'); return; }
+
+        const checkValue = (cellVal, cr, val) => {
+            const s = String(cellVal).trim(), v = String(val).trim();
+            return cr === 'empty' ? s === '' : cr === 'zero' ? s === '0' : cr === 'value' ? s !== '' : cr === 'exact' ? s === v : cr === 'includes' ? v !== '' && s.toLowerCase().includes(v.toLowerCase()) : false;
+        };
+
+        let count = 0;
+        elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
+            const checkbox = row.querySelector('.row-checkbox');
+            if (!checkbox) return;
+
+            const table = row.closest('table');
+            const ths = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'));
+            
+            const getCellText = (colName) => {
+                if (!colName) return null;
+                const colIdx = ths.findIndex(th => th.textContent.trim().replace(/\n/g, ' ') === colName);
+                if (colIdx === -1) return null;
+                return row.children[colIdx + 1] ? row.children[colIdx + 1].textContent : '';
+            };
+
+            let cMatch = false;
+            const r1 = col1 ? checkValue(getCellText(col1) ?? '', criteria1, inputVal1) : null;
+            const r2 = col2 ? checkValue(getCellText(col2) ?? '', criteria2, inputVal2) : null;
+            cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
+
+            if (cMatch) { checkbox.checked = true; count++; }
+        });
+        alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
+        syncCheckboxesInScope();
+    }
+
+
+    // ─────────────────────────────────────────────
+    // 🌟 雙軌操作：欄位隱藏設定
+    // ─────────────────────────────────────────────
+    function openMainColumnModal() {
+        const allTables = elements.displayArea.querySelectorAll('.table-wrapper table');
+        if (allTables.length === 0) { alert('目前沒有可操作的表格。'); return; }
+
+        const allHeaders = new Set();
+        allTables.forEach(table => { table.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => allHeaders.add(th.textContent.trim())); });
+
+        state.columnModalContext = 'main';
+        
+        if(elements.columnChecklist) {
+            elements.columnChecklist.innerHTML = Array.from(allHeaders).map(h => {
+                const displayH = h.replace(/\n/g, ' '); 
+                const isChecked = !state.mainViewHiddenColumns.has(h);
+                return `<label><input type="checkbox" value="${h}" ${isChecked ? 'checked' : ''}> ${displayH}</label>`;
+            }).join('');
+        }
+        toggleColumnModal(true);
+    }
+
+    function openMergeColumnModal() {
+        state.columnModalContext = 'merge';
+        updateColumnSelects(state.mergedHeaders);
+        toggleColumnModal(true);
+    }
+
+    function toggleColumnModal(show) { if (elements.columnModal) elements.columnModal.classList.toggle('hidden', !show); }
+
+    function applyColumnChanges() {
+        if (state.columnModalContext === 'main') {
+            const visibility = {};
+            elements.columnChecklist.querySelectorAll('input').forEach(input => {
+                visibility[input.value] = input.checked;
+                if (!input.checked) state.mainViewHiddenColumns.add(input.value); else state.mainViewHiddenColumns.delete(input.value);
+            });
+            applyMainViewColumnState();
+        } else {
+            const mergedTable = elements.mergeViewContent.querySelector('table');
+            if (!mergedTable) return;
+            const visibility = {};
+            elements.columnChecklist.querySelectorAll('input').forEach(input => visibility[input.value] = input.checked);
+            
+            const allThs = Array.from(mergedTable.querySelectorAll('thead th'));
+            const firstDataIdx = allThs.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
+            if (firstDataIdx === -1) return;
+            
+            allThs.slice(firstDataIdx).forEach((th, i) => {
+                const colIdx = i + firstDataIdx;
+                const headerText = th.textContent.replace('×', '').trim();
+                mergedTable.querySelectorAll(`tr > *:nth-child(${colIdx + 1})`).forEach(cell => cell.classList.toggle('column-hidden', !visibility[headerText]));
+            });
+        }
+    }
+
+    function applyMainViewColumnState() {
+        const allTables = elements.displayArea.querySelectorAll('.table-wrapper table');
+        allTables.forEach(table => {
+            const headers = Array.from(table.querySelectorAll('thead th'));
+            headers.forEach((th, colIdx) => {
+                if (th.classList.contains('checkbox-cell')) return;
+                const isHidden = state.mainViewHiddenColumns.has(th.textContent.trim());
+                th.classList.toggle('column-hidden', isHidden);
+                table.querySelectorAll(`tbody tr`).forEach(tr => {
+                    const td = tr.children[colIdx];
+                    if (td) td.classList.toggle('column-hidden', isHidden);
+                });
+            });
+        });
+    }
+
+    function updateColumnSelects(headers) {
+        if(elements.columnChecklist) {
+            elements.columnChecklist.innerHTML = headers.map(h => {
+                const displayH = h.replace(/\n/g, ' '); 
+                return `<label><input type="checkbox" value="${h}" checked> ${displayH}</label>`;
+            }).join('');
+        }
+        const makeOption = (value, text) => { const opt = document.createElement('option'); opt.value = value; opt.textContent = text.replace(/\n/g, ' '); return opt; };
+        if(elements.colSelect1) { elements.colSelect1.innerHTML = ''; elements.colSelect1.appendChild(makeOption('', '-- 選擇欄位 1 --')); headers.forEach(h => elements.colSelect1.appendChild(makeOption(h, h))); }
+        if(elements.colSelect2) { elements.colSelect2.innerHTML = ''; elements.colSelect2.appendChild(makeOption('', '-- 選擇欄位 2 (選填) --')); headers.forEach(h => elements.colSelect2.appendChild(makeOption(h, h))); }
+    }
+
+    // ─────────────────────────────────────────────
+    // 7. 合併視圖 (Merge View)
+    // ─────────────────────────────────────────────
     function createMergedView(mode = 'all') {
         if (!elements.displayArea || !elements.mergeViewModal) return;
         const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
@@ -509,7 +722,6 @@ const ExcelViewer = (() => {
         state.mergedHeaders = Array.from(allHeaders);
         state.mergedData = tableData;
         renderMergedTable();
-        updateColumnSelects(state.mergedHeaders);
         
         state.isMergedView = true;
         elements.mergeViewModal.classList.remove('hidden');
@@ -534,7 +746,6 @@ const ExcelViewer = (() => {
         if (state.showSourceColumn) headerRow.insertAdjacentHTML('beforeend', '<th class="source-col">來源檔案</th>');
         
         state.mergedHeaders.forEach(header => { 
-            // 直接放入帶有 \n 的 header，靠 CSS pre-wrap 來換行
             headerRow.insertAdjacentHTML('beforeend', `<th>${header}<span class="delete-col-btn" data-header="${header}">&times;</span></th>`); 
         });
 
@@ -597,7 +808,7 @@ const ExcelViewer = (() => {
         const selected = scope.querySelectorAll('tbody .row-checkbox:checked');
         if (!selected.length) { alert('請先勾選列'); return; }
 
-        if (state.isMergedView) {
+        if (state.isMergedView && !specificScope) {
             const backupData = [...state.mergedData];
             const toDelete = new Set(Array.from(selected).map(cb => parseInt(cb.closest('tr').dataset.rowIndex, 10)));
             undoManager.push(`刪除 ${toDelete.size} 列 (合併視圖)`, () => { state.mergedData = backupData; if (state.isMergedView) renderMergedTable(); });
@@ -609,6 +820,7 @@ const ExcelViewer = (() => {
             const backups = rows.map(tr => ({ parent: tr.parentNode, sibling: tr.nextSibling, node: tr }));
             undoManager.push(`刪除 ${rows.length} 列 (主表)`, () => { backups.forEach(b => b.parent.insertBefore(b.node, b.sibling)); syncCheckboxesInScope(); });
             rows.forEach(tr => tr.remove());
+            if(!state.isMergedView) state.originalHtmlString = elements.displayArea.innerHTML;
         }
         syncCheckboxesInScope();
     }
@@ -839,148 +1051,6 @@ const ExcelViewer = (() => {
         return totals;
     }
 
-    // 🌟 在選單介面中保護 \n 不會破圖
-    function updateColumnSelects(headers) {
-        if(elements.columnChecklist) {
-            elements.columnChecklist.innerHTML = headers.map(h => {
-                const displayH = h.replace(/\n/g, ' '); // 替換為空白以利顯示
-                return `<label><input type="checkbox" value="${h}" checked> ${displayH}</label>`;
-            }).join('');
-        }
-
-        const makeOption = (value, text) => { 
-            const opt = document.createElement('option'); 
-            opt.value = value; 
-            opt.textContent = text.replace(/\n/g, ' '); 
-            return opt; 
-        };
-        
-        if(elements.colSelect1) { 
-            elements.colSelect1.innerHTML = ''; 
-            elements.colSelect1.appendChild(makeOption('', '-- 選擇欄位 1 --')); 
-            headers.forEach(h => elements.colSelect1.appendChild(makeOption(h, h))); 
-        }
-        if(elements.colSelect2) { 
-            elements.colSelect2.innerHTML = ''; 
-            elements.colSelect2.appendChild(makeOption('', '-- 選擇欄位 2 (選填) --')); 
-            headers.forEach(h => elements.colSelect2.appendChild(makeOption(h, h))); 
-        }
-    }
-
-    function toggleColumnModal(show) { if (elements.columnModal) elements.columnModal.classList.toggle('hidden', !show); }
-
-    function applyColumnChanges() {
-        const mergedTable = elements.mergeViewContent.querySelector('table');
-        if (!mergedTable) return;
-        const visibility = {};
-        elements.columnChecklist.querySelectorAll('input').forEach(input => visibility[input.value] = input.checked);
-        const allThs = Array.from(mergedTable.querySelectorAll('thead th'));
-        const firstDataIdx = allThs.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
-        if (firstDataIdx === -1) return;
-        allThs.slice(firstDataIdx).forEach((th, i) => {
-            const colIdx = i + firstDataIdx;
-            const headerText = th.textContent.replace('×', '').trim();
-            mergedTable.querySelectorAll(`tr > *:nth-child(${colIdx + 1})`).forEach(cell => cell.classList.toggle('column-hidden', !visibility[headerText]));
-        });
-    }
-
-    function updateDropAreaDisplay() {
-        const hasFiles = state.loadedTables > 0;
-        if(elements.dropArea) elements.dropArea.classList.toggle('compact', hasFiles);
-        if(elements.dropAreaInitial) elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
-        if(elements.dropAreaLoaded) elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
-        if(elements.importOptionsContainer) elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
-        if (hasFiles && elements.fileCount && elements.fileNames) {
-            elements.fileCount.textContent = state.loadedTables;
-            elements.fileNames.textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
-        }
-    }
-
-    function showControls(hiddenCount) { 
-        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden'); 
-        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); 
-        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.toggle('hidden', hiddenCount === 0);
-    }
-
-    function updateSelectionInfo() {
-        if(!elements.displayArea) return;
-        const selected = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
-        if(elements.selectedTablesList) elements.selectedTablesList.textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
-        if(elements.selectedTablesInfo) elements.selectedTablesInfo.classList.toggle('hidden', selected.length === 0);
-    }
-
-    function detectHiddenElements() { return elements.displayArea ? elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length : 0; }
-
-    function updateFileStateAfterDeletion() {
-        if(!elements.displayArea) return;
-        state.loadedTables = elements.displayArea.querySelectorAll('.table-wrapper').length;
-        if (!state.loadedTables) clearAllFiles(true); else { updateDropAreaDisplay(); updateSelectionInfo(); }
-    }
-
-    function clearAllFiles(silent = false) {
-        if (!silent && !confirm('確定清除所有檔案？')) return;
-        if (state.isMergedView) closeMergeView();
-        state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
-        if(elements.displayArea) elements.displayArea.innerHTML = ''; 
-        if (elements.fileInput) elements.fileInput.value = '';
-        updateDropAreaDisplay(); resetControls(); setViewMode('list');
-    }
-
-    function setViewMode(mode) {
-        const isGrid = mode === 'grid';
-        if(elements.displayArea) { elements.displayArea.classList.toggle('grid-view', isGrid); elements.displayArea.classList.toggle('list-view', !isGrid); }
-        if(elements.gridViewBtn) elements.gridViewBtn.classList.toggle('active', isGrid);
-        if(elements.listViewBtn) elements.listViewBtn.classList.toggle('active', !isGrid);
-        if(elements.gridScaleControl) elements.gridScaleControl.classList.toggle('hidden', !isGrid);
-    }
-
-    function updateGridScale() { if(elements.displayArea && elements.gridScaleSlider) elements.displayArea.style.setProperty('--grid-columns', elements.gridScaleSlider.value); }
-
-    function showAllHiddenElements() {
-        if(!elements.displayArea) return;
-        const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
-        if (!hidden.length) return;
-        hidden.forEach(el => el.style.display = '');
-        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.add('hidden');
-        if(elements.loadStatusMessage) elements.loadStatusMessage.classList.add('hidden');
-    }
-
-    function toggleToolbar() { if(elements.collapsibleToolbar) { const collapsed = elements.collapsibleToolbar.classList.toggle('collapsed'); if (elements.toggleToolbarBtn) elements.toggleToolbarBtn.textContent = collapsed ? '展開工具列' : '收合工具列'; } }
-    function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
-    function handleScroll() { if(elements.backToTopBtn) elements.backToTopBtn.classList.toggle('visible', window.scrollY > window.innerHeight / 2); }
-
-    function openPreview(card) {
-        if (state.zoomedCard) return;
-        card.classList.add('is-zoomed'); state.zoomedCard = card; document.body.classList.add('no-scroll');
-    }
-
-    function closePreview() {
-        if (!state.zoomedCard) return;
-        state.zoomedCard.classList.remove('is-zoomed'); state.zoomedCard = null; document.body.classList.remove('no-scroll');
-    }
-
-    function resetView() {
-        if (state.isMergedView) closeMergeView();
-        if (!state.originalHtmlString || !elements.displayArea) return;
-        elements.displayArea.innerHTML = state.originalHtmlString;
-        injectCheckboxes(elements.displayArea);
-        ['searchInput', 'selectKeywordInput'].forEach(id => { if(elements[id]) elements[id].value = ''; });
-        if(elements.selectKeywordRegex) elements.selectKeywordRegex.checked = false;
-        filterTable(); updateSelectionInfo(); setViewMode('list');
-    }
-
-    function handleCriteriaChange(e) {
-        const radio = e.target;
-        if (radio.type !== 'radio') return;
-        const group = radio.closest('.radio-group');
-        if (!group) return;
-        const target = elements[group.dataset.target];
-        if (!target) return;
-        const needsInput = radio.value === 'exact' || radio.value === 'includes';
-        target.disabled = !needsInput;
-        if (needsInput) { target.focus(); } else { target.value = ''; }
-    }
-
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
         const data = [];
         const headerRow = table.querySelector('thead tr');
@@ -1085,45 +1155,88 @@ const ExcelViewer = (() => {
         renderMergedTable();
     }
 
+    // ─────────────────────────────────────────────
+    // 🌟 雙軌操作：智慧去重
+    // ─────────────────────────────────────────────
     function executeSmartDeduplication() {
         const keyCol = elements.dedupColSelect?.value;
         if (!keyCol) return;
 
         const groups = {};
-        const rows = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)'));
-
-        rows.forEach(tr => tr.classList.remove('dedup-marked'));
-
-        rows.forEach(tr => {
-            const idx = parseInt(tr.dataset.rowIndex, 10);
-            const rowData = state.mergedData[idx];
-            if (!rowData) return;
-            const key = String(rowData[keyCol] || '').trim();
-            if (!key) return;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push({ tr, rowData });
-        });
-
         let markedCount = 0;
-        Object.entries(groups).forEach(([key, items]) => {
-            if (items.length <= 1) return;
 
-            const cleanKey = key.replace(/[\s_基金]/g, '');
-            let best = items.find(({ rowData }) => {
-                const src = String(rowData._sourceFile || '').replace(/[\s_]/g, '');
-                return src.includes(cleanKey) || cleanKey.includes(src);
-            }) ?? items[0];
+        if (state.dedupContext === 'main') {
+            const rows = Array.from(elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)'));
+            rows.forEach(tr => tr.classList.remove('dedup-marked'));
 
-            items.forEach(item => {
-                if (item === best) return;
-                const cb = item.tr.querySelector('.row-checkbox');
-                if (cb && !cb.checked) { 
-                    cb.checked = true; 
-                    item.tr.classList.add('dedup-marked'); 
-                    markedCount++; 
-                }
+            rows.forEach(tr => {
+                const table = tr.closest('table');
+                const ths = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'));
+                const colIdx = ths.findIndex(th => th.textContent.trim().replace(/\n/g, ' ') === keyCol);
+                if (colIdx === -1) return;
+
+                const dataTd = tr.children[colIdx + 1]; 
+                if (!dataTd) return;
+                const key = dataTd.textContent.trim();
+                if (!key) return;
+
+                const sourceFile = tr.closest('.table-wrapper').querySelector('h4').textContent;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push({ tr, sourceFile });
             });
-        });
+
+            Object.entries(groups).forEach(([key, items]) => {
+                if (items.length <= 1) return;
+                const cleanKey = key.replace(/[\s_基金]/g, '');
+                let best = items.find(({ sourceFile }) => {
+                    const src = String(sourceFile).replace(/[\s_]/g, '');
+                    return src.includes(cleanKey) || cleanKey.includes(src);
+                }) ?? items[0];
+
+                items.forEach(item => {
+                    if (item === best) return;
+                    const cb = item.tr.querySelector('.row-checkbox');
+                    if (cb && !cb.checked) { 
+                        cb.checked = true; 
+                        item.tr.classList.add('dedup-marked'); 
+                        markedCount++; 
+                    }
+                });
+            });
+        } else {
+            // 合併檢視去重
+            const rows = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)'));
+            rows.forEach(tr => tr.classList.remove('dedup-marked'));
+
+            rows.forEach(tr => {
+                const idx = parseInt(tr.dataset.rowIndex, 10);
+                const rowData = state.mergedData[idx];
+                if (!rowData) return;
+                const key = String(rowData[keyCol] || '').trim();
+                if (!key) return;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push({ tr, rowData });
+            });
+
+            Object.entries(groups).forEach(([key, items]) => {
+                if (items.length <= 1) return;
+                const cleanKey = key.replace(/[\s_基金]/g, '');
+                let best = items.find(({ rowData }) => {
+                    const src = String(rowData._sourceFile || '').replace(/[\s_]/g, '');
+                    return src.includes(cleanKey) || cleanKey.includes(src);
+                }) ?? items[0];
+
+                items.forEach(item => {
+                    if (item === best) return;
+                    const cb = item.tr.querySelector('.row-checkbox');
+                    if (cb && !cb.checked) { 
+                        cb.checked = true; 
+                        item.tr.classList.add('dedup-marked'); 
+                        markedCount++; 
+                    }
+                });
+            });
+        }
 
         if(elements.dedupModal) elements.dedupModal.classList.add('hidden');
         syncCheckboxesInScope();
@@ -1141,8 +1254,9 @@ const ExcelViewer = (() => {
     }
 
     function clearDedupMarks() {
-        if(!elements.mergeViewContent) return;
-        elements.mergeViewContent.querySelectorAll('.dedup-marked').forEach(tr => {
+        const scope = getActiveScope();
+        if(!scope) return;
+        scope.querySelectorAll('.dedup-marked').forEach(tr => {
             tr.classList.remove('dedup-marked');
             const cb = tr.querySelector('.row-checkbox');
             if (cb) cb.checked = false;
@@ -1151,6 +1265,9 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
 
+    // ─────────────────────────────────────────────
+    // 12. 事件綁定 
+    // ─────────────────────────────────────────────
     function bindEvents() {
         setupDragAndDrop();
 
@@ -1186,6 +1303,13 @@ const ExcelViewer = (() => {
         if(elements.gridViewBtn) elements.gridViewBtn.addEventListener('click', () => setViewMode('grid'));
         if(elements.gridScaleSlider) elements.gridScaleSlider.addEventListener('input', updateGridScale);
 
+        // 🌟 綁定主畫面新按鈕事件
+        if(elements.mainColumnOperationsBtn) elements.mainColumnOperationsBtn.addEventListener('click', openMainColumnModal);
+        if(elements.mainEditDataBtn) elements.mainEditDataBtn.addEventListener('click', () => toggleMainEditMode(true));
+        if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.addEventListener('click', saveMainEdits);
+        if(elements.mainCopyRowsBtn) elements.mainCopyRowsBtn.addEventListener('click', copyMainSelectedRows);
+        if(elements.mainExecuteFilterBtn) elements.mainExecuteFilterBtn.addEventListener('click', executeMainComplexFilter);
+
         if(elements.selectAllTablesBtn) elements.selectAllTablesBtn.addEventListener('click', () => { if(elements.displayArea) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = true); updateSelectionInfo(); } });
         if(elements.unselectAllTablesBtn) elements.unselectAllTablesBtn.addEventListener('click', () => { if(elements.displayArea) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = false); updateSelectionInfo(); } });
         if(elements.deleteSelectedTablesBtn) elements.deleteSelectedTablesBtn.addEventListener('click', () => deleteSelectedTables());
@@ -1206,6 +1330,7 @@ const ExcelViewer = (() => {
         if(elements.viewCheckedCombinedBtn) elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
         if(elements.closeMergeViewBtn) elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
 
+        // 合併畫面操作
         if(elements.searchInputMerged) elements.searchInputMerged.addEventListener('input', utils.debounce(filterTable, 300));
         if(elements.executeFilterSelectionBtn) elements.executeFilterSelectionBtn.addEventListener('click', () => { executeCombinedSelection(); syncCheckboxesInScope(); });
         if(elements.invertSelectionMergedBtn) elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
@@ -1223,20 +1348,33 @@ const ExcelViewer = (() => {
         if(elements.exportCurrentMergedXlsxBtn) elements.exportCurrentMergedXlsxBtn.addEventListener('click', exportCurrentMergedXlsx);
         if(elements.sortMergedByNameBtn) elements.sortMergedByNameBtn.addEventListener('click', sortMergedTableByFundName);
 
-        if(elements.columnOperationsBtn) elements.columnOperationsBtn.addEventListener('click', () => toggleColumnModal(true));
+        if(elements.columnOperationsBtn) elements.columnOperationsBtn.addEventListener('click', openMergeColumnModal);
+        
         if(elements.closeColumnModalBtn) elements.closeColumnModalBtn.addEventListener('click', () => toggleColumnModal(false));
         if(elements.applyColumnChangesBtn) elements.applyColumnChangesBtn.addEventListener('click', () => { applyColumnChanges(); toggleColumnModal(false); });
+        
         if(elements.modalCheckAll) elements.modalCheckAll.addEventListener('click', () => { if(elements.columnChecklist) elements.columnChecklist.querySelectorAll('input').forEach(i => i.checked = true); });
         if(elements.modalUncheckAll) elements.modalUncheckAll.addEventListener('click', () => { if(elements.columnChecklist) elements.columnChecklist.querySelectorAll('input').forEach(i => i.checked = false); });
 
-        if(elements.smartDedupBtn) elements.smartDedupBtn.addEventListener('click', () => { 
-            if(elements.dedupColSelect) { 
-                elements.dedupColSelect.innerHTML = state.mergedHeaders.map(h => `<option value="${h}">${h.replace(/\n/g, ' ')}</option>`).join(''); 
-                const defaultMatch = state.mergedHeaders.find(h => h.includes('名') || h.includes('基金') || h.includes('科目'));
-                if (defaultMatch) elements.dedupColSelect.value = defaultMatch;
-                if(elements.dedupModal) elements.dedupModal.classList.remove('hidden'); 
+        // 🌟 雙軌共用的智慧去重按鈕 (判斷來自哪裡並開啟 Modal)
+        const setupDedupModal = (context) => {
+            state.dedupContext = context;
+            if(!elements.dedupColSelect) return;
+            const allHeaders = new Set();
+            if (context === 'main') {
+                elements.displayArea.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => allHeaders.add(th.textContent.trim().replace(/\n/g, ' ')));
+            } else {
+                state.mergedHeaders.forEach(h => allHeaders.add(h.replace(/\n/g, ' ')));
             }
-        });
+            elements.dedupColSelect.innerHTML = Array.from(allHeaders).map(h => `<option value="${h}">${h}</option>`).join('');
+            const defaultMatch = Array.from(allHeaders).find(h => h.includes('名') || h.includes('基金') || h.includes('科目'));
+            if (defaultMatch) elements.dedupColSelect.value = defaultMatch;
+            if(elements.dedupModal) elements.dedupModal.classList.remove('hidden'); 
+        };
+
+        if(elements.mainSmartDedupBtn) elements.mainSmartDedupBtn.addEventListener('click', () => setupDedupModal('main'));
+        if(elements.smartDedupBtn) elements.smartDedupBtn.addEventListener('click', () => setupDedupModal('merge'));
+
         if(elements.closeDedupModalBtn) elements.closeDedupModalBtn.addEventListener('click', () => { if(elements.dedupModal) elements.dedupModal.classList.add('hidden'); });
         if(elements.cancelDedupBtn) elements.cancelDedupBtn.addEventListener('click', () => { if(elements.dedupModal) elements.dedupModal.classList.add('hidden'); });
         if(elements.executeDedupBtn) elements.executeDedupBtn.addEventListener('click', executeSmartDeduplication);
@@ -1258,6 +1396,21 @@ const ExcelViewer = (() => {
             });
         }
 
+        // 處理主畫面複合條件選單的 disabled 切換
+        if(elements.controlPanel) {
+            elements.controlPanel.addEventListener('change', e => {
+                if (e.target.name === 'main-criteria-1' || e.target.name === 'main-criteria-2') {
+                    const group = e.target.closest('.radio-group');
+                    if(!group) return;
+                    const targetInput = document.getElementById(group.dataset.target);
+                    if(!targetInput) return;
+                    const needsInput = e.target.value === 'exact' || e.target.value === 'includes';
+                    targetInput.disabled = !needsInput;
+                    if (needsInput) targetInput.focus(); else targetInput.value = '';
+                }
+            });
+        }
+
         if(elements.displayArea) {
             elements.displayArea.addEventListener('change', e => {
                 if (e.target.matches('.table-select-checkbox,[id^="select-all-cb"], .row-checkbox')) syncCheckboxesInScope();
@@ -1276,10 +1429,14 @@ const ExcelViewer = (() => {
         const onKeywordEnter = e => {
             if (e.key !== 'Enter') return;
             e.preventDefault();
-            state.isMergedView ? elements.executeFilterSelectionBtn?.click() : elements.selectByKeywordBtn?.click();
+            if(state.isMergedView) elements.executeFilterSelectionBtn?.click();
+            else if(e.target.id.includes('main-input-criteria')) elements.mainExecuteFilterBtn?.click();
+            else elements.selectByKeywordBtn?.click();
         };
         if(elements.selectKeywordInput) elements.selectKeywordInput.addEventListener('keydown', onKeywordEnter);
         if(elements.selectKeywordInputMerged) elements.selectKeywordInputMerged.addEventListener('keydown', onKeywordEnter);
+        if(elements.mainInputCriteria1) elements.mainInputCriteria1.addEventListener('keydown', onKeywordEnter);
+        if(elements.mainInputCriteria2) elements.mainInputCriteria2.addEventListener('keydown', onKeywordEnter);
 
         if(elements.backToTopBtn) elements.backToTopBtn.addEventListener('click', scrollToTop);
         window.addEventListener('scroll', handleScroll);
@@ -1301,7 +1458,7 @@ const ExcelViewer = (() => {
             cacheElements();
             await loadFundConfig();
             bindEvents();
-            console.log("✅ ExcelViewer 初始化成功！");
+            console.log("✅ ExcelViewer 初始化成功！雙軌操作模式已啟動。");
         } catch (error) {
             console.error("❌ 初始化過程中發生錯誤：", error);
         }
