@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 第一階段優化版 (完整無刪減)
+ * ExcelViewer — 第一階段優化版 (修復上傳與拖曳失效問題)
  * 實作項目：
  * [A1] 清洗設定快取與免重傳重新套用
  * [A3] 合併視圖「最小化」保留狀態
@@ -19,18 +19,18 @@ const ExcelViewer = (() => {
   const state = {
     originalHtmlString: '',
     isProcessing: false,
-    loadedFiles:[],
+    loadedFiles: [],
     loadedTables: 0,
     zoomedCard: null,
 
     // [A1] 儲存解析後的原始 JSON，用於「重新套用清洗設定」而不必重新讀檔
-    rawSheetsCache:[],
+    rawSheetsCache: [],
     isSettingsDirty: false,
 
     // [A4] Undo 復原堆疊
     undoStack: [],
 
-    //[A3] 合併視圖狀態 (現在關閉時不會被清空)
+    // [A3] 合併視圖狀態 (現在關閉時不會被清空)
     isMergedView: false,
     isEditing: false,
     showTotalRow: false,
@@ -38,9 +38,9 @@ const ExcelViewer = (() => {
     mergedData: [],
     mergedHeaders: [],
 
-    fundSortOrder:[],
+    fundSortOrder: [],
     fundAliasMap: {},
-    fundAliasKeys:[],
+    fundAliasKeys: [],
   };
 
   // ─────────────────────────────────────────────
@@ -84,14 +84,14 @@ const ExcelViewer = (() => {
       });
     },
     calculateColumnWidths(data) {
-      if (!data.length) return[];
+      if (!data.length) return [];
       return data[0].map((_, col) => ({
         wch: Math.min(50, Math.max(10, ...data.map(r => (r[col] ? String(r[col]).length : 0))) + 2),
       }));
     }
   };
 
-  /**[A4] Undo 管理器 */
+  /** [A4] Undo 管理器 */
   const undoManager = {
     push(description, restoreFn) {
       state.undoStack.push({ description, restoreFn });
@@ -108,10 +108,13 @@ const ExcelViewer = (() => {
     showToast(desc) {
       const toast = el.get('undoToast');
       if (toast) {
-        el.get('undoText').textContent = `已${desc}`;
+        const textEl = el.get('undoText');
+        if (textEl) textEl.textContent = `已${desc}`;
         toast.classList.add('show');
         clearTimeout(this.timer);
         this.timer = setTimeout(() => this.hideToast(), 8000); // 8 秒後消失
+      } else {
+        console.log(`[系統提示] 可復原操作: 已${desc}`);
       }
     },
     hideToast() {
@@ -185,8 +188,8 @@ const ExcelViewer = (() => {
   function resetControls() {
     state.originalHtmlString = '';
     ['searchInput', 'selectKeywordInput'].forEach(id => { const e = el.get(id); if (e) e.value = ''; });
-    el.get('selectKeywordRegex').checked = false;
-    el.get('controlPanel').classList.add('hidden');
+    if (el.get('selectKeywordRegex')) el.get('selectKeywordRegex').checked = false;
+    el.get('controlPanel')?.classList.add('hidden');
     updateSelectionInfo();
   }
 
@@ -211,18 +214,18 @@ const ExcelViewer = (() => {
     const skipCount = el.get('skipTopRowsCheckbox')?.checked ? parseInt(el.get('skipTopRowsInput').value, 10) || 0 : 0;
     const removeEmpty = el.get('removeEmptyRowsCheckbox')?.checked ?? false;
     const removeKeywords = el.get('removeKeywordRowsCheckbox')?.checked ?? false;
-    const keywords = removeKeywords
+    const keywords = removeKeywords && el.get('removeKeywordRowsInput')
       ? el.get('removeKeywordRowsInput').value.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
-      :[];
+      : [];
 
     const colProps = sheet['!cols'] || [];
-    const rowProps = sheet['!rows'] ||[];
-    const visibleCols =[];
+    const rowProps = sheet['!rows'] || [];
+    const visibleCols = [];
     for (let c = startCol; c <= endCol; c++) {
       if (!(colProps[c] && colProps[c].hidden)) visibleCols.push(c - startCol);
     }
 
-    const result =[];
+    const result = [];
     jsonData.forEach((row, idx) => {
       if (idx < skipCount) return; // 防線一
       const absRow = startRow + idx;
@@ -247,16 +250,19 @@ const ExcelViewer = (() => {
     if (!files.length) { alert('請上傳 Excel 檔案'); return; }
     if (state.isProcessing) return;
 
-    const importMode = document.querySelector('input[name="import-mode"]:checked').value;
-    const sheetCriteria = { name: el.get('specificSheetNameInput').value.trim(), position: el.get('specificSheetPositionInput').value.trim() };
+    const importMode = document.querySelector('input[name="import-mode"]:checked')?.value || 'first';
+    const sheetCriteria = { 
+        name: el.get('specificSheetNameInput')?.value.trim() || '', 
+        position: el.get('specificSheetPositionInput')?.value.trim() || '' 
+    };
 
     state.isProcessing = true;
     el.get('displayArea').innerHTML = '<div class="loading">讀取中...</div>';
     resetControls();
     
     state.rawSheetsCache = []; 
-    state.loadedFiles =[];
-    const tablesToRender =[];
+    state.loadedFiles = [];
+    const tablesToRender = [];
 
     try {
       for (let i = 0; i < files.length; i++) {
@@ -316,6 +322,8 @@ const ExcelViewer = (() => {
       el.get('displayArea').innerHTML = `<p style="color:red;">處理錯誤：${err.message}</p>`;
     } finally {
       state.isProcessing = false;
+      // 確保重置 fileInput，這樣即使上傳完全一模一樣的檔案也能正常觸發 change 事件
+      if (el.get('fileInput')) el.get('fileInput').value = '';
     }
   }
 
@@ -326,7 +334,7 @@ const ExcelViewer = (() => {
     
     setTimeout(() => {
       const tablesToRender = [];
-      state.loadedFiles =[];
+      state.loadedFiles = [];
       
       state.rawSheetsCache.forEach(cache => {
         const filtered = applyPreprocessing(
@@ -353,18 +361,18 @@ const ExcelViewer = (() => {
   function markSettingsDirty() {
     if (state.loadedTables > 0) {
       state.isSettingsDirty = true;
-      el.get('reapplyBanner').classList.remove('hidden');
+      el.get('reapplyBanner')?.classList.remove('hidden'); // 加入 ?. 保護
     }
   }
 
   function markSettingsClean() {
     state.isSettingsDirty = false;
-    el.get('reapplyBanner').classList.add('hidden');
+    el.get('reapplyBanner')?.classList.add('hidden'); // 加入 ?. 保護
   }
 
   async function getSelectedSheetNames(filename, workbook, mode, criteria) {
     const names = workbook.SheetNames;
-    if (!names.length) return[];
+    if (!names.length) return [];
     if (mode === 'first') return [names[0]];
     if (mode === 'specific') return names.filter(n => n.toLowerCase().includes(criteria.name.toLowerCase()));
     if (mode === 'position') return utils.parsePositionString(criteria.position).map(i => names[i]).filter(Boolean);
@@ -453,7 +461,7 @@ const ExcelViewer = (() => {
       tableHeaderMap.set(table, headers);
     });
 
-    const tableData =[];
+    const tableData = [];
     tables.forEach(table => {
       const headers = tableHeaderMap.get(table);
       if (!headers) return;
@@ -582,7 +590,7 @@ const ExcelViewer = (() => {
 
       state.mergedData = state.mergedData.filter((_, i) => !toDelete.has(i));
       renderMergedTable();
-      el.get('dedupResultPanel').classList.add('hidden');
+      el.get('dedupResultPanel')?.classList.add('hidden'); // 加入 ?. 保護
 
     } else {
       const rows = Array.from(selected).map(cb => cb.closest('tr'));
@@ -713,7 +721,7 @@ const ExcelViewer = (() => {
 
     let matcher;
     try {
-      matcher = buildKeywordMatcher(keyword, regexEl.checked);
+      matcher = buildKeywordMatcher(keyword, regexEl?.checked || false);
     } catch (e) {
       alert('Regex 錯誤：' + e.message);
       return;
@@ -732,6 +740,7 @@ const ExcelViewer = (() => {
 
   function filterTable() {
     const inputEl = state.isMergedView ? el.get('searchInputMerged') : el.get('searchInput');
+    if (!inputEl) return;
     const keywords = inputEl.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
     const scope = getActiveScope();
 
@@ -753,7 +762,7 @@ const ExcelViewer = (() => {
     if (!state.isMergedView) return;
 
     const keyword = el.get('selectKeywordInputMerged').value.trim();
-    const isRegex = el.get('selectKeywordRegexMerged').checked;
+    const isRegex = el.get('selectKeywordRegexMerged')?.checked || false;
     let keywordMatcher = null;
     if (keyword) {
       try { keywordMatcher = buildKeywordMatcher(keyword, isRegex); }
@@ -809,11 +818,11 @@ const ExcelViewer = (() => {
 
   function toggleEditMode(startEditing) {
     state.isEditing = startEditing;
-    el.get('editDataBtn').classList.toggle('hidden', startEditing);
-    el.get('saveEditsBtn').classList.toggle('hidden', !startEditing);
-    el.get('cancelEditsBtn').classList.toggle('hidden', !startEditing);
+    el.get('editDataBtn')?.classList.toggle('hidden', startEditing);
+    el.get('saveEditsBtn')?.classList.toggle('hidden', !startEditing);
+    el.get('cancelEditsBtn')?.classList.toggle('hidden', !startEditing);
     
-    const toggleIds =[
+    const toggleIds = [
       'addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn',
       'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn',
       'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2',
@@ -825,7 +834,7 @@ const ExcelViewer = (() => {
       if (elem) elem.disabled = startEditing;
     });
 
-    ['inputCriteria1', 'inputCriteria2'].forEach(id => { el.get(id).disabled = true; });
+    ['inputCriteria1', 'inputCriteria2'].forEach(id => { if (el.get(id)) el.get(id).disabled = true; });
     document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]')
       .forEach(r => r.disabled = startEditing);
 
@@ -833,7 +842,7 @@ const ExcelViewer = (() => {
   }
   
   function saveEdits() {
-    const backupData =[...state.mergedData];
+    const backupData = [...state.mergedData];
     const newData = Array.from(el.get('mergeViewContent').querySelectorAll('tbody tr')).map(tr => {
       const row = {};
       const origIdx = parseInt(tr.dataset.rowIndex, 10);
@@ -879,8 +888,10 @@ const ExcelViewer = (() => {
     if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
     state.showSourceColumn = !state.showSourceColumn;
     renderMergedTable();
-    el.get('toggleSourceColBtn').textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
-    el.get('toggleSourceColBtn').classList.toggle('active', state.showSourceColumn);
+    if(el.get('toggleSourceColBtn')){
+        el.get('toggleSourceColBtn').textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
+        el.get('toggleSourceColBtn').classList.toggle('active', state.showSourceColumn);
+    }
   }
 
   function calculateTotals() {
@@ -926,7 +937,7 @@ const ExcelViewer = (() => {
   }
 
   function toggleColumnModal(show) {
-    el.get('columnModal').classList.toggle('hidden', !show);
+    el.get('columnModal')?.classList.toggle('hidden', !show);
   }
 
   function applyColumnChanges() {
@@ -956,7 +967,7 @@ const ExcelViewer = (() => {
   // ─────────────────────────────────────────────
 
   function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
-    const data =[];
+    const data = [];
     const headerRow = table.querySelector('thead tr');
     if (headerRow) {
       const headers = Array.from(headerRow.querySelectorAll('th:not(.checkbox-cell):not(.column-hidden)'))
@@ -1016,7 +1027,7 @@ const ExcelViewer = (() => {
     );
     if (!tables.length) { alert('沒有可匯出的表格。'); return; }
 
-    const allData =[];
+    const allData = [];
     tables.forEach((table, i) => {
       const data = extractTableData(table, { includeFilename: true });
       if (data.length > 1) allData.push(...(i === 0 ? data : data.slice(1)));
@@ -1077,7 +1088,7 @@ const ExcelViewer = (() => {
   // ─────────────────────────────────────────────
 
   function executeSmartDeduplication() {
-    const keyCol = el.get('dedupColSelect').value;
+    const keyCol = el.get('dedupColSelect')?.value;
     if (!keyCol) return;
 
     const groups = {};
@@ -1116,12 +1127,16 @@ const ExcelViewer = (() => {
       });
     });
 
-    el.get('dedupModal').classList.add('hidden');
+    el.get('dedupModal')?.classList.add('hidden');
     syncCheckboxesInScope();
 
     if (markedCount > 0) {
-      el.get('dedupResultText').innerHTML = `🎯 <b>智慧去重完成：</b> 已為您自動標記並勾選了 <b>${markedCount}</b> 筆不符合來源規則的舊資料。`;
-      el.get('dedupResultPanel').classList.remove('hidden');
+      if (el.get('dedupResultText')) {
+          el.get('dedupResultText').innerHTML = `🎯 <b>智慧去重完成：</b> 已為您自動標記並勾選了 <b>${markedCount}</b> 筆不符合來源規則的舊資料。`;
+      } else {
+          alert(`🎯 智慧去重完成：\n已為您自動標記並勾選了 ${markedCount} 筆不符合來源規則的舊資料。`);
+      }
+      el.get('dedupResultPanel')?.classList.remove('hidden');
     } else {
       undoManager.showToast('未發現需要處理的重複資料');
     }
@@ -1132,7 +1147,7 @@ const ExcelViewer = (() => {
       tr.classList.remove('dedup-marked');
       tr.querySelector('.row-checkbox').checked = false;
     });
-    el.get('dedupResultPanel').classList.add('hidden');
+    el.get('dedupResultPanel')?.classList.add('hidden');
     syncCheckboxesInScope();
   }
 
@@ -1142,26 +1157,28 @@ const ExcelViewer = (() => {
 
   function updateDropAreaDisplay() {
     const hasFiles = state.loadedTables > 0;
-    el.get('dropArea').classList.toggle('compact', hasFiles);
-    el.get('dropAreaInitial').classList.toggle('hidden', hasFiles);
-    el.get('dropAreaLoaded').classList.toggle('hidden', !hasFiles);
-    el.get('importOptionsContainer').classList.toggle('hidden', hasFiles);
-    if (hasFiles) {
+    el.get('dropArea')?.classList.toggle('compact', hasFiles);
+    el.get('dropAreaInitial')?.classList.toggle('hidden', hasFiles);
+    el.get('dropAreaLoaded')?.classList.toggle('hidden', !hasFiles);
+    el.get('importOptionsContainer')?.classList.toggle('hidden', hasFiles);
+    if (hasFiles && el.get('fileCount') && el.get('fileNames')) {
       el.get('fileCount').textContent = state.loadedTables;
       el.get('fileNames').textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
     }
   }
 
   function showControls(hiddenCount) { 
-    el.get('controlPanel').classList.remove('hidden'); 
-    el.get('mergeViewBtn').classList.toggle('hidden', state.loadedTables <= 1); 
-    el.get('showHiddenBtn').classList.toggle('hidden', hiddenCount === 0);
+    el.get('controlPanel')?.classList.remove('hidden'); 
+    el.get('mergeViewBtn')?.classList.toggle('hidden', state.loadedTables <= 1); 
+    el.get('showHiddenBtn')?.classList.toggle('hidden', hiddenCount === 0);
   }
 
   function updateSelectionInfo() {
     const selected = el.get('displayArea').querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
-    el.get('selectedTablesList').textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
-    el.get('selectedTablesInfo').classList.toggle('hidden', selected.length === 0);
+    if(el.get('selectedTablesList')) {
+        el.get('selectedTablesList').textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
+    }
+    el.get('selectedTablesInfo')?.classList.toggle('hidden', selected.length === 0);
   }
 
   function detectHiddenElements() {
@@ -1179,22 +1196,23 @@ const ExcelViewer = (() => {
   function clearAllFiles(silent = false) {
     if (!silent && !confirm('確定清除所有檔案？')) return;
     if (state.isMergedView) closeMergeView();
-    state.originalHtmlString = ''; state.loadedFiles =[]; state.loadedTables = 0; state.rawSheetsCache =[];
-    el.get('displayArea').innerHTML = ''; el.get('fileInput').value = '';
+    state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
+    el.get('displayArea').innerHTML = ''; 
+    if (el.get('fileInput')) el.get('fileInput').value = '';
     updateDropAreaDisplay(); resetControls(); setViewMode('list');
   }
 
   function setViewMode(mode) {
     const isGrid = mode === 'grid';
-    el.get('displayArea').classList.toggle('grid-view', isGrid);
-    el.get('displayArea').classList.toggle('list-view', !isGrid);
-    el.get('gridViewBtn').classList.toggle('active', isGrid);
-    el.get('listViewBtn').classList.toggle('active', !isGrid);
-    el.get('gridScaleControl').classList.toggle('hidden', !isGrid);
+    el.get('displayArea')?.classList.toggle('grid-view', isGrid);
+    el.get('displayArea')?.classList.toggle('list-view', !isGrid);
+    el.get('gridViewBtn')?.classList.toggle('active', isGrid);
+    el.get('listViewBtn')?.classList.toggle('active', !isGrid);
+    el.get('gridScaleControl')?.classList.toggle('hidden', !isGrid);
   }
 
   function updateGridScale() {
-    el.get('displayArea').style.setProperty('--grid-columns', el.get('gridScaleSlider').value);
+    el.get('displayArea')?.style.setProperty('--grid-columns', el.get('gridScaleSlider').value);
   }
 
   function showAllHiddenElements() {
@@ -1203,13 +1221,15 @@ const ExcelViewer = (() => {
     );
     if (!hidden.length) return;
     hidden.forEach(el => el.style.display = '');
-    el.get('showHiddenBtn').classList.add('hidden');
-    el.get('loadStatusMessage').classList.add('hidden');
+    el.get('showHiddenBtn')?.classList.add('hidden');
+    el.get('loadStatusMessage')?.classList.add('hidden');
   }
 
   function toggleToolbar() {
-    const collapsed = el.get('collapsibleToolbar').classList.toggle('collapsed');
-    el.get('toggleToolbarBtn').textContent = collapsed ? '展開工具列' : '收合工具列';
+    const collapsed = el.get('collapsibleToolbar')?.classList.toggle('collapsed');
+    if (el.get('toggleToolbarBtn')) {
+        el.get('toggleToolbarBtn').textContent = collapsed ? '展開工具列' : '收合工具列';
+    }
   }
 
   function scrollToTop() {
@@ -1217,7 +1237,7 @@ const ExcelViewer = (() => {
   }
 
   function handleScroll() {
-    el.get('backToTopBtn').classList.toggle('visible', window.scrollY > window.innerHeight / 2);
+    el.get('backToTopBtn')?.classList.toggle('visible', window.scrollY > window.innerHeight / 2);
   }
 
   function openPreview(card) {
@@ -1239,8 +1259,8 @@ const ExcelViewer = (() => {
     if (!state.originalHtmlString) return;
     el.get('displayArea').innerHTML = state.originalHtmlString;
     injectCheckboxes(el.get('displayArea'));
-    ['searchInput', 'selectKeywordInput'].forEach(id => { el.get(id).value = ''; });
-    el.get('selectKeywordRegex').checked = false;
+    ['searchInput', 'selectKeywordInput'].forEach(id => { if(el.get(id)) el.get(id).value = ''; });
+    if(el.get('selectKeywordRegex')) el.get('selectKeywordRegex').checked = false;
     filterTable();
     updateSelectionInfo();
     setViewMode('list');
@@ -1266,33 +1286,37 @@ const ExcelViewer = (() => {
     const dropArea = el.get('dropArea');
     const fileInput = el.get('fileInput');
 
-    // ── 1. 上傳與拖曳事件 (增加防呆與錯誤檢查) ──
+    // ── 1. 上傳與拖曳事件 (修復防呆與事件攔截) ──
     if (dropArea && fileInput) {
-      ['dragenter', 'dragover'].forEach(e => dropArea.addEventListener(e, ev => { 
-        ev.preventDefault(); 
-        dropArea.classList.add('highlight'); 
-      }));
+      // 阻止預設行為與事件冒泡 (重要：防止拖放時被瀏覽器開啟)
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, ev => { 
+          ev.preventDefault(); 
+          ev.stopPropagation(); 
+        });
+      });
       
-      ['dragleave', 'drop'].forEach(e => dropArea.addEventListener(e, ev => { 
-        ev.preventDefault(); 
-        dropArea.classList.remove('highlight'); 
-      }));
+      ['dragenter', 'dragover'].forEach(e => dropArea.addEventListener(e, () => dropArea.classList.add('highlight')));
+      ['dragleave', 'drop'].forEach(e => dropArea.addEventListener(e, () => dropArea.classList.remove('highlight')));
       
-      dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
+      dropArea.addEventListener('drop', e => {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) processFiles(files);
+      });
       
-      // 確保點擊外框或按鈕時能正確觸發 input，並防止無限迴圈
+      // 確保點擊時觸發 fileInput，並排除清除檔案按鈕 (重要修復)
       dropArea.addEventListener('click', (e) => {
-        if (e.target !== fileInput) {
-          fileInput.click();
+        if (e.target.id === 'clear-files-btn' || e.target.closest('.btn-clear') || e.target === fileInput) {
+          return; // 若點擊的是清除按鈕或 input 本身，則不觸發上傳
         }
+        fileInput.click();
       });
 
       fileInput.addEventListener('change', e => {
-        processFiles(e.target.files);
-        e.target.value = ''; // 清空 value，確保重複上傳同一個檔案也能觸發
+        if (e.target.files && e.target.files.length > 0) {
+          processFiles(e.target.files);
+        }
       });
-    } else {
-      console.error("❌ 找不到上傳區塊 (dropArea) 或檔案輸入框 (fileInput)！");
     }
 
     el.get('clearFilesBtn')?.addEventListener('click', () => clearAllFiles(false));
@@ -1301,16 +1325,17 @@ const ExcelViewer = (() => {
     el.get('importOptionsContainer')?.addEventListener('change', e => {
       if (e.target.name !== 'import-mode') return;
       const mode = e.target.value;
-      el.get('specificSheetNameGroup').classList.toggle('hidden', mode !== 'specific');
-      el.get('specificSheetPositionGroup').classList.toggle('hidden', mode !== 'position');
+      el.get('specificSheetNameGroup')?.classList.toggle('hidden', mode !== 'specific');
+      el.get('specificSheetPositionGroup')?.classList.toggle('hidden', mode !== 'position');
     });
 
-    // ── 3. 預處理開關與重新套用 [A1] ──['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
+    // ── 3. 預處理開關與重新套用 [A1] ──
+    ['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
       el.get(id)?.addEventListener('change', markSettingsDirty);
       el.get(id)?.addEventListener('input', utils.debounce(markSettingsDirty, 500));
     });
-    el.get('skipTopRowsCheckbox')?.addEventListener('change', e => el.get('skipTopRowsInput').disabled = !e.target.checked);
-    el.get('removeKeywordRowsCheckbox')?.addEventListener('change', e => el.get('removeKeywordRowsInput').disabled = !e.target.checked);
+    el.get('skipTopRowsCheckbox')?.addEventListener('change', e => { if (el.get('skipTopRowsInput')) el.get('skipTopRowsInput').disabled = !e.target.checked; });
+    el.get('removeKeywordRowsCheckbox')?.addEventListener('change', e => { if (el.get('removeKeywordRowsInput')) el.get('removeKeywordRowsInput').disabled = !e.target.checked; });
     el.get('reapplySettingsBtn')?.addEventListener('click', reapplyPreprocessing);
 
     // ── 4. 視圖切換 ──
@@ -1369,9 +1394,9 @@ const ExcelViewer = (() => {
     el.get('modalUncheckAll')?.addEventListener('click', () => { el.get('columnChecklist').querySelectorAll('input').forEach(i => i.checked = false); });
 
     // ── 12. 智慧去重 [B3] ──
-    el.get('smartDedupBtn')?.addEventListener('click', () => { el.get('dedupColSelect').innerHTML = state.mergedHeaders.map(h=>`<option>${h}</option>`).join(''); el.get('dedupModal').classList.remove('hidden'); });
-    el.get('closeDedupModalBtn')?.addEventListener('click', () => el.get('dedupModal').classList.add('hidden'));
-    el.get('cancelDedupBtn')?.addEventListener('click', () => el.get('dedupModal').classList.add('hidden'));
+    el.get('smartDedupBtn')?.addEventListener('click', () => { if(el.get('dedupColSelect')) { el.get('dedupColSelect').innerHTML = state.mergedHeaders.map(h=>`<option>${h}</option>`).join(''); el.get('dedupModal').classList.remove('hidden'); }});
+    el.get('closeDedupModalBtn')?.addEventListener('click', () => el.get('dedupModal')?.classList.add('hidden'));
+    el.get('cancelDedupBtn')?.addEventListener('click', () => el.get('dedupModal')?.classList.add('hidden'));
     el.get('executeDedupBtn')?.addEventListener('click', executeSmartDeduplication);
     el.get('clearDedupMarksBtn')?.addEventListener('click', clearDedupMarks);
     el.get('deleteDedupMarksBtn')?.addEventListener('click', () => deleteSelectedRows());
@@ -1411,7 +1436,7 @@ const ExcelViewer = (() => {
     const onKeywordEnter = e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      state.isMergedView ? el.get('executeFilterSelectionBtn').click() : el.get('selectByKeywordBtn').click();
+      state.isMergedView ? el.get('executeFilterSelectionBtn')?.click() : el.get('selectByKeywordBtn')?.click();
     };
     el.get('selectKeywordInput')?.addEventListener('keydown', onKeywordEnter);
     el.get('selectKeywordInputMerged')?.addEventListener('keydown', onKeywordEnter);
@@ -1424,8 +1449,8 @@ const ExcelViewer = (() => {
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoManager.undoLast(); }
       if (e.key === 'Escape') {
-        if (!el.get('columnModal').classList.contains('hidden')) { toggleColumnModal(false); }
-        else if (!el.get('dedupModal').classList.contains('hidden')) { el.get('dedupModal').classList.add('hidden'); }
+        if (el.get('columnModal') && !el.get('columnModal').classList.contains('hidden')) { toggleColumnModal(false); }
+        else if (el.get('dedupModal') && !el.get('dedupModal').classList.contains('hidden')) { el.get('dedupModal').classList.add('hidden'); }
         else if (state.isMergedView) { closeMergeView(); }
         else if (state.zoomedCard) { closePreview(); }
       }
@@ -1451,7 +1476,6 @@ const ExcelViewer = (() => {
   return { init };
 })();
 
-// 確保在各種載入情況下（包含 GitHub Pages 延遲載入）都能正確執行
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', ExcelViewer.init);
 } else {
