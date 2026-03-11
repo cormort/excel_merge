@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極黃金版 (極速防假死、複合條件收合、表頭壓縮換行、雙軌操作)
+ * ExcelViewer — 不卡死極速版 (實體邊界掃描、非同步 UI 釋放、雙軌全功能)
  */
 
 const ExcelViewer = (() => {
@@ -221,12 +221,12 @@ const ExcelViewer = (() => {
         });
     }
 
-    // 🚀 【效能引擎修復】：O(1) 快取防重複、forEach 跳空行、(欄位 X) 動態標題
+    // 🚀 【核心效能引擎】：強制邊界檢測，切斷所有幽靈資料
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
         const headerCount = useHeaderCompression && elements.headerRowsInput ? parseInt(elements.headerRowsInput.value, 10) || 1 : 1;
-        const totalSkipCount = discardCount + headerCount;
+        const totalSkipCount = useHeaderCompression ? (discardCount + headerCount) : 0;
 
         const removeEmpty = elements.removeEmptyRowsCheckbox ? elements.removeEmptyRowsCheckbox.checked : false;
         const removeKeywords = elements.removeKeywordRowsCheckbox ? elements.removeKeywordRowsCheckbox.checked : false;
@@ -235,80 +235,82 @@ const ExcelViewer = (() => {
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
 
-        // 動態抓取真實寬度，避免 Excel 的無限空白欄位
-        let maxDataColIdx = -1;
-        jsonData.forEach(row => {
-            if (row && row.length > 0) {
-                const maxKey = row.length - 1;
-                if (maxKey > maxDataColIdx) maxDataColIdx = maxKey;
+        // 1. 找出真正的資料寬度，忽略格式造成的假空白欄位
+        let actualMaxCol = -1;
+        for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (row) {
+                for (let j = row.length - 1; j >= 0; j--) {
+                    if (row[j] !== undefined && row[j] !== null && String(row[j]).trim() !== '') {
+                        if (j > actualMaxCol) actualMaxCol = j;
+                        break;
+                    }
+                }
             }
-        });
-        const effectiveEndCol = Math.min(endCol, startCol + Math.max(maxDataColIdx, 0));
+        }
+        if (actualMaxCol === -1) return []; // 整張表都是空的
 
         const visibleCols = [];
-        for (let c = startCol; c <= effectiveEndCol; c++) {
-            if (!(colProps[c] && colProps[c].hidden)) visibleCols.push(c - startCol);
+        for (let c = 0; c <= actualMaxCol; c++) {
+            const absCol = startCol + c;
+            if (!(colProps[absCol] && colProps[absCol].hidden)) {
+                visibleCols.push(c);
+            }
         }
 
         const result = [];
-        const usedNames = new Map(); // O(1) 快取，防卡死
+        const usedNames = new Set();
 
-        if (jsonData.length > discardCount) {
-            const headerRow = visibleCols.map((colRelativeIdx, index) => { 
-                const actualColIdx = startCol + colRelativeIdx;
+        // 2. 處理壓縮表頭
+        if (useHeaderCompression && jsonData.length > discardCount) {
+            const headerRow = visibleCols.map((colIdx, index) => {
                 const headerParts = [];
-                
                 const scanEnd = Math.min(discardCount + headerCount, jsonData.length);
                 for (let r = discardCount; r < scanEnd; r++) {
-                    if (jsonData[r]) {
-                        const cellVal = jsonData[r][actualColIdx];
-                        if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
-                            headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
-                        }
+                    if (jsonData[r] && jsonData[r][colIdx] !== undefined) {
+                        const val = String(jsonData[r][colIdx]).trim();
+                        if (val !== '') headerParts.push(val.replace(/\r?\n|\r/g, ''));
                     }
                 }
-                
                 const uniqueParts = [...new Set(headerParts)];
                 const colLabel = `(欄位 ${index + 1})`;
-                const partsString = uniqueParts.join('\n');
-                
-                // 讓下拉選單與表格標題完美顯示 (欄位 1) \n 標題
-                let baseName = partsString ? `${colLabel}\n${partsString}` : colLabel;
+                let baseName = uniqueParts.length > 0 ? `${colLabel}\n${uniqueParts.join('\n')}` : colLabel;
                 
                 let uniqueName = baseName;
-                if (usedNames.has(baseName)) {
-                    let count = usedNames.get(baseName) + 1;
-                    uniqueName = `${baseName}_${count}`;
-                    usedNames.set(baseName, count);
-                } else {
-                    usedNames.set(baseName, 1);
+                let counter = 2;
+                while (usedNames.has(uniqueName)) {
+                    uniqueName = `${baseName}_${counter}`;
+                    counter++;
                 }
+                usedNames.add(uniqueName);
                 return uniqueName;
             });
             result.push(headerRow);
         }
 
-        jsonData.forEach((row, idx) => {
-            if (idx < totalSkipCount) return; 
-            if (!row) return;
-
-            const absRow = startRow + idx;
-            if (rowProps[absRow]?.hidden) return; 
-
-            const newRow = visibleCols.map(i => (row[i] !== undefined ? row[i] : ''));
-            const isEmpty = newRow.every(c => String(c).trim() === '');
-            if (removeEmpty && isEmpty) return; 
-
-            if (keywords.length > 0 && !isEmpty) {
-                const content = newRow.join(' ').toLowerCase();
-                if (keywords.some(k => content.includes(k))) return; 
-            }
+        // 3. 處理資料列
+        for (let idx = totalSkipCount; idx < jsonData.length; idx++) {
+            const row = jsonData[idx];
+            if (!row) continue;
             
-            if (newRow.some(cell => String(cell).trim() !== '')) {
+            const absRow = startRow + idx;
+            if (rowProps[absRow] && rowProps[absRow].hidden) continue;
+
+            const newRow = visibleCols.map(c => row[c] !== undefined ? String(row[c]).trim() : '');
+            
+            if (removeEmpty && newRow.every(val => val === '')) continue;
+            
+            if (keywords.length > 0 && newRow.some(val => val !== '')) {
+                const rowText = newRow.join(' ').toLowerCase();
+                if (keywords.some(k => rowText.includes(k))) continue;
+            }
+
+            // 只要不是全空就加入
+            if (newRow.some(val => val !== '')) {
                 result.push(newRow);
             }
-        });
-        
+        }
+
         return result;
     }
 
@@ -323,7 +325,7 @@ const ExcelViewer = (() => {
         const sheetCriteria = { name: elements.specificSheetNameInput?.value.trim() || '', position: elements.specificSheetPositionInput?.value.trim() || '' };
 
         state.isProcessing = true;
-        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">高速讀取中...</div>';
+        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">正在準備解析...</div>';
         resetControls(true);
         state.rawSheetsCache = []; state.loadedFiles = [];
         const tablesToRender = [];
@@ -331,7 +333,10 @@ const ExcelViewer = (() => {
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if(elements.displayArea) elements.displayArea.innerHTML = `<div class="loading">高速讀取中... (${i + 1}/${files.length})</div>`;
+                
+                // 🚀 UI 非同步釋放：讓瀏覽器有時間畫出載入畫面，不會卡死成全白
+                if(elements.displayArea) elements.displayArea.innerHTML = `<div class="loading">高速讀取中... 檔案 (${i + 1}/${files.length}) : ${file.name}</div>`;
+                await new Promise(r => setTimeout(r, 20));
 
                 const binary = await utils.readFileAsBinary(file);
                 const workbook = XLSX.read(binary, { type: 'binary', cellStyles: true });
@@ -340,31 +345,37 @@ const ExcelViewer = (() => {
                 for (const sheetName of sheetNames) {
                     const sheet = workbook.Sheets[sheetName];
                     const ref = sheet['!ref'];
-                    const range = ref ? XLSX.utils.decode_range(ref) : { s: { r: 0, c: 0 }, e: { c: 0 } };
+                    if (!ref) continue;
+                    const range = XLSX.utils.decode_range(ref);
                     
-                    // 🚀🚀🚀 【極限安全閥】：強制切斷幽靈資料範圍！
-                    range.e.r = Math.min(range.e.r, range.s.r + 8000); 
-                    range.e.c = Math.min(range.e.c, range.s.c + 150);
-
+                    // 🚀 極限安全閥：無情切斷超過 10000 列的幽靈格式，防止記憶體崩潰
+                    range.e.r = Math.min(range.e.r, range.s.r + 10000); 
+                    
+                    // 取出為 Sparse Array (沒有 defval)，大幅節省記憶體
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, range: range, raw: false });
+
+                    // 找出實際最寬的欄位，防止合併儲存格的無窮迴圈
+                    let maxCol = 0;
+                    for(let r=0; r<jsonData.length; r++) {
+                        if(jsonData[r] && jsonData[r].length > maxCol) maxCol = jsonData[r].length;
+                    }
 
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
                             const startR = merge.s.r - range.s.r, startC = merge.s.c - range.s.c;
                             const endR = merge.e.r - range.s.r, endC = merge.e.c - range.s.c;
                             
-                            if (startR >= 0 && startC >= 0 && jsonData[startR]) {
-                                const primaryValue = jsonData[startR][startC];
-                                if (primaryValue === undefined || primaryValue === null || String(primaryValue).trim() === '') return;
-
-                                // 限定迴圈次數，避免假死
+                            if (startR >= 0 && startC >= 0 && jsonData[startR] && jsonData[startR][startC] !== undefined) {
+                                const val = jsonData[startR][startC];
+                                if (String(val).trim() === '') return;
+                                
                                 const maxR = Math.min(endR, jsonData.length - 1);
-                                const maxC = Math.min(endC, 150);
+                                const maxC = Math.min(endC, maxCol); // 限制橫向填滿
                                 
                                 for (let r = startR; r <= maxR; r++) {
                                     if (!jsonData[r]) jsonData[r] = [];
                                     for (let c = startC; c <= maxC; c++) {
-                                        jsonData[r][c] = primaryValue;
+                                        jsonData[r][c] = val;
                                     }
                                 }
                             }
@@ -382,6 +393,10 @@ const ExcelViewer = (() => {
                     }
                 }
             }
+            
+            if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">正在渲染表格畫面...</div>';
+            await new Promise(r => setTimeout(r, 20));
+
             state.loadedTables = tablesToRender.length;
             renderTables(tablesToRender);
             updateDropAreaDisplay();
@@ -950,111 +965,101 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
 
-    function executeCombinedSelection() {
-        if (!state.isMergedView || !elements.mergeViewContent) return;
-        
-        const col1 = elements.colSelect1?.value;
-        let col2 = elements.colSelect2?.value;
-        if (elements.mergeCondition2Wrapper && elements.mergeCondition2Wrapper.classList.contains('hidden')) {
-            col2 = ''; 
-        }
-        
-        const criteria1 = document.querySelector('input[name="criteria-1"]:checked')?.value;
-        const criteria2 = document.querySelector('input[name="criteria-2"]:checked')?.value;
-        const logicOp = document.querySelector('input[name="logic-op"]:checked')?.value ?? 'and';
-        const inputVal1 = elements.inputCriteria1?.value;
-        const inputVal2 = elements.inputCriteria2?.value;
-
-        if (!col1 && !col2) { alert('請輸入至少一個條件'); return; }
-        const checkValue = (cellVal, cr, val) => {
-            const s = String(cellVal).trim(), v = String(val).trim();
-            return cr === 'empty' ? s === '' : cr === 'zero' ? s === '0' : cr === 'value' ? s !== '' : cr === 'exact' ? s === v : cr === 'includes' ? v !== '' && s.toLowerCase().includes(v.toLowerCase()) : false;
-        };
-
-        let count = 0;
-        elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-            const checkbox = row.querySelector('.row-checkbox');
-            if (!checkbox) return;
-            const kMatch = false; 
-            let cMatch = false;
-            if (col1 || col2) {
-                const r1 = col1 ? checkValue(row.querySelector(`td[data-col-header="${col1}"]`)?.textContent ?? '', criteria1, inputVal1) : null;
-                const r2 = col2 ? checkValue(row.querySelector(`td[data-col-header="${col2}"]`)?.textContent ?? '', criteria2, inputVal2) : null;
-                cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
-            }
-            if (kMatch || cMatch) { checkbox.checked = true; count++; }
-        });
-        alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
-    }
-
-    function toggleEditMode(startEditing) {
-        state.isEditing = startEditing;
-        if(elements.editDataBtn) elements.editDataBtn.classList.toggle('hidden', startEditing);
-        if(elements.saveEditsBtn) elements.saveEditsBtn.classList.toggle('hidden', !startEditing);
-        if(elements.cancelEditsBtn) elements.cancelEditsBtn.classList.toggle('hidden', !startEditing);
-        
-        ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged', 'unselectMergedRowsBtn', 'smartDedupBtn'].forEach(id => { if (elements[id]) elements[id].disabled = startEditing; });
-        ['inputCriteria1', 'inputCriteria2'].forEach(id => { if (elements[id]) elements[id].disabled = true; });
-        document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => r.disabled = startEditing);
-        renderMergedTable();
-    }
-  
-    function saveEdits() {
-        const backupData = [...state.mergedData];
-        const newData = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr')).map(tr => {
-            const row = {};
-            const origIdx = parseInt(tr.dataset.rowIndex, 10);
-            row._sourceFile = state.showSourceColumn ? tr.querySelector('.source-col').textContent : (state.mergedData[origIdx]?._sourceFile || '(修改)');
-            tr.querySelectorAll('td[data-col-header]').forEach(cell => row[cell.dataset.colHeader] = cell.textContent);
-            return row;
-        });
-        undoManager.push('儲存編輯', () => { state.mergedData = backupData; if (state.isMergedView) renderMergedTable(); });
-        state.mergedData = newData;
-        toggleEditMode(false);
-    }
-
-    function addNewRow() {
-        const newRow = { _isNew: true, _sourceFile: '(新增資料列)' };
-        state.mergedHeaders.forEach(h => newRow[h] = '');
-        state.mergedData.unshift(newRow);
-        toggleEditMode(true);
-    }
-
-    function copySelectedRows() {
-        const selected = elements.mergeViewContent.querySelectorAll('.row-checkbox:checked');
-        if (!selected.length) { alert('請先勾選要複製的資料列。'); return; }
-        const copies = Array.from(selected).map(cb => {
-            const idx = parseInt(cb.closest('tr').dataset.rowIndex, 10);
-            if (isNaN(idx) || !state.mergedData[idx]) return null;
-            const copy = JSON.parse(JSON.stringify(state.mergedData[idx]));
-            copy._isNew = true; copy._sourceFile += ' (複製)';
-            return copy;
-        }).filter(Boolean);
-        state.mergedData.unshift(...copies);
-        toggleEditMode(true);
-    }
-
-    function toggleSourceColumn() {
-        if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
-        state.showSourceColumn = !state.showSourceColumn;
-        renderMergedTable();
-        if(elements.toggleSourceColBtn){
-            elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
-            elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
+    function updateDropAreaDisplay() {
+        const hasFiles = state.loadedTables > 0;
+        if(elements.dropArea) elements.dropArea.classList.toggle('compact', hasFiles);
+        if(elements.dropAreaInitial) elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
+        if(elements.dropAreaLoaded) elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
+        if(elements.importOptionsContainer) elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
+        if (hasFiles && elements.fileCount && elements.fileNames) {
+            elements.fileCount.textContent = state.loadedTables;
+            elements.fileNames.textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
         }
     }
 
-    function calculateTotals() {
-        const totals = {};
-        state.mergedHeaders.forEach(header => {
-            const sum = state.mergedData.reduce((acc, row) => {
-                const n = parseFloat(String(row[header] || '').replace(/,/g, ''));
-                return acc + (isNaN(n) ? 0 : n);
-            }, 0);
-            const hasAnyNumber = state.mergedData.some(row => !isNaN(parseFloat(String(row[header] || '').replace(/,/g, ''))));
-            if (sum !== 0 || hasAnyNumber) totals[header] = sum;
-        });
-        return totals;
+    function showControls(hiddenCount) { 
+        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden'); 
+        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); 
+        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.toggle('hidden', hiddenCount === 0);
+    }
+
+    function updateSelectionInfo() {
+        if(!elements.displayArea) return;
+        const selected = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
+        if(elements.selectedTablesList) elements.selectedTablesList.textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
+        if(elements.selectedTablesInfo) elements.selectedTablesInfo.classList.toggle('hidden', selected.length === 0);
+    }
+
+    function detectHiddenElements() { return elements.displayArea ? elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length : 0; }
+
+    function updateFileStateAfterDeletion() {
+        if(!elements.displayArea) return;
+        state.loadedTables = elements.displayArea.querySelectorAll('.table-wrapper').length;
+        if (!state.loadedTables) clearAllFiles(true); else { updateDropAreaDisplay(); updateSelectionInfo(); }
+    }
+
+    function clearAllFiles(silent = false) {
+        if (!silent && !confirm('確定清除所有檔案？')) return;
+        if (state.isMergedView) closeMergeView();
+        state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
+        if(elements.displayArea) elements.displayArea.innerHTML = ''; 
+        if (elements.fileInput) elements.fileInput.value = '';
+        updateDropAreaDisplay(); resetControls(); setViewMode('list');
+    }
+
+    function setViewMode(mode) {
+        const isGrid = mode === 'grid';
+        if(elements.displayArea) { elements.displayArea.classList.toggle('grid-view', isGrid); elements.displayArea.classList.toggle('list-view', !isGrid); }
+        if(elements.gridViewBtn) elements.gridViewBtn.classList.toggle('active', isGrid);
+        if(elements.listViewBtn) elements.listViewBtn.classList.toggle('active', !isGrid);
+        if(elements.gridScaleControl) elements.gridScaleControl.classList.toggle('hidden', !isGrid);
+    }
+
+    function updateGridScale() { if(elements.displayArea && elements.gridScaleSlider) elements.displayArea.style.setProperty('--grid-columns', elements.gridScaleSlider.value); }
+
+    function showAllHiddenElements() {
+        if(!elements.displayArea) return;
+        const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
+        if (!hidden.length) return;
+        hidden.forEach(el => el.style.display = '');
+        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.add('hidden');
+        if(elements.loadStatusMessage) elements.loadStatusMessage.classList.add('hidden');
+    }
+
+    function toggleToolbar() { if(elements.collapsibleToolbar) { const collapsed = elements.collapsibleToolbar.classList.toggle('collapsed'); if (elements.toggleToolbarBtn) elements.toggleToolbarBtn.textContent = collapsed ? '展開工具列' : '收合工具列'; } }
+    function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    function handleScroll() { if(elements.backToTopBtn) elements.backToTopBtn.classList.toggle('visible', window.scrollY > window.innerHeight / 2); }
+
+    function openPreview(card) {
+        if (state.zoomedCard) return;
+        card.classList.add('is-zoomed'); state.zoomedCard = card; document.body.classList.add('no-scroll');
+    }
+
+    function closePreview() {
+        if (!state.zoomedCard) return;
+        state.zoomedCard.classList.remove('is-zoomed'); state.zoomedCard = null; document.body.classList.remove('no-scroll');
+    }
+
+    function resetView() {
+        if (state.isMergedView) closeMergeView();
+        if (!state.originalHtmlString || !elements.displayArea) return;
+        elements.displayArea.innerHTML = state.originalHtmlString;
+        injectCheckboxes(elements.displayArea);
+        ['searchInput', 'selectKeywordInput'].forEach(id => { if(elements[id]) elements[id].value = ''; });
+        if(elements.selectKeywordRegex) elements.selectKeywordRegex.checked = false;
+        filterTable(); updateSelectionInfo(); setViewMode('list');
+    }
+
+    function handleCriteriaChange(e) {
+        const radio = e.target;
+        if (radio.type !== 'radio') return;
+        const group = radio.closest('.radio-group');
+        if (!group) return;
+        const target = elements[group.dataset.target];
+        if (!target) return;
+        const needsInput = radio.value === 'exact' || radio.value === 'includes';
+        target.disabled = !needsInput;
+        if (needsInput) { target.focus(); } else { target.value = ''; }
     }
 
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
@@ -1324,7 +1329,6 @@ const ExcelViewer = (() => {
             });
         }
         
-        // 🌟 合併畫面的收合按鈕事件
         if(elements.toggleMergeConditionBtn) {
             elements.toggleMergeConditionBtn.addEventListener('click', () => {
                 const isHidden = elements.mergeCondition2Wrapper.classList.toggle('hidden');
