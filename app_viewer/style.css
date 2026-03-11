@@ -805,9 +805,36 @@ tr.dedup-marked td:first-child {
     align-items: center;
 }
 
-/*🌟 允許表頭 (th) 換行顯示的魔法 */
+/* =========================================
+   🌟 表頭 (th) 優化：適度換行與寬度控制
+========================================= */
 table th, .table-content table th, #merge-view-content table th {
-    white-space: pre-wrap !important; /* 允許 \n 符號真實換行 */
-    vertical-align: bottom; /* 讓多行文字靠底部對齊，看起來更整齊 */
-    line-height: 1.4; /* 稍微增加行高，避免上下行字疊在一起 */
+    /* 1. 處理換行邏輯 */
+    white-space: pre-wrap !important; 
+    word-break: break-word; /* 允許長字串在邊界處自然換行，不會擠成直的 */
+    
+    /* 2. 控制尺寸，避免變成高牆 */
+    min-width: 80px;  /* 給每個欄位一個基本寬度 */
+    max-width: 250px; /* 限制最大寬度，避免「說明」欄位無限延伸 */
+    padding: 10px 8px !important; /* 增加一點內距讓文字呼吸 */
+    
+    /* 3. 對齊與排版 */
+    vertical-align: bottom; 
+    line-height: 1.4; 
+    text-align: center !important; /* 置中對齊在多行時視覺更平衡 */
 }
+
+/* 針對「說明」這種特別長但內容通常是空白的欄位，給予更大寬度限制 */
+table th:last-child {
+    max-width: 400px;
+}
+
+/* 確保資料列 (td) 也能配合適度換行，特別是「說明」欄位 */
+table td, .table-content table td, #merge-view-content table td {
+    max-width: 300px;
+    white-space: normal !important; /* 允許資料列自然換行 */
+    word-break: break-word;
+    vertical-align: top; /* 資料列靠上對齊比較好閱讀 */
+    line-height: 1.5;
+}
+
