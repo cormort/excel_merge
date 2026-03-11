@@ -871,3 +871,38 @@ td.source-col + td {
 td.checkbox-cell, th.checkbox-cell {
     text-align: center !important;
 }
+/* =========================================
+   🌟 高密度資料檢視：最佳化字體與列高
+========================================= */
+
+/* 1. 全局縮小表格字體至 12px (0.75rem)，保持清晰但極致緊湊 */
+.table-content table, 
+#merge-view-content table {
+    font-size: 12px !important; 
+}
+
+/* 2. 大幅縮減儲存格的上下左右留白 (這是讓螢幕塞下更多列的關鍵) */
+.table-content th, 
+.table-content td, 
+#merge-view-content th, 
+#merge-view-content td {
+    padding: 3px 6px !important; /* 將原本寬鬆的留白壓縮至極限 */
+    line-height: 1.3 !important; /* 讓換行的文字也靠得更緊湊 */
+}
+
+/* 3. 稍微縮小核取方塊的佔位，避免撐開列高 */
+.table-content table td.checkbox-cell, 
+.table-content table th.checkbox-cell,
+#merge-view-content table td.checkbox-cell,
+#merge-view-content table th.checkbox-cell {
+    width: 24px !important;
+    padding: 2px !important;
+}
+
+/* 4. 針對核取方塊本身微調大小 */
+.row-checkbox, .table-select-checkbox, input[id^="select-all-cb"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    cursor: pointer;
+}
