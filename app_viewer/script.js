@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極完整版 (主畫面與合併畫面雙軌全功能：編輯、複製、進階篩選、智慧去重)
+ * ExcelViewer — 終極效能修復版 (防堵無限迴圈、記憶體優化、雙軌全功能)
  */
 
 const ExcelViewer = (() => {
@@ -18,7 +18,6 @@ const ExcelViewer = (() => {
         isSettingsDirty: false,
         undoStack: [],
 
-        // 追蹤當前操作環境
         columnModalContext: 'main', 
         dedupContext: 'main',
         mainViewHiddenColumns: new Set(),
@@ -32,7 +31,7 @@ const ExcelViewer = (() => {
         mergedHeaders: [],
 
         fundSortOrder: [],
-        fundAliasMap: [],
+        fundAliasMap: {}, // 修正為物件
         fundAliasKeys: [],
     };
 
@@ -136,16 +135,11 @@ const ExcelViewer = (() => {
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
             
-            // 🌟 主畫面專屬進階功能 
             mainColumnOperationsBtn: 'main-column-operations-btn',
-            mainSmartDedupBtn: 'main-smart-dedup-btn',
-            mainEditDataBtn: 'main-edit-data-btn',
-            mainSaveEditsBtn: 'main-save-edits-btn',
-            mainCopyRowsBtn: 'main-copy-rows-btn',
-            mainColSelect1: 'main-col-select-1',
-            mainColSelect2: 'main-col-select-2',
-            mainInputCriteria1: 'main-input-criteria-1',
-            mainInputCriteria2: 'main-input-criteria-2',
+            mainSmartDedupBtn: 'main-smart-dedup-btn', mainEditDataBtn: 'main-edit-data-btn',
+            mainSaveEditsBtn: 'main-save-edits-btn', mainCopyRowsBtn: 'main-copy-rows-btn',
+            mainColSelect1: 'main-col-select-1', mainColSelect2: 'main-col-select-2',
+            mainInputCriteria1: 'main-input-criteria-1', mainInputCriteria2: 'main-input-criteria-2',
             mainExecuteFilterBtn: 'main-execute-filter-btn',
 
             skipTopRowsCheckbox: 'skip-top-rows-checkbox', discardRowsInput: 'discard-rows-input', 
@@ -220,6 +214,7 @@ const ExcelViewer = (() => {
         });
     }
 
+    // 🌟 核心引擎修復：極限安全閥與防堵無限迴圈
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -232,8 +227,16 @@ const ExcelViewer = (() => {
 
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
+        
+        // 【極限安全閥 1】: 找出真實有資料的最大欄位，避免 Excel 將空白格式推至 16384 欄導致記憶體崩潰
+        let maxDataColIdx = -1;
+        for (let i = 0; i < jsonData.length; i++) {
+            if (jsonData[i]) maxDataColIdx = Math.max(maxDataColIdx, jsonData[i].length - 1);
+        }
+        const effectiveEndCol = Math.min(endCol, startCol + Math.max(maxDataColIdx, 0));
+
         const visibleCols = [];
-        for (let c = startCol; c <= endCol; c++) {
+        for (let c = startCol; c <= effectiveEndCol; c++) {
             if (!(colProps[c] && colProps[c].hidden)) visibleCols.push(c - startCol);
         }
 
@@ -247,9 +250,11 @@ const ExcelViewer = (() => {
                 
                 const scanEnd = Math.min(discardCount + headerCount, jsonData.length);
                 for (let r = discardCount; r < scanEnd; r++) {
-                    const cellVal = jsonData[r][actualColIdx];
-                    if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
-                        headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
+                    if (jsonData[r]) { // 防呆：確保列存在
+                        const cellVal = jsonData[r][actualColIdx];
+                        if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
+                            headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
+                        }
                     }
                 }
                 
@@ -271,10 +276,12 @@ const ExcelViewer = (() => {
         const dataStartIndex = Math.max(totalSkipCount, 1);
         for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
             const row = jsonData[idx];
+            if (!row) continue; // 防呆：跳過完全未定義的列
+
             const absRow = startRow + idx;
             if (rowProps[absRow]?.hidden) continue; 
 
-            const newRow = visibleCols.map(i => (row?.[i] ?? ''));
+            const newRow = visibleCols.map(i => (row[i] ?? ''));
             const isEmpty = newRow.every(c => String(c).trim() === '');
             if (removeEmpty && isEmpty) continue; 
 
@@ -295,10 +302,15 @@ const ExcelViewer = (() => {
 
         const importModeInput = document.querySelector('input[name="import-mode"]:checked');
         const importMode = importModeInput ? importModeInput.value : 'first';
-        const sheetCriteria = { name: elements.specificSheetNameInput?.value.trim() || '', position: elements.specificSheetPositionInput?.value.trim() || '' };
+        
+        // 防呆：確保 DOM 元素存在才取值
+        const sheetCriteria = { 
+            name: elements.specificSheetNameInput ? elements.specificSheetNameInput.value.trim() : '', 
+            position: elements.specificSheetPositionInput ? elements.specificSheetPositionInput.value.trim() : '' 
+        };
 
         state.isProcessing = true;
-        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">讀取中...</div>';
+        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">讀取中... (防止假死，這可能需要幾秒鐘)</div>';
         resetControls(true);
         state.rawSheetsCache = []; state.loadedFiles = [];
         const tablesToRender = [];
@@ -321,15 +333,20 @@ const ExcelViewer = (() => {
 
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
 
+                    // 【極限安全閥 2】: 防堵合併儲存格無限迴圈
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
                             const sr = merge.s.r - startRow, sc = merge.s.c - startCol;
                             const er = merge.e.r - startRow, ec = merge.e.c - startCol;
                             if (sr >= 0 && sc >= 0 && jsonData[sr]) {
                                 const val = jsonData[sr][sc];
-                                for (let r = sr; r <= er; r++) {
-                                    for (let c = sc; c <= ec; c++) {
-                                        if (jsonData[r]) jsonData[r][c] = val;
+                                // 將合併範圍限制在實際有資料的範圍內，避免迴圈 1048576 次卡死 CPU
+                                const maxR = Math.min(er, jsonData.length - 1);
+                                for (let r = sr; r <= maxR; r++) {
+                                    if (jsonData[r]) {
+                                        for (let c = sc; c <= ec; c++) {
+                                            jsonData[r][c] = val;
+                                        }
                                     }
                                 }
                             }
@@ -337,7 +354,8 @@ const ExcelViewer = (() => {
                     }
 
                     const label = `${file.name} (${sheetName})`;
-                    state.rawSheetsCache.push({ label, startRow, startCol, endCol, sheet, jsonData: JSON.parse(JSON.stringify(jsonData)) });
+                    // 【極限安全閥 3】: 直接儲存 reference，不使用 JSON.parse(JSON.stringify)，省下大量記憶體與時間
+                    state.rawSheetsCache.push({ label, startRow, startCol, endCol, sheet, jsonData: jsonData });
 
                     const filtered = applyPreprocessing(jsonData, sheet, startRow, startCol, endCol);
                     if (filtered.length > 0) {
@@ -352,8 +370,8 @@ const ExcelViewer = (() => {
             updateDropAreaDisplay();
             markSettingsClean();
         } catch (err) {
-            console.error(err);
-            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red;">處理檔案錯誤：${err.message}</p>`;
+            console.error("處理檔案發生錯誤:", err);
+            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red; font-weight:bold;">❌ 處理檔案錯誤：<br>${err.message}</p>`;
         } finally {
             state.isProcessing = false;
             if (elements.fileInput) elements.fileInput.value = '';
@@ -369,7 +387,8 @@ const ExcelViewer = (() => {
             const tablesToRender = [];
             state.loadedFiles = [];
             state.rawSheetsCache.forEach(cache => {
-                const filtered = applyPreprocessing(JSON.parse(JSON.stringify(cache.jsonData)), cache.sheet, cache.startRow, cache.startCol, cache.endCol);
+                // 直接使用 cache.jsonData，因為 applyPreprocessing 內部是創造新陣列，不會破壞原始資料
+                const filtered = applyPreprocessing(cache.jsonData, cache.sheet, cache.startRow, cache.startCol, cache.endCol);
                 if (filtered.length > 0) {
                     const cleanSheet = XLSX.utils.aoa_to_sheet(filtered);
                     tablesToRender.push({ html: XLSX.utils.sheet_to_html(cleanSheet), filename: cache.label });
@@ -458,10 +477,7 @@ const ExcelViewer = (() => {
         
         injectCheckboxes(elements.displayArea);
         if (state.mainViewHiddenColumns.size > 0) applyMainViewColumnState();
-        
-        // 🌟 生成主畫面的進階篩選下拉選單
         populateMainDropdowns();
-
         showControls(detectHiddenElements());
         sortTablesByFundName();
     }
@@ -478,10 +494,8 @@ const ExcelViewer = (() => {
     }
 
     // ─────────────────────────────────────────────
-    // 🌟 雙軌操作：主畫面專用函式
+    // 🌟 主畫面專屬函式
     // ─────────────────────────────────────────────
-    
-    // 匯集主畫面所有表格的欄位，生成下拉選單
     function populateMainDropdowns() {
         const allHeaders = new Set();
         elements.displayArea.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => {
@@ -492,46 +506,36 @@ const ExcelViewer = (() => {
         if (elements.mainColSelect2) elements.mainColSelect2.innerHTML = '<option value="">-- 選擇欄位 2 (選填) --</option>' + options;
     }
 
-    // 主畫面：編輯資料開關
     function toggleMainEditMode(startEditing) {
         state.isMainEditing = startEditing;
         if(elements.mainEditDataBtn) elements.mainEditDataBtn.classList.toggle('hidden', startEditing);
         if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.classList.toggle('hidden', !startEditing);
-        
         elements.displayArea.querySelectorAll('td:not(.checkbox-cell)').forEach(td => {
             td.contentEditable = startEditing;
             td.style.backgroundColor = startEditing ? '#fffbeb' : ''; 
         });
-        
         ['mainCopyRowsBtn', 'mainSmartDedupBtn', 'mainExecuteFilterBtn', 'deleteSelectedBtn', 'mainColumnOperationsBtn'].forEach(id => {
             if (elements[id]) elements[id].disabled = startEditing;
         });
     }
 
-    // 主畫面：儲存編輯
     function saveMainEdits() {
         elements.displayArea.querySelectorAll('td:not(.checkbox-cell)').forEach(td => {
-            td.contentEditable = false;
-            td.style.backgroundColor = '';
+            td.contentEditable = false; td.style.backgroundColor = '';
         });
         state.isMainEditing = false;
         if(elements.mainEditDataBtn) elements.mainEditDataBtn.classList.remove('hidden');
         if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.classList.add('hidden');
-        
         ['mainCopyRowsBtn', 'mainSmartDedupBtn', 'mainExecuteFilterBtn', 'deleteSelectedBtn', 'mainColumnOperationsBtn'].forEach(id => {
             if (elements[id]) elements[id].disabled = false;
         });
-
-        // 覆寫原始字串，讓 Reset 不會洗掉這些編輯
         state.originalHtmlString = elements.displayArea.innerHTML;
         undoManager.showToast('儲存主畫面編輯');
     }
 
-    // 主畫面：複製列 (直接在 DOM 複製)
     function copyMainSelectedRows() {
         const selected = elements.displayArea.querySelectorAll('tbody .row-checkbox:checked');
         if (!selected.length) { alert('請先勾選要複製的資料列。'); return; }
-        
         selected.forEach(cb => {
             const tr = cb.closest('tr');
             const clone = tr.cloneNode(true);
@@ -540,11 +544,9 @@ const ExcelViewer = (() => {
             tr.parentNode.insertBefore(clone, tr.nextSibling);
         });
         syncCheckboxesInScope();
-        // 更新狀態以保存在記憶中
         state.originalHtmlString = elements.displayArea.innerHTML;
     }
 
-    // 主畫面：執行複合篩選
     function executeMainComplexFilter() {
         const col1 = elements.mainColSelect1?.value;
         const col2 = elements.mainColSelect2?.value;
@@ -555,7 +557,6 @@ const ExcelViewer = (() => {
         const inputVal2 = elements.mainInputCriteria2?.value;
 
         if (!col1 && !col2) { alert('請輸入至少一個條件'); return; }
-
         const checkValue = (cellVal, cr, val) => {
             const s = String(cellVal).trim(), v = String(val).trim();
             return cr === 'empty' ? s === '' : cr === 'zero' ? s === '0' : cr === 'value' ? s !== '' : cr === 'exact' ? s === v : cr === 'includes' ? v !== '' && s.toLowerCase().includes(v.toLowerCase()) : false;
@@ -565,41 +566,33 @@ const ExcelViewer = (() => {
         elements.displayArea.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
             const checkbox = row.querySelector('.row-checkbox');
             if (!checkbox) return;
-
             const table = row.closest('table');
             const ths = Array.from(table.querySelectorAll('thead th:not(.checkbox-cell)'));
-            
             const getCellText = (colName) => {
                 if (!colName) return null;
                 const colIdx = ths.findIndex(th => th.textContent.trim().replace(/\n/g, ' ') === colName);
                 if (colIdx === -1) return null;
                 return row.children[colIdx + 1] ? row.children[colIdx + 1].textContent : '';
             };
-
-            let cMatch = false;
             const r1 = col1 ? checkValue(getCellText(col1) ?? '', criteria1, inputVal1) : null;
             const r2 = col2 ? checkValue(getCellText(col2) ?? '', criteria2, inputVal2) : null;
-            cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
-
+            const cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
             if (cMatch) { checkbox.checked = true; count++; }
         });
         alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
         syncCheckboxesInScope();
     }
 
-
     // ─────────────────────────────────────────────
-    // 🌟 雙軌操作：欄位隱藏設定
+    // 🌟 欄位隱藏設定
     // ─────────────────────────────────────────────
     function openMainColumnModal() {
         const allTables = elements.displayArea.querySelectorAll('.table-wrapper table');
         if (allTables.length === 0) { alert('目前沒有可操作的表格。'); return; }
-
         const allHeaders = new Set();
         allTables.forEach(table => { table.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => allHeaders.add(th.textContent.trim())); });
 
         state.columnModalContext = 'main';
-        
         if(elements.columnChecklist) {
             elements.columnChecklist.innerHTML = Array.from(allHeaders).map(h => {
                 const displayH = h.replace(/\n/g, ' '); 
@@ -620,9 +613,7 @@ const ExcelViewer = (() => {
 
     function applyColumnChanges() {
         if (state.columnModalContext === 'main') {
-            const visibility = {};
             elements.columnChecklist.querySelectorAll('input').forEach(input => {
-                visibility[input.value] = input.checked;
                 if (!input.checked) state.mainViewHiddenColumns.add(input.value); else state.mainViewHiddenColumns.delete(input.value);
             });
             applyMainViewColumnState();
@@ -635,7 +626,6 @@ const ExcelViewer = (() => {
             const allThs = Array.from(mergedTable.querySelectorAll('thead th'));
             const firstDataIdx = allThs.findIndex(th => !th.classList.contains('checkbox-cell') && !th.classList.contains('source-col'));
             if (firstDataIdx === -1) return;
-            
             allThs.slice(firstDataIdx).forEach((th, i) => {
                 const colIdx = i + firstDataIdx;
                 const headerText = th.textContent.replace('×', '').trim();
@@ -744,7 +734,6 @@ const ExcelViewer = (() => {
         const headerRow = thead.insertRow();
 
         if (state.showSourceColumn) headerRow.insertAdjacentHTML('beforeend', '<th class="source-col">來源檔案</th>');
-        
         state.mergedHeaders.forEach(header => { 
             headerRow.insertAdjacentHTML('beforeend', `<th>${header}<span class="delete-col-btn" data-header="${header}">&times;</span></th>`); 
         });
@@ -1155,9 +1144,6 @@ const ExcelViewer = (() => {
         renderMergedTable();
     }
 
-    // ─────────────────────────────────────────────
-    // 🌟 雙軌操作：智慧去重
-    // ─────────────────────────────────────────────
     function executeSmartDeduplication() {
         const keyCol = elements.dedupColSelect?.value;
         if (!keyCol) return;
@@ -1204,7 +1190,6 @@ const ExcelViewer = (() => {
                 });
             });
         } else {
-            // 合併檢視去重
             const rows = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)'));
             rows.forEach(tr => tr.classList.remove('dedup-marked'));
 
@@ -1265,9 +1250,6 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
 
-    // ─────────────────────────────────────────────
-    // 12. 事件綁定 
-    // ─────────────────────────────────────────────
     function bindEvents() {
         setupDragAndDrop();
 
@@ -1303,7 +1285,6 @@ const ExcelViewer = (() => {
         if(elements.gridViewBtn) elements.gridViewBtn.addEventListener('click', () => setViewMode('grid'));
         if(elements.gridScaleSlider) elements.gridScaleSlider.addEventListener('input', updateGridScale);
 
-        // 🌟 綁定主畫面新按鈕事件
         if(elements.mainColumnOperationsBtn) elements.mainColumnOperationsBtn.addEventListener('click', openMainColumnModal);
         if(elements.mainEditDataBtn) elements.mainEditDataBtn.addEventListener('click', () => toggleMainEditMode(true));
         if(elements.mainSaveEditsBtn) elements.mainSaveEditsBtn.addEventListener('click', saveMainEdits);
@@ -1330,7 +1311,6 @@ const ExcelViewer = (() => {
         if(elements.viewCheckedCombinedBtn) elements.viewCheckedCombinedBtn.addEventListener('click', () => createMergedView('checked'));
         if(elements.closeMergeViewBtn) elements.closeMergeViewBtn.addEventListener('click', closeMergeView);
 
-        // 合併畫面操作
         if(elements.searchInputMerged) elements.searchInputMerged.addEventListener('input', utils.debounce(filterTable, 300));
         if(elements.executeFilterSelectionBtn) elements.executeFilterSelectionBtn.addEventListener('click', () => { executeCombinedSelection(); syncCheckboxesInScope(); });
         if(elements.invertSelectionMergedBtn) elements.invertSelectionMergedBtn.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
@@ -1356,7 +1336,6 @@ const ExcelViewer = (() => {
         if(elements.modalCheckAll) elements.modalCheckAll.addEventListener('click', () => { if(elements.columnChecklist) elements.columnChecklist.querySelectorAll('input').forEach(i => i.checked = true); });
         if(elements.modalUncheckAll) elements.modalUncheckAll.addEventListener('click', () => { if(elements.columnChecklist) elements.columnChecklist.querySelectorAll('input').forEach(i => i.checked = false); });
 
-        // 🌟 雙軌共用的智慧去重按鈕 (判斷來自哪裡並開啟 Modal)
         const setupDedupModal = (context) => {
             state.dedupContext = context;
             if(!elements.dedupColSelect) return;
@@ -1396,7 +1375,6 @@ const ExcelViewer = (() => {
             });
         }
 
-        // 處理主畫面複合條件選單的 disabled 切換
         if(elements.controlPanel) {
             elements.controlPanel.addEventListener('change', e => {
                 if (e.target.name === 'main-criteria-1' || e.target.name === 'main-criteria-2') {
