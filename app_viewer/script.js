@@ -1,13 +1,10 @@
 /**
- * ExcelViewer — 終極完整版 (結合舊版穩定上傳拖曳 + 新版優化與排序匯出功能)
+ * ExcelViewer — 終極完整版 (包含分離拋棄列、標題換行、智慧去重)
  */
 
 const ExcelViewer = (() => {
     'use strict';
 
-    // ─────────────────────────────────────────────
-    // 1. 常數與初始狀態
-    // ─────────────────────────────────────────────
     const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
 
     const state = {
@@ -17,14 +14,10 @@ const ExcelViewer = (() => {
         loadedTables: 0,
         zoomedCard: null,
 
-        // 清洗設定快取
         rawSheetsCache: [],
         isSettingsDirty: false,
-
-        // Undo 復原堆疊
         undoStack: [],
 
-        // 合併視圖狀態
         isMergedView: false,
         isEditing: false,
         showTotalRow: false,
@@ -32,7 +25,6 @@ const ExcelViewer = (() => {
         mergedData: [],
         mergedHeaders: [],
 
-        // 排序清單
         fundSortOrder: [],
         fundAliasMap: {},
         fundAliasKeys: [],
@@ -40,9 +32,6 @@ const ExcelViewer = (() => {
 
     const elements = {};
 
-    // ─────────────────────────────────────────────
-    // 2. 工具函數 & Undo 機制
-    // ─────────────────────────────────────────────
     const utils = {
         debounce(fn, ms) {
             let timer;
@@ -122,9 +111,6 @@ const ExcelViewer = (() => {
         }
     };
 
-    // ─────────────────────────────────────────────
-    // 3. DOM 快取
-    // ─────────────────────────────────────────────
     function cacheElements() {
         const mapping = {
             fileInput: 'file-input', displayArea: 'excel-display-area', searchInput: 'search-input',
@@ -143,11 +129,16 @@ const ExcelViewer = (() => {
             selectedTablesInfo: 'selected-tables-info', selectedTablesList: 'selected-tables-list', 
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
-            skipTopRowsCheckbox: 'skip-top-rows-checkbox', skipTopRowsCheckbox: 'skip-top-rows-checkbox', 
-            discardRowsInput: 'discard-rows-input', // 新增這行
-            headerRowsInput: 'header-rows-input',   // 新增這行
-            removeEmptyRowsCheckbox: 'remove-empty-rows-checkbox', removeKeywordRowsCheckbox: 'remove-keyword-rows-checkbox', 
-            removeKeywordRowsInput: 'remove-keyword-rows-input', reapplyBanner: 'reapply-banner', reapplySettingsBtn: 'reapply-settings-btn',
+            
+            // 🌟 清洗設定相關
+            skipTopRowsCheckbox: 'skip-top-rows-checkbox', 
+            discardRowsInput: 'discard-rows-input', 
+            headerRowsInput: 'header-rows-input',
+            removeEmptyRowsCheckbox: 'remove-empty-rows-checkbox', 
+            removeKeywordRowsCheckbox: 'remove-keyword-rows-checkbox', 
+            removeKeywordRowsInput: 'remove-keyword-rows-input', 
+            reapplyBanner: 'reapply-banner', reapplySettingsBtn: 'reapply-settings-btn',
+            
             mergeViewModal: 'merge-view-modal', closeMergeViewBtn: 'close-merge-view-btn', mergeViewContent: 'merge-view-content',
             mergeViewBtn: 'merge-view-btn', viewCheckedCombinedBtn: 'view-checked-combined-btn',
             toggleToolbarBtn: 'toggle-toolbar-btn', collapsibleToolbar: 'collapsible-toolbar-area',
@@ -167,14 +158,10 @@ const ExcelViewer = (() => {
             undoToast: 'undo-toast', undoText: 'undo-text', undoBtn: 'undo-btn'
         };
 
-        Object.keys(mapping).forEach(key => {
-            elements[key] = document.getElementById(mapping[key]);
-        });
+        Object.keys(mapping).forEach(key => { elements[key] = document.getElementById(mapping[key]); });
     }
 
-    function getActiveScope() {
-        return state.isMergedView ? elements.mergeViewContent : elements.displayArea;
-    }
+    function getActiveScope() { return state.isMergedView ? elements.mergeViewContent : elements.displayArea; }
 
     function resetControls(isNewFile) {
         if (!isNewFile) return;
@@ -186,9 +173,6 @@ const ExcelViewer = (() => {
         updateSelectionInfo();
     }
 
-    // ─────────────────────────────────────────────
-    // 4. 基礎載入
-    // ─────────────────────────────────────────────
     async function loadFundConfig() {
         try {
             const response = await fetch(`fund-config.json?v=${Date.now()}`);
@@ -202,42 +186,32 @@ const ExcelViewer = (() => {
         } catch (err) { console.warn('設定檔讀取失敗', err); }
     }
 
-    // ─────────────────────────────────────────────
-    // 5. 檔案拖曳與匯入解析
-    // ─────────────────────────────────────────────
     function setupDragAndDrop() {
         if (!elements.dropArea || !elements.fileInput) return;
-
         elements.dropArea.addEventListener('click', e => {
             if (e.target.id === 'clear-files-btn' || e.target.closest('.btn-clear') || e.target === elements.fileInput) return;
             elements.fileInput.click();
         });
-
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { 
-            elements.dropArea.addEventListener(eventName, e => { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
-            }); 
+            elements.dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }); 
         });
-
         ['dragenter', 'dragover'].forEach(e => elements.dropArea.addEventListener(e, () => elements.dropArea.classList.add('highlight')));
         ['dragleave', 'drop'].forEach(e => elements.dropArea.addEventListener(e, () => elements.dropArea.classList.remove('highlight')));
 
         elements.dropArea.addEventListener('drop', e => {
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files);
         });
-        
         elements.fileInput.addEventListener('change', e => {
             if (e.target.files && e.target.files.length > 0) processFiles(e.target.files);
         });
     }
 
-function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
-        // 1. 取得使用者設定的「拋棄列數」與「表頭列數」
+    // 🌟 核心：清洗與換行標題壓縮 
+    function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
         const headerCount = useHeaderCompression && elements.headerRowsInput ? parseInt(elements.headerRowsInput.value, 10) || 1 : 1;
-        const totalSkipCount = discardCount + headerCount; // 資料實際開始的列數
+        const totalSkipCount = discardCount + headerCount;
 
         const removeEmpty = elements.removeEmptyRowsCheckbox ? elements.removeEmptyRowsCheckbox.checked : false;
         const removeKeywords = elements.removeKeywordRowsCheckbox ? elements.removeKeywordRowsCheckbox.checked : false;
@@ -253,13 +227,11 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const result = [];
         const usedNames = new Set(); 
 
-        // 🌟 2. 產生精準複合表頭 (避開了被拋棄的垃圾標題)
         if (jsonData.length > discardCount) {
             const headerRow = visibleCols.map(colRelativeIdx => {
                 const actualColIdx = startCol + colRelativeIdx;
                 const headerParts = [];
                 
-                // 掃描範圍：從 discardCount 開始，掃描 headerCount 這麼多列
                 const scanEnd = Math.min(discardCount + headerCount, jsonData.length);
                 for (let r = discardCount; r < scanEnd; r++) {
                     const cellVal = jsonData[r][actualColIdx];
@@ -269,9 +241,10 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
                 }
                 
                 const uniqueParts = [...new Set(headerParts)];
-                let baseName = uniqueParts.join(' ') || `(空白欄位)`;
+                // 🌟 使用 \n 換行符號結合
+                let baseName = uniqueParts.join('\n') || `(空白欄位)`;
                 
-                // 防重複命名機制 (_2, _3)
+                // 防重複命名機制
                 let uniqueName = baseName;
                 let counter = 2;
                 while (usedNames.has(uniqueName)) {
@@ -281,11 +254,11 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
                 usedNames.add(uniqueName);
                 return uniqueName;
             });
-            result.push(headerRow); // 將完美表頭推入作為第一列
+            result.push(headerRow);
         }
 
-        // 🌟 3. 處理實際資料列 (從拋棄列 + 表頭列 之後開始抓)
-        for (let idx = totalSkipCount; idx < jsonData.length; idx++) {
+        const dataStartIndex = Math.max(totalSkipCount, 1);
+        for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
             const row = jsonData[idx];
             const absRow = startRow + idx;
             if (rowProps[absRow]?.hidden) continue; 
@@ -422,22 +395,15 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         return names;
     }
 
-    // ─────────────────────────────────────────────
-    // 6. 表格渲染 (主表)
-    // ─────────────────────────────────────────────
     function renderTables(tables) {
         if (!elements.displayArea) return;
-        if (!tables.length) {
-            elements.displayArea.innerHTML = '<p>沒有找到符合條件的工作表。</p>';
-            return;
-        }
+        if (!tables.length) { elements.displayArea.innerHTML = '<p>沒有找到符合條件的工作表。</p>'; return; }
 
         const fragment = document.createDocumentFragment();
         tables.forEach(({ html, filename }) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'table-wrapper';
             
-            // 🌟 修正 sheet_to_html 沒有 <thead> 的問題 🌟
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             const table = tempDiv.querySelector('table');
@@ -447,10 +413,13 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
                     const firstRow = tbody.querySelector('tr');
                     if (firstRow) {
                         const thead = document.createElement('thead');
-                        thead.appendChild(firstRow); // 將第一列升級為表頭
+                        thead.appendChild(firstRow);
+                        
+                        // 🌟 關鍵修復：將 SheetJS 產生的 <br> 轉回實體 \n 換行符號
                         firstRow.querySelectorAll('td').forEach(td => {
                             const th = document.createElement('th');
-                            th.innerHTML = td.innerHTML;
+                            td.innerHTML = td.innerHTML.replace(/<br\s*[\/]?>/gi, '___NEWLINE___');
+                            th.textContent = td.textContent.replace(/___NEWLINE___/g, '\n').trim();
                             td.replaceWith(th);
                         });
                         table.insertBefore(thead, tbody);
@@ -477,7 +446,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         elements.displayArea.innerHTML = '';
         elements.displayArea.appendChild(fragment);
         state.originalHtmlString = elements.displayArea.innerHTML;
-
         injectCheckboxes(elements.displayArea);
         showControls(detectHiddenElements());
         sortTablesByFundName();
@@ -494,9 +462,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         });
     }
 
-    // ─────────────────────────────────────────────
-    // 7. 合併視圖 (Merge View)
-    // ─────────────────────────────────────────────
     function createMergedView(mode = 'all') {
         if (!elements.displayArea || !elements.mergeViewModal) return;
         const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
@@ -567,7 +532,11 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const headerRow = thead.insertRow();
 
         if (state.showSourceColumn) headerRow.insertAdjacentHTML('beforeend', '<th class="source-col">來源檔案</th>');
-        state.mergedHeaders.forEach(header => { headerRow.insertAdjacentHTML('beforeend', `<th>${header}<span class="delete-col-btn" data-header="${header}">&times;</span></th>`); });
+        
+        state.mergedHeaders.forEach(header => { 
+            // 直接放入帶有 \n 的 header，靠 CSS pre-wrap 來換行
+            headerRow.insertAdjacentHTML('beforeend', `<th>${header}<span class="delete-col-btn" data-header="${header}">&times;</span></th>`); 
+        });
 
         const tbody = table.createTBody();
         state.mergedData.forEach((rowData, index) => {
@@ -622,9 +591,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         if (selectAllCb) selectAllCb.addEventListener('change', e => { elements.mergeViewContent.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked); });
     }
 
-    // ─────────────────────────────────────────────
-    // 8. 選取、過濾與刪除 (包含 Undo)
-    // ─────────────────────────────────────────────
     function deleteSelectedRows(specificScope = null) {
         const scope = specificScope || getActiveScope();
         if(!scope) return;
@@ -667,11 +633,11 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
     }
 
     function deleteColumn(headerToDelete) {
-        if (!confirm(`確定要刪除「${headerToDelete}」欄位？`)) return;
+        if (!confirm(`確定要刪除「${headerToDelete.replace(/\n/g, ' ')}」欄位？`)) return;
         const backupHeaders = [...state.mergedHeaders];
         const backupData = state.mergedData.map(row => ({...row}));
 
-        undoManager.push(`刪除欄位: ${headerToDelete}`, () => {
+        undoManager.push(`刪除欄位: ${headerToDelete.replace(/\n/g, ' ')}`, () => {
             state.mergedHeaders = backupHeaders; state.mergedData = backupData;
             if (state.isMergedView) { renderMergedTable(); updateColumnSelects(state.mergedHeaders); }
         });
@@ -803,9 +769,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
     }
 
-    // ─────────────────────────────────────────────
-    // 9. 編輯與介面操作
-    // ─────────────────────────────────────────────
     function toggleEditMode(startEditing) {
         state.isEditing = startEditing;
         if(elements.editDataBtn) elements.editDataBtn.classList.toggle('hidden', startEditing);
@@ -876,11 +839,32 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         return totals;
     }
 
+    // 🌟 在選單介面中保護 \n 不會破圖
     function updateColumnSelects(headers) {
-        if(elements.columnChecklist) elements.columnChecklist.innerHTML = headers.map(h => `<label><input type="checkbox" value="${h}" checked> ${h}</label>`).join('');
-        const makeOption = (value, text) => { const opt = document.createElement('option'); opt.value = value; opt.textContent = text; return opt; };
-        if(elements.colSelect1) { elements.colSelect1.innerHTML = ''; elements.colSelect1.appendChild(makeOption('', '-- 選擇欄位 1 --')); headers.forEach(h => elements.colSelect1.appendChild(makeOption(h, h))); }
-        if(elements.colSelect2) { elements.colSelect2.innerHTML = ''; elements.colSelect2.appendChild(makeOption('', '-- 選擇欄位 2 (選填) --')); headers.forEach(h => elements.colSelect2.appendChild(makeOption(h, h))); }
+        if(elements.columnChecklist) {
+            elements.columnChecklist.innerHTML = headers.map(h => {
+                const displayH = h.replace(/\n/g, ' '); // 替換為空白以利顯示
+                return `<label><input type="checkbox" value="${h}" checked> ${displayH}</label>`;
+            }).join('');
+        }
+
+        const makeOption = (value, text) => { 
+            const opt = document.createElement('option'); 
+            opt.value = value; 
+            opt.textContent = text.replace(/\n/g, ' '); 
+            return opt; 
+        };
+        
+        if(elements.colSelect1) { 
+            elements.colSelect1.innerHTML = ''; 
+            elements.colSelect1.appendChild(makeOption('', '-- 選擇欄位 1 --')); 
+            headers.forEach(h => elements.colSelect1.appendChild(makeOption(h, h))); 
+        }
+        if(elements.colSelect2) { 
+            elements.colSelect2.innerHTML = ''; 
+            elements.colSelect2.appendChild(makeOption('', '-- 選擇欄位 2 (選填) --')); 
+            headers.forEach(h => elements.colSelect2.appendChild(makeOption(h, h))); 
+        }
     }
 
     function toggleColumnModal(show) { if (elements.columnModal) elements.columnModal.classList.toggle('hidden', !show); }
@@ -997,9 +981,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         if (needsInput) { target.focus(); } else { target.value = ''; }
     }
 
-    // ─────────────────────────────────────────────
-    // 10. 匯出與排序 (核心補回區塊)
-    // ─────────────────────────────────────────────
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
         const data = [];
         const headerRow = table.querySelector('thead tr');
@@ -1104,9 +1085,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         renderMergedTable();
     }
 
-    // ─────────────────────────────────────────────
-    // 11. 智慧去重
-    // ─────────────────────────────────────────────
     function executeSmartDeduplication() {
         const keyCol = elements.dedupColSelect?.value;
         if (!keyCol) return;
@@ -1173,9 +1151,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         syncCheckboxesInScope();
     }
 
-    // ─────────────────────────────────────────────
-    // 12. 事件綁定 (統一管理)
-    // ─────────────────────────────────────────────
     function bindEvents() {
         setupDragAndDrop();
 
@@ -1190,18 +1165,20 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
             });
         }
 
-        ['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
+        ['skipTopRowsCheckbox', 'discardRowsInput', 'headerRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
             if(elements[id]) {
                 elements[id].addEventListener('change', markSettingsDirty);
                 elements[id].addEventListener('input', utils.debounce(markSettingsDirty, 500));
             }
         });
+        
         if(elements.skipTopRowsCheckbox) {
             elements.skipTopRowsCheckbox.addEventListener('change', e => { 
                 if (elements.discardRowsInput) elements.discardRowsInput.disabled = !e.target.checked; 
                 if (elements.headerRowsInput) elements.headerRowsInput.disabled = !e.target.checked; 
             });
         }
+
         if(elements.removeKeywordRowsCheckbox) elements.removeKeywordRowsCheckbox.addEventListener('change', e => { if (elements.removeKeywordRowsInput) elements.removeKeywordRowsInput.disabled = !e.target.checked; });
         if(elements.reapplySettingsBtn) elements.reapplySettingsBtn.addEventListener('click', reapplyPreprocessing);
 
@@ -1254,7 +1231,7 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
 
         if(elements.smartDedupBtn) elements.smartDedupBtn.addEventListener('click', () => { 
             if(elements.dedupColSelect) { 
-                elements.dedupColSelect.innerHTML = state.mergedHeaders.map(h=>`<option value="${h}">${h}</option>`).join(''); 
+                elements.dedupColSelect.innerHTML = state.mergedHeaders.map(h => `<option value="${h}">${h.replace(/\n/g, ' ')}</option>`).join(''); 
                 const defaultMatch = state.mergedHeaders.find(h => h.includes('名') || h.includes('基金') || h.includes('科目'));
                 if (defaultMatch) elements.dedupColSelect.value = defaultMatch;
                 if(elements.dedupModal) elements.dedupModal.classList.remove('hidden'); 
@@ -1319,9 +1296,6 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         if(elements.undoBtn) elements.undoBtn.addEventListener('click', () => undoManager.undoLast());
     }
 
-    // ─────────────────────────────────────────────
-    // 13. 初始化
-    // ─────────────────────────────────────────────
     async function init() {
         try {
             cacheElements();
@@ -1336,11 +1310,8 @@ function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
     return { init };
 })();
 
-// 啟動程式
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', ExcelViewer.init);
 } else {
     ExcelViewer.init();
 }
-
-
