@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極效能修復版 (防堵無限迴圈、記憶體優化、雙軌全功能)
+ * ExcelViewer — 終極效能修復版 (解決卡死問題、保留雙軌全功能)
  */
 
 const ExcelViewer = (() => {
@@ -31,7 +31,7 @@ const ExcelViewer = (() => {
         mergedHeaders: [],
 
         fundSortOrder: [],
-        fundAliasMap: {}, // 修正為物件
+        fundAliasMap: {},
         fundAliasKeys: [],
     };
 
@@ -214,7 +214,7 @@ const ExcelViewer = (() => {
         });
     }
 
-    // 🌟 核心引擎修復：極限安全閥與防堵無限迴圈
+    // 🌟 核心引擎修復：O(1) 效能升級與防呆邊界判定
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -227,11 +227,18 @@ const ExcelViewer = (() => {
 
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
-        
-        // 【極限安全閥 1】: 找出真實有資料的最大欄位，避免 Excel 將空白格式推至 16384 欄導致記憶體崩潰
+
+        // 【極限安全閥 1】: 找出真正有資料的最右側欄位，拋棄 Excel 的無限空白格式 (可達 16384 欄)
         let maxDataColIdx = -1;
-        for (let i = 0; i < jsonData.length; i++) {
-            if (jsonData[i]) maxDataColIdx = Math.max(maxDataColIdx, jsonData[i].length - 1);
+        for (let i = Math.max(0, discardCount); i < jsonData.length; i++) {
+            if (jsonData[i]) {
+                for (let j = jsonData[i].length - 1; j > maxDataColIdx; j--) {
+                    if (jsonData[i][j] !== undefined && jsonData[i][j] !== null && String(jsonData[i][j]).trim() !== '') {
+                        maxDataColIdx = j;
+                        break;
+                    }
+                }
+            }
         }
         const effectiveEndCol = Math.min(endCol, startCol + Math.max(maxDataColIdx, 0));
 
@@ -241,7 +248,8 @@ const ExcelViewer = (() => {
         }
 
         const result = [];
-        const usedNames = new Set(); 
+        // 【極限安全閥 2】: 使用 Map 進行 O(1) 的超高速防重複命名 (解決卡死的核心)
+        const nameCounts = new Map();
 
         if (jsonData.length > discardCount) {
             const headerRow = visibleCols.map(colRelativeIdx => {
@@ -250,7 +258,7 @@ const ExcelViewer = (() => {
                 
                 const scanEnd = Math.min(discardCount + headerCount, jsonData.length);
                 for (let r = discardCount; r < scanEnd; r++) {
-                    if (jsonData[r]) { // 防呆：確保列存在
+                    if (jsonData[r]) {
                         const cellVal = jsonData[r][actualColIdx];
                         if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
                             headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
@@ -261,13 +269,15 @@ const ExcelViewer = (() => {
                 const uniqueParts = [...new Set(headerParts)];
                 let baseName = uniqueParts.join('\n') || `(空白欄位)`;
                 
+                // O(1) 的防重複命名魔法
                 let uniqueName = baseName;
-                let counter = 2;
-                while (usedNames.has(uniqueName)) {
-                    uniqueName = `${baseName}_${counter}`;
-                    counter++;
+                if (nameCounts.has(baseName)) {
+                    let count = nameCounts.get(baseName) + 1;
+                    uniqueName = `${baseName}_${count}`;
+                    nameCounts.set(baseName, count);
+                } else {
+                    nameCounts.set(baseName, 1);
                 }
-                usedNames.add(uniqueName);
                 return uniqueName;
             });
             result.push(headerRow);
@@ -276,12 +286,13 @@ const ExcelViewer = (() => {
         const dataStartIndex = Math.max(totalSkipCount, 1);
         for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
             const row = jsonData[idx];
-            if (!row) continue; // 防呆：跳過完全未定義的列
+            if (!row) continue;
 
             const absRow = startRow + idx;
             if (rowProps[absRow]?.hidden) continue; 
 
-            const newRow = visibleCols.map(i => (row[i] ?? ''));
+            // 還原原始版本的取值寫法，確保速度最快
+            const newRow = visibleCols.map(i => (row[i] !== undefined ? row[i] : ''));
             const isEmpty = newRow.every(c => String(c).trim() === '');
             if (removeEmpty && isEmpty) continue; 
 
@@ -289,7 +300,11 @@ const ExcelViewer = (() => {
                 const content = newRow.join(' ').toLowerCase();
                 if (keywords.some(k => content.includes(k))) continue; 
             }
-            result.push(newRow);
+            
+            // 還原原始版本的空白列剔除機制
+            if (newRow.some(cell => String(cell).trim() !== '')) {
+                result.push(newRow);
+            }
         }
         return result;
     }
@@ -302,15 +317,10 @@ const ExcelViewer = (() => {
 
         const importModeInput = document.querySelector('input[name="import-mode"]:checked');
         const importMode = importModeInput ? importModeInput.value : 'first';
-        
-        // 防呆：確保 DOM 元素存在才取值
-        const sheetCriteria = { 
-            name: elements.specificSheetNameInput ? elements.specificSheetNameInput.value.trim() : '', 
-            position: elements.specificSheetPositionInput ? elements.specificSheetPositionInput.value.trim() : '' 
-        };
+        const sheetCriteria = { name: elements.specificSheetNameInput?.value.trim() || '', position: elements.specificSheetPositionInput?.value.trim() || '' };
 
         state.isProcessing = true;
-        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">讀取中... (防止假死，這可能需要幾秒鐘)</div>';
+        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">讀取中... </div>';
         resetControls(true);
         state.rawSheetsCache = []; state.loadedFiles = [];
         const tablesToRender = [];
@@ -333,19 +343,17 @@ const ExcelViewer = (() => {
 
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
 
-                    // 【極限安全閥 2】: 防堵合併儲存格無限迴圈
+                    // 還原原始版本的合併填滿邏輯，確保相容性
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
-                            const sr = merge.s.r - startRow, sc = merge.s.c - startCol;
-                            const er = merge.e.r - startRow, ec = merge.e.c - startCol;
-                            if (sr >= 0 && sc >= 0 && jsonData[sr]) {
-                                const val = jsonData[sr][sc];
-                                // 將合併範圍限制在實際有資料的範圍內，避免迴圈 1048576 次卡死 CPU
-                                const maxR = Math.min(er, jsonData.length - 1);
-                                for (let r = sr; r <= maxR; r++) {
+                            const startR = merge.s.r - startRow, startC = merge.s.c - startCol;
+                            const endR = merge.e.r - startRow, endC = merge.e.c - startCol;
+                            if (startR >= 0 && startC >= 0 && jsonData[startR]) {
+                                const primaryValue = jsonData[startR][startC];
+                                for (let r = startR; r <= endR; r++) {
                                     if (jsonData[r]) {
-                                        for (let c = sc; c <= ec; c++) {
-                                            jsonData[r][c] = val;
+                                        for (let c = startC; c <= endC; c++) {
+                                            jsonData[r][c] = primaryValue;
                                         }
                                     }
                                 }
@@ -354,7 +362,7 @@ const ExcelViewer = (() => {
                     }
 
                     const label = `${file.name} (${sheetName})`;
-                    // 【極限安全閥 3】: 直接儲存 reference，不使用 JSON.parse(JSON.stringify)，省下大量記憶體與時間
+                    // 快取時不再做深拷貝，大幅節省記憶體
                     state.rawSheetsCache.push({ label, startRow, startCol, endCol, sheet, jsonData: jsonData });
 
                     const filtered = applyPreprocessing(jsonData, sheet, startRow, startCol, endCol);
@@ -371,7 +379,7 @@ const ExcelViewer = (() => {
             markSettingsClean();
         } catch (err) {
             console.error("處理檔案發生錯誤:", err);
-            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red; font-weight:bold;">❌ 處理檔案錯誤：<br>${err.message}</p>`;
+            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red;">處理檔案錯誤：${err.message}</p>`;
         } finally {
             state.isProcessing = false;
             if (elements.fileInput) elements.fileInput.value = '';
@@ -387,7 +395,6 @@ const ExcelViewer = (() => {
             const tablesToRender = [];
             state.loadedFiles = [];
             state.rawSheetsCache.forEach(cache => {
-                // 直接使用 cache.jsonData，因為 applyPreprocessing 內部是創造新陣列，不會破壞原始資料
                 const filtered = applyPreprocessing(cache.jsonData, cache.sheet, cache.startRow, cache.startCol, cache.endCol);
                 if (filtered.length > 0) {
                     const cleanSheet = XLSX.utils.aoa_to_sheet(filtered);
@@ -493,9 +500,6 @@ const ExcelViewer = (() => {
         });
     }
 
-    // ─────────────────────────────────────────────
-    // 🌟 主畫面專屬函式
-    // ─────────────────────────────────────────────
     function populateMainDropdowns() {
         const allHeaders = new Set();
         elements.displayArea.querySelectorAll('thead th:not(.checkbox-cell)').forEach(th => {
@@ -583,9 +587,6 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
 
-    // ─────────────────────────────────────────────
-    // 🌟 欄位隱藏設定
-    // ─────────────────────────────────────────────
     function openMainColumnModal() {
         const allTables = elements.displayArea.querySelectorAll('.table-wrapper table');
         if (allTables.length === 0) { alert('目前沒有可操作的表格。'); return; }
@@ -662,9 +663,6 @@ const ExcelViewer = (() => {
         if(elements.colSelect2) { elements.colSelect2.innerHTML = ''; elements.colSelect2.appendChild(makeOption('', '-- 選擇欄位 2 (選填) --')); headers.forEach(h => elements.colSelect2.appendChild(makeOption(h, h))); }
     }
 
-    // ─────────────────────────────────────────────
-    // 7. 合併視圖 (Merge View)
-    // ─────────────────────────────────────────────
     function createMergedView(mode = 'all') {
         if (!elements.displayArea || !elements.mergeViewModal) return;
         const tables = Array.from(elements.displayArea.querySelectorAll('.table-wrapper:not([style*="display: none"]) table'));
