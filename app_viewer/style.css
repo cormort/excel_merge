@@ -838,3 +838,36 @@ table td, .table-content table td, #merge-view-content table td {
     line-height: 1.5;
 }
 
+/* =========================================
+   🌟 報表專業排版：標題置中、首欄靠左、其餘靠右
+========================================= */
+
+/* 1. 標題列 (th)：強制水平置中 */
+table th, .table-content table th, #merge-view-content table th {
+    text-align: center !important;
+}
+
+/* 2. 資料列 (td) 預設：全部靠右對齊 (處理第2欄之後的數字) */
+table td, .table-content table td, #merge-view-content table td {
+    text-align: right !important;
+}
+
+/* 3. 特殊欄位與「第一欄文字」：強制靠左 */
+
+/* 因為表格最前方有「核取方塊(checkbox)」，所以「真正的第一欄」是 checkbox 的下一格 */
+td.checkbox-cell + td {
+    text-align: left !important;
+}
+
+/* 如果有開啟「來源檔案」欄位，來源檔案本身會靠左，且它的下一格(也是第一欄資料)也要靠左 */
+td.source-col {
+    text-align: left !important;
+}
+td.source-col + td {
+    text-align: left !important;
+}
+
+/* 4. 確保核取方塊本身保持置中，不要被影響 */
+td.checkbox-cell, th.checkbox-cell {
+    text-align: center !important;
+}
