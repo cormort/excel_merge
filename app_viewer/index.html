@@ -291,5 +291,11 @@
 
     <!-- 確保這裡的檔名與你儲存的 JS 檔名一致 (app.js 或 script.js) -->
     <script src="app.js"></script>
+    <div id="undo-toast" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #2d3748; color: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 15px; z-index: 10000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;">
+        <span id="undo-text">已執行操作</span>
+        <button id="undo-btn" style="background: transparent; border: 1px solid #a0aec0; color: #a0aec0; padding: 4px 10px; border-radius: 4px; cursor: pointer;">復原 (Ctrl+Z)</button>
+    </div>
+    <style>#undo-toast.show { opacity: 1; pointer-events: auto; }</style>
 </body>
 </html>
+
