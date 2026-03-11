@@ -244,21 +244,56 @@ const ExcelViewer = (() => {
         }
 
         const result = [];
-        jsonData.forEach((row, idx) => {
-            if (idx < skipCount) return; 
+        const usedNames = new Set(); // 🌟 吸收您的靈感：防重複命名清單
+
+        // 🌟 1. 產生不重複的複合表頭 (將垃圾標題轉廢為寶)
+        if (jsonData.length > 0) {
+            const headerRow = visibleCols.map(colRelativeIdx => {
+                const actualColIdx = startCol + colRelativeIdx;
+                const headerParts = [];
+                
+                // 掃描要略過的那些列，把它們的文字串接起來
+                const rowsToScan = skipCount > 0 ? Math.min(skipCount, jsonData.length) : 1;
+                for (let r = 0; r < rowsToScan; r++) {
+                    const cellVal = jsonData[r][actualColIdx];
+                    if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
+                        headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
+                    }
+                }
+                
+                const uniqueParts = [...new Set(headerParts)];
+                let baseName = uniqueParts.join(' ') || `(空白欄位)`;
+                
+                // 🌟 關鍵修復：套用您的防重複機制 (_2, _3)
+                let uniqueName = baseName;
+                let counter = 2;
+                while (usedNames.has(uniqueName)) {
+                    uniqueName = `${baseName}_${counter}`;
+                    counter++;
+                }
+                usedNames.add(uniqueName);
+                return uniqueName;
+            });
+            result.push(headerRow); // 將完美表頭推入作為第一列
+        }
+
+        // 🌟 2. 處理實際資料列
+        const dataStartIndex = Math.max(skipCount, 1); // 確保避開已變為表頭的列
+        for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
+            const row = jsonData[idx];
             const absRow = startRow + idx;
-            if (rowProps[absRow]?.hidden) return; 
+            if (rowProps[absRow]?.hidden) continue; 
 
             const newRow = visibleCols.map(i => (row?.[i] ?? ''));
             const isEmpty = newRow.every(c => String(c).trim() === '');
-            if (removeEmpty && isEmpty) return; 
+            if (removeEmpty && isEmpty) continue; 
 
             if (keywords.length > 0 && !isEmpty) {
                 const content = newRow.join(' ').toLowerCase();
-                if (keywords.some(k => content.includes(k))) return; 
+                if (keywords.some(k => content.includes(k))) continue; 
             }
             result.push(newRow);
-        });
+        }
         return result;
     }
 
@@ -386,12 +421,37 @@ const ExcelViewer = (() => {
     // ─────────────────────────────────────────────
     function renderTables(tables) {
         if (!elements.displayArea) return;
-        if (!tables.length) { elements.displayArea.innerHTML = '<p>沒有找到符合條件的工作表。</p>'; return; }
+        if (!tables.length) {
+            elements.displayArea.innerHTML = '<p>沒有找到符合條件的工作表。</p>';
+            return;
+        }
 
         const fragment = document.createDocumentFragment();
         tables.forEach(({ html, filename }) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'table-wrapper';
+            
+            // 🌟 修正 sheet_to_html 沒有 <thead> 的問題 🌟
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            const table = tempDiv.querySelector('table');
+            if (table) {
+                const tbody = table.querySelector('tbody');
+                if (tbody) {
+                    const firstRow = tbody.querySelector('tr');
+                    if (firstRow) {
+                        const thead = document.createElement('thead');
+                        thead.appendChild(firstRow); // 將第一列升級為表頭
+                        firstRow.querySelectorAll('td').forEach(td => {
+                            const th = document.createElement('th');
+                            th.innerHTML = td.innerHTML;
+                            td.replaceWith(th);
+                        });
+                        table.insertBefore(thead, tbody);
+                    }
+                }
+            }
+
             wrapper.innerHTML = `
                 <div class="table-header">
                     <input type="checkbox" class="table-select-checkbox" title="選取此表格">
@@ -402,13 +462,16 @@ const ExcelViewer = (() => {
                     </div>
                     <button class="close-zoom">&times;</button>
                 </div>
-                <div class="table-content">${html}</div>`;
+                <div class="table-content"></div>`;
+            
+            if (table) wrapper.querySelector('.table-content').appendChild(table);
             fragment.appendChild(wrapper);
         });
 
         elements.displayArea.innerHTML = '';
         elements.displayArea.appendChild(fragment);
         state.originalHtmlString = elements.displayArea.innerHTML;
+
         injectCheckboxes(elements.displayArea);
         showControls(detectHiddenElements());
         sortTablesByFundName();
@@ -1268,3 +1331,4 @@ if (document.readyState === 'loading') {
 } else {
     ExcelViewer.init();
 }
+
