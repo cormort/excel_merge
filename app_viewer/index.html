@@ -259,45 +259,47 @@
                 </div>
 
                 <div id="merge-view-column-ops" class="complex-filter-box" style="padding: 10px; background-color: #f1f3f5; border-bottom: 1px solid #dee2e6;">
-                    <div class="filter-row">
-                        <div class="filter-section">
-                            <label>條件 A：</label>
-                            <select id="col-select-1" class="filter-select"><option value="">-- 選擇欄位任一欄位 --</option></select>
-                            <div class="radio-group" data-target="inputCriteria1">
-                                <label><input type="radio" name="criteria-1" value="empty" checked> 空值</label>
-                                <label><input type="radio" name="criteria-1" value="zero"> 為零</label>
-                                <label><input type="radio" name="criteria-1" value="value"> 有值</label>
-                                <label><input type="radio" name="criteria-1" value="exact"> 等於</label>
-                                <label><input type="radio" name="criteria-1" value="includes"> 包含</label>
-                                <input type="text" id="input-criteria-1" class="filter-input" placeholder="輸入比對值" disabled>
-                            </div>
-                        </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h5 style="margin: 0; color: #4a5568; font-size: 0.95rem; font-weight: 600;">🧮 依欄位條件篩選勾選</h5>
+                        <button id="toggle-merge-condition-btn" class="btn btn-secondary" style="height: 22px !important; padding: 0 8px !important; font-size: 11px !important; line-height: 1;">+ 新增第二條件</button>
                     </div>
-                    <div class="filter-row">
-                        <div class="logic-operator">
-                            <label><input type="radio" name="logic-op" value="and" checked> AND (且)</label>
+
+                    <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 5px;">
+                        <select id="col-select-1" class="filter-select" style="min-width: 150px;"><option value="">-- 選擇欄位 1 --</option></select>
+                        <div class="radio-group" data-target="input-criteria-1" style="display: flex; gap: 8px; font-size: 0.9rem;">
+                            <label><input type="radio" name="criteria-1" value="empty" checked> 空值</label>
+                            <label><input type="radio" name="criteria-1" value="zero"> 為零</label>
+                            <label><input type="radio" name="criteria-1" value="value"> 有值</label>
+                            <label><input type="radio" name="criteria-1" value="exact"> 等於</label>
+                            <label><input type="radio" name="criteria-1" value="includes"> 包含</label>
+                        </div>
+                        <input type="text" id="input-criteria-1" class="filter-input" placeholder="輸入比對值" disabled style="padding: 4px 8px;">
+                    </div>
+                    
+                    <div id="merge-condition-2-wrapper" class="hidden" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #cbd5e1;">
+                        <div class="filter-row" style="margin-bottom: 8px; font-size: 0.9rem; color: #4a5568; font-weight: bold;">
+                            <label style="margin-right: 15px;"><input type="radio" name="logic-op" value="and" checked> AND (且)</label>
                             <label><input type="radio" name="logic-op" value="or"> OR (或)</label>
                         </div>
-                    </div>
-                    <div class="filter-row">
-                        <div class="filter-section">
-                            <label>條件 B：</label>
-                            <select id="col-select-2" class="filter-select"><option value="">-- 選擇任一欄位2(選填) --</option></select>
-                            <div class="radio-group" data-target="inputCriteria2">
+                        <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                            <select id="col-select-2" class="filter-select" style="min-width: 150px;"><option value="">-- 選擇欄位 2 (選填) --</option></select>
+                            <div class="radio-group" data-target="input-criteria-2" style="display: flex; gap: 8px; font-size: 0.9rem;">
                                 <label><input type="radio" name="criteria-2" value="empty" checked> 空值</label>
                                 <label><input type="radio" name="criteria-2" value="zero"> 為零</label>
                                 <label><input type="radio" name="criteria-2" value="value"> 有值</label>
                                 <label><input type="radio" name="criteria-2" value="exact"> 等於</label>
                                 <label><input type="radio" name="criteria-2" value="includes"> 包含</label>
-                                <input type="text" id="input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled>
                             </div>
+                            <input type="text" id="input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled style="padding: 4px 8px;">
                         </div>
                     </div>
-                    <div class="filter-row execute-row">
+
+                    <div class="filter-row execute-row" style="margin-top: 8px;">
                         <div class="button-group" style="margin-left: auto;">
-                            <button id="unselect-merged-rows-btn" class="btn btn-secondary">取消勾選</button>
-                            <button class="btn btn-danger" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選列</button>
-                            <button id="execute-filter-selection-btn" class="btn btn-primary">🚀 執行篩選勾選</button>
+                            <button id="unselect-merged-rows-btn" class="btn btn-secondary btn-sm">取消勾選</button>
+                            <button class="btn btn-danger btn-sm" id="delete-merged-rows-btn" title="刪除在此合併表格中勾選的資料列">刪除勾選列</button>
+                            <button id="execute-filter-selection-btn" class="btn btn-primary btn-sm">🚀 執行篩選勾選</button>
                         </div>
                     </div>
                 </div>
@@ -362,6 +364,7 @@
     
 </body>
 </html>
+
 
 
 
