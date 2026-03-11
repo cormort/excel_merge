@@ -805,3 +805,9 @@ tr.dedup-marked td:first-child {
     align-items: center;
 }
 
+/*🌟 允許表頭 (th) 換行顯示的魔法 */
+table th, .table-content table th, #merge-view-content table th {
+    white-space: pre-wrap !important; /* 允許 \n 符號真實換行 */
+    vertical-align: bottom; /* 讓多行文字靠底部對齊，看起來更整齊 */
+    line-height: 1.4; /* 稍微增加行高，避免上下行字疊在一起 */
+}
