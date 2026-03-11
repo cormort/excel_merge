@@ -30,11 +30,13 @@
                     <hr style="margin: 15px 0 10px 0; border: 0; border-top: 1px dashed #dee2e6;">
                     
                     <div style="background-color: #e9ecef; padding: 10px; border-radius: 6px;">
-                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0 0 8px 0;">
+                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0 0 8px 0; flex-wrap: wrap; line-height: 1.8;">
                             <input type="checkbox" id="skip-top-rows-checkbox" checked style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
-                            ✂️ 匯入時自動刪除前 
-                            <input type="number" id="skip-top-rows-input" value="3" min="1" style="width: 50px; margin: 0 8px; padding: 2px 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;"> 
-                            列 (去除垃圾標題)
+                            ✂️ 先拋棄表單頂部前 
+                            <input type="number" id="discard-rows-input" value="2" min="0" style="width: 45px; margin: 0 6px; padding: 2px 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;"> 
+                            列 (如表名/單位) ，再將接下來的
+                            <input type="number" id="header-rows-input" value="2" min="1" style="width: 45px; margin: 0 6px; padding: 2px 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;">
+                            列壓縮成完美表頭
                         </label>
                         <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0 0 8px 0;">
                             <input type="checkbox" id="remove-empty-rows-checkbox" checked style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
@@ -279,3 +281,4 @@
     
 </body>
 </html>
+
