@@ -143,7 +143,9 @@ const ExcelViewer = (() => {
             selectedTablesInfo: 'selected-tables-info', selectedTablesList: 'selected-tables-list', 
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
-            skipTopRowsCheckbox: 'skip-top-rows-checkbox', skipTopRowsInput: 'skip-top-rows-input',
+            skipTopRowsCheckbox: 'skip-top-rows-checkbox', skipTopRowsCheckbox: 'skip-top-rows-checkbox', 
+            discardRowsInput: 'discard-rows-input', // 新增這行
+            headerRowsInput: 'header-rows-input',   // 新增這行
             removeEmptyRowsCheckbox: 'remove-empty-rows-checkbox', removeKeywordRowsCheckbox: 'remove-keyword-rows-checkbox', 
             removeKeywordRowsInput: 'remove-keyword-rows-input', reapplyBanner: 'reapply-banner', reapplySettingsBtn: 'reapply-settings-btn',
             mergeViewModal: 'merge-view-modal', closeMergeViewBtn: 'close-merge-view-btn', mergeViewContent: 'merge-view-content',
@@ -230,8 +232,13 @@ const ExcelViewer = (() => {
         });
     }
 
-    function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
-        const skipCount = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked && elements.skipTopRowsInput ? parseInt(elements.skipTopRowsInput.value, 10) || 0 : 0;
+function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
+        // 1. 取得使用者設定的「拋棄列數」與「表頭列數」
+        const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
+        const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
+        const headerCount = useHeaderCompression && elements.headerRowsInput ? parseInt(elements.headerRowsInput.value, 10) || 1 : 1;
+        const totalSkipCount = discardCount + headerCount; // 資料實際開始的列數
+
         const removeEmpty = elements.removeEmptyRowsCheckbox ? elements.removeEmptyRowsCheckbox.checked : false;
         const removeKeywords = elements.removeKeywordRowsCheckbox ? elements.removeKeywordRowsCheckbox.checked : false;
         const keywords = removeKeywords && elements.removeKeywordRowsInput ? elements.removeKeywordRowsInput.value.split(',').map(k => k.trim().toLowerCase()).filter(Boolean) : [];
@@ -244,17 +251,17 @@ const ExcelViewer = (() => {
         }
 
         const result = [];
-        const usedNames = new Set(); // 🌟 吸收您的靈感：防重複命名清單
+        const usedNames = new Set(); 
 
-        // 🌟 1. 產生不重複的複合表頭 (將垃圾標題轉廢為寶)
-        if (jsonData.length > 0) {
+        // 🌟 2. 產生精準複合表頭 (避開了被拋棄的垃圾標題)
+        if (jsonData.length > discardCount) {
             const headerRow = visibleCols.map(colRelativeIdx => {
                 const actualColIdx = startCol + colRelativeIdx;
                 const headerParts = [];
                 
-                // 掃描要略過的那些列，把它們的文字串接起來
-                const rowsToScan = skipCount > 0 ? Math.min(skipCount, jsonData.length) : 1;
-                for (let r = 0; r < rowsToScan; r++) {
+                // 掃描範圍：從 discardCount 開始，掃描 headerCount 這麼多列
+                const scanEnd = Math.min(discardCount + headerCount, jsonData.length);
+                for (let r = discardCount; r < scanEnd; r++) {
                     const cellVal = jsonData[r][actualColIdx];
                     if (cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '') {
                         headerParts.push(String(cellVal).replace(/\r?\n|\r/g, '').trim());
@@ -264,7 +271,7 @@ const ExcelViewer = (() => {
                 const uniqueParts = [...new Set(headerParts)];
                 let baseName = uniqueParts.join(' ') || `(空白欄位)`;
                 
-                // 🌟 關鍵修復：套用您的防重複機制 (_2, _3)
+                // 防重複命名機制 (_2, _3)
                 let uniqueName = baseName;
                 let counter = 2;
                 while (usedNames.has(uniqueName)) {
@@ -277,9 +284,8 @@ const ExcelViewer = (() => {
             result.push(headerRow); // 將完美表頭推入作為第一列
         }
 
-        // 🌟 2. 處理實際資料列
-        const dataStartIndex = Math.max(skipCount, 1); // 確保避開已變為表頭的列
-        for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
+        // 🌟 3. 處理實際資料列 (從拋棄列 + 表頭列 之後開始抓)
+        for (let idx = totalSkipCount; idx < jsonData.length; idx++) {
             const row = jsonData[idx];
             const absRow = startRow + idx;
             if (rowProps[absRow]?.hidden) continue; 
@@ -1190,7 +1196,12 @@ const ExcelViewer = (() => {
                 elements[id].addEventListener('input', utils.debounce(markSettingsDirty, 500));
             }
         });
-        if(elements.skipTopRowsCheckbox) elements.skipTopRowsCheckbox.addEventListener('change', e => { if (elements.skipTopRowsInput) elements.skipTopRowsInput.disabled = !e.target.checked; });
+        if(elements.skipTopRowsCheckbox) {
+            elements.skipTopRowsCheckbox.addEventListener('change', e => { 
+                if (elements.discardRowsInput) elements.discardRowsInput.disabled = !e.target.checked; 
+                if (elements.headerRowsInput) elements.headerRowsInput.disabled = !e.target.checked; 
+            });
+        }
         if(elements.removeKeywordRowsCheckbox) elements.removeKeywordRowsCheckbox.addEventListener('change', e => { if (elements.removeKeywordRowsInput) elements.removeKeywordRowsInput.disabled = !e.target.checked; });
         if(elements.reapplySettingsBtn) elements.reapplySettingsBtn.addEventListener('click', reapplyPreprocessing);
 
@@ -1331,4 +1342,5 @@ if (document.readyState === 'loading') {
 } else {
     ExcelViewer.init();
 }
+
 
