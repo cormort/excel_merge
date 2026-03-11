@@ -18,7 +18,7 @@
         <main class="content-area">
             <div id="import-options-container">
                 <fieldset>
-                    <legend>⚙️ 步驟一：選擇匯入方式</legend>
+                    <legend>⚙️ 步驟一：選擇匯入方式與清洗設定</legend>
                     <label class="import-option"><input type="radio" name="import-mode" value="all" title="匯入每個 Excel 檔案中的所有工作表"> 匯入所有工作表</label>
                     <label class="import-option"><input type="radio" name="import-mode" value="first" checked title="僅匯入每個 Excel 檔案的第一張工作表"> 僅匯入第一張工作表</label>
                     <label class="import-option"><input type="radio" name="import-mode" value="position" title="僅匯入指定位置的工作表 (例如: 1, 3, 5-7)"> 匯入指定位置</label>
@@ -28,12 +28,23 @@
                     <label class="import-option"><input type="radio" name="import-mode" value="manual" title="針對每個檔案，手動勾選要匯入的工作表"> 逐一檔案手動決定</label>
 
                     <hr style="margin: 15px 0 10px 0; border: 0; border-top: 1px dashed #dee2e6;">
+                    
+                    <!-- 預處理清洗設定區塊 -->
                     <div style="background-color: #e9ecef; padding: 10px; border-radius: 6px;">
-                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0;">
+                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0 0 8px 0;">
                             <input type="checkbox" id="skip-top-rows-checkbox" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
                             ✂️ 匯入時自動刪除前 
                             <input type="number" id="skip-top-rows-input" value="3" min="1" disabled style="width: 50px; margin: 0 8px; padding: 2px 4px; text-align: center; border: 1px solid #ced4da; border-radius: 4px;"> 
                             列 (去除垃圾標題)
+                        </label>
+                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0 0 8px 0;">
+                            <input type="checkbox" id="remove-empty-rows-checkbox" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
+                            🗑️ 匯入時自動移除「完全空白」的資料列
+                        </label>
+                        <label style="font-weight: 600; color: #495057; display: flex; align-items: center; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="remove-keyword-rows-checkbox" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #667eea;"> 
+                            🚫 匯入時自動剔除包含特定關鍵字的列：
+                            <input type="text" id="remove-keyword-rows-input" placeholder="例如: 小計, 總計 (用逗號分隔)" disabled style="flex: 1; margin-left: 8px; padding: 2px 6px; border: 1px solid #ced4da; border-radius: 4px;"> 
                         </label>
                     </div>
                 </fieldset>
@@ -84,14 +95,12 @@
                             <input type="text" id="select-keyword-input" placeholder="多關鍵字用空格(AND)或逗號(OR)分隔" title="輸入關鍵字以供下方按鈕勾選">                            
                             <label class="checkbox-label"><input type="checkbox" id="select-keyword-regex" title="使用正規表示式來進行關鍵字勾選"> 使用正規表示式</label>
                         </div>
-
                     </div>
                 </div>
                 
                 <div class="control-group-row">
                     <div class="control-group">
                         <label>▶️ 資料列操作 (主畫面)</label>
-                        
                         <div class="button-group">
                             <button class="btn btn-primary" id="select-by-keyword-btn" title="根據上方輸入的關鍵字勾選資料列">依關鍵字勾選</button>
                             <button class="btn btn-primary" id="select-empty-btn" title="勾選所有內容完全空白的資料列">勾選空白列</button>
@@ -108,20 +117,25 @@
                             <button class="btn btn-info hidden" id="merge-view-btn" title="將所有可見表格合併為一個可編輯的新表格">合併檢視</button>
                             <button class="btn btn-info" id="view-checked-combined-btn" title="將所有被勾選的資料列合併為一個新表格">勾選資料列合併檢視</button>
                             <button class="btn btn-info" id="show-hidden-btn" title="(若有) 顯示 Excel 中被隱藏的欄或列">顯示隱藏行列</button>
-                            
                             <button class="btn btn-success" id="export-merged-xlsx-btn" title="將所有可見表格合併並直接匯出為一個 XLSX 檔案">合併所有表格</button>
                         </div>
                     </div>
                 </div> 
-
             </div>
+            
             <div class="status-message hidden" id="load-status-message"></div>
             
+            <!-- [A1] 重新套用設定 Banner -->
+            <div id="reapply-banner" class="reapply-banner hidden">
+                <span>⚠️ 偵測到「清洗設定」已變更，是否使用新設定重新清洗目前已載入的資料？</span>
+                <button id="reapply-settings-btn">重新套用設定</button>
+            </div>
+
             <section id="excel-display-area" class="list-view"></section>
         </main>
     </div>
     
-    
+    <!-- 合併視圖 Modal -->
     <div id="merge-view-modal" class="merge-view-overlay hidden">
         <div class="merge-view-container">
             <header id="merge-view-header">
@@ -131,6 +145,10 @@
                     <button class="btn btn-primary btn-sm" id="column-operations-btn" title="開啟欄位顯示/隱藏/排序選單">欄位操作</button>
                     <button class="btn btn-primary btn-sm" id="sort-merged-by-fund-name-btn" title="根據預設的基金列表排序此合併表格">依基金名稱排序</button>
                     <button class="btn btn-primary btn-sm" id="toggle-source-col-btn" title="切換顯示/隱藏 來源檔案欄位">新增來源欄位</button>
+                    
+                    <!-- [B3] 智慧去重按鈕 -->
+                    <button class="btn btn-warning btn-sm" id="smart-dedup-btn" title="自動比對重複的基金名稱，標記來源不符的舊資料">智慧去重</button>
+                    
                     <button class="btn btn-info btn-sm" id="edit-data-btn" title="啟用/停用表格內容編輯功能">編輯資料</button>
                     <button class="btn btn-success btn-sm hidden" id="save-edits-btn" title="儲存您對表格所做的變更">儲存</button>
                     <button class="btn btn-secondary btn-sm hidden" id="cancel-edits-btn" title="放棄編輯並還原回儲存前的狀態">取消</button>
@@ -142,7 +160,8 @@
                 </div>
                 
                 <button id="toggle-toolbar-btn" class="btn btn-warning btn-sm" title="收合/展開工具列">收合工具列</button>
-                <button id="close-merge-view-btn" class="close-btn" title="關閉合併檢視 (Esc)">&times;</button>
+                <!-- [A3] 關閉按鈕改為最小化提示 -->
+                <button id="close-merge-view-btn" class="close-btn" title="最小化並保留狀態 (Esc)">&times;</button>
             </header>
 
             <div id="collapsible-toolbar-area">
@@ -212,11 +231,21 @@
                 </div>
             </div>
 
+            <!-- [B3] 智慧去重結果面板 -->
+            <div id="dedup-result-panel" class="dedup-result-panel hidden">
+                <span id="dedup-result-text"></span>
+                <div class="button-group">
+                    <button id="clear-dedup-marks-btn" class="btn btn-secondary btn-sm">取消標記</button>
+                    <button id="delete-dedup-marks-btn" class="btn btn-danger btn-sm">刪除勾選列</button>
+                </div>
+            </div>
+
             <div id="merge-view-content">
             </div>
         </div>
     </div>
 
+    <!-- 欄位顯示/隱藏 Modal -->
     <div id="column-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
             <div class="modal-header">
@@ -234,8 +263,33 @@
         </div>
     </div>
 
-    <button id="back-to-top-btn" title="回到工具列">↑</button>
+    <!-- [B3] 智慧去重設定 Modal -->
+    <div id="dedup-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>智慧去重設定</h3>
+                <button id="close-dedup-modal-btn" class="close-btn" title="關閉此視窗 (Esc)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="dedup-col-select">選擇比對基準欄位 (通常為基金名稱或科目)：</label>
+                <select id="dedup-col-select" class="filter-select" style="width: 100%; margin-top: 10px; padding: 8px;"></select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-dedup-btn">取消</button>
+                <button class="btn btn-primary" id="execute-dedup-btn">執行去重比對</button>
+            </div>
+        </div>
+    </div>
 
-    <script src="script.js"></script>
+    <button id="back-to-top-btn" title="回到頂端">↑</button>
+
+    <!-- [A4] Undo 復原吐司通知 -->
+    <div id="undo-toast" class="undo-toast">
+        <span id="undo-text"></span>
+        <button id="undo-btn">復原 (Ctrl+Z)</button>
+    </div>
+
+    <!-- 確保這裡的檔名與你儲存的 JS 檔名一致 (app.js 或 script.js) -->
+    <script src="app.js"></script>
 </body>
 </html>
