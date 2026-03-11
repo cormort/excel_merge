@@ -1012,3 +1012,39 @@ tbody tr:hover td.checkbox-cell { background-color: #ebf4ff !important; }
 #import-options-container hr {
     margin: 6px 0 !important;
 }
+/* =========================================
+   🌟 修正：全選 Checkbox 與表頭雙向釘選 (Sticky)
+========================================= */
+
+/* 1. 讓所有的表頭 (包含主畫面與合併畫面) 在向下捲動時固定在最上方 */
+table thead th, 
+.table-content table thead th, 
+#merge-view-content table thead th {
+    position: sticky !important;
+    top: 0;
+    z-index: 10;
+    /* 這裡非常關鍵：讓表頭文字垂直置中，Checkbox 就不會沉到底部 */
+    vertical-align: middle !important; 
+}
+
+/* 2. 左上角「全選」Checkbox：雙向釘選 (往右、往下都不會跑掉) */
+table thead th.checkbox-cell, 
+.table-content table thead th.checkbox-cell, 
+#merge-view-content table thead th.checkbox-cell {
+    position: sticky !important;
+    top: 0;
+    left: 0;
+    z-index: 30 !important; /* 層級必須最高，才能蓋過其他移動的格子 */
+    background-color: #667eea !important; /* 強制與您的紫色表頭顏色一致 */
+    color: white;
+}
+
+/* 3. 各資料列的 Checkbox：向右捲動時固定在最左側 */
+table tbody td.checkbox-cell,
+.table-content table tbody td.checkbox-cell,
+#merge-view-content table tbody td.checkbox-cell {
+    position: sticky !important;
+    left: 0;
+    z-index: 20 !important;
+    vertical-align: middle !important;
+}
