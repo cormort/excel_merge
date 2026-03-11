@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極效能修復版 (防堵百萬列幽靈範圍卡死、雙軌全功能)
+ * ExcelViewer — 終極效能修復版 (修復合併檢視下拉選單與釘選問題)
  */
 
 const ExcelViewer = (() => {
@@ -214,6 +214,7 @@ const ExcelViewer = (() => {
         });
     }
 
+// 🌟 核心引擎修復：自動加入 (欄位 X) 編號標籤
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -227,7 +228,7 @@ const ExcelViewer = (() => {
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
 
-        // 動態抓取真實寬度，忽略無限延伸的空白欄位
+        // 動態抓取真實寬度
         let maxDataColIdx = -1;
         jsonData.forEach(row => {
             if (row && row.length > 0) {
@@ -246,7 +247,7 @@ const ExcelViewer = (() => {
         const usedNames = new Set(); 
 
         if (jsonData.length > discardCount) {
-            const headerRow = visibleCols.map(colRelativeIdx => {
+            const headerRow = visibleCols.map((colRelativeIdx, index) => { // 🌟 抓取 index
                 const actualColIdx = startCol + colRelativeIdx;
                 const headerParts = [];
                 
@@ -261,7 +262,13 @@ const ExcelViewer = (() => {
                 }
                 
                 const uniqueParts = [...new Set(headerParts)];
-                let baseName = uniqueParts.join('\n') || `(空白欄位)`;
+                
+                // 🌟 【魔法關鍵】：在最前方安插 (欄位 X)
+                const colLabel = `(欄位 ${index + 1})`;
+                const partsString = uniqueParts.join('\n');
+                
+                // 如果下面有實際文字，就用換行符號接起來；如果沒有，就只顯示 (欄位 X)
+                let baseName = partsString ? `${colLabel}\n${partsString}` : colLabel;
                 
                 let uniqueName = baseName;
                 let counter = 2;
@@ -275,7 +282,6 @@ const ExcelViewer = (() => {
             result.push(headerRow);
         }
 
-        // 使用 forEach 迴圈跳過空行
         jsonData.forEach((row, idx) => {
             if (idx < totalSkipCount) return; 
             if (!row) return;
@@ -330,13 +336,9 @@ const ExcelViewer = (() => {
                     const ref = sheet['!ref'];
                     const range = ref ? XLSX.utils.decode_range(ref) : { s: { r: 0, c: 0 }, e: { c: 0 } };
                     
-                    // 🚀🚀🚀 【極限安全閥】：強制切斷幽靈資料範圍！🚀🚀🚀
-                    // 防止政府報表因整欄套色導致範圍高達 100萬列 x 1萬欄
-                    // 限制最大讀取範圍：向下 8000 列、向右 150 欄 (已超過一般報表極限)
                     range.e.r = Math.min(range.e.r, range.s.r + 8000); 
                     range.e.c = Math.min(range.e.c, range.s.c + 150);
 
-                    // 移除 defval: '' 的設定，讓陣列維持稀疏 (Sparse Array)，不再消耗大量記憶體
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, range: range, raw: false });
 
                     if (sheet['!merges']) {
@@ -348,7 +350,6 @@ const ExcelViewer = (() => {
                                 const primaryValue = jsonData[startR][startC];
                                 if (primaryValue === undefined || primaryValue === null || String(primaryValue).trim() === '') return;
 
-                                // 限制合併填滿的迴圈次數，避免卡死
                                 const maxR = Math.min(endR, jsonData.length - 1);
                                 const maxC = Math.min(endC, 150);
                                 
@@ -363,7 +364,6 @@ const ExcelViewer = (() => {
                     }
 
                     const label = `${file.name} (${sheetName})`;
-                    // 直接傳址快取，不再做深拷貝，大幅提升速度
                     state.rawSheetsCache.push({ label, startRow: range.s.r, startCol: range.s.c, endCol: range.e.c, sheet, jsonData: jsonData });
 
                     const filtered = applyPreprocessing(jsonData, sheet, range.s.r, range.s.c, range.e.c);
@@ -456,6 +456,10 @@ const ExcelViewer = (() => {
                             const th = document.createElement('th');
                             td.innerHTML = td.innerHTML.replace(/<br\s*[\/]?>/gi, '___NEWLINE___');
                             th.textContent = td.textContent.replace(/___NEWLINE___/g, '\n').trim();
+                            
+                            // 保留 Excel 原本的行內樣式 (如背景色)
+                            th.style.cssText = td.style.cssText;
+                            
                             td.replaceWith(th);
                         });
                         table.insertBefore(thead, tbody);
@@ -711,6 +715,9 @@ const ExcelViewer = (() => {
         state.mergedHeaders = Array.from(allHeaders);
         state.mergedData = tableData;
         renderMergedTable();
+        
+        // 🌟 補回漏掉的這行，確保下拉選單能抓到合併後的欄位！
+        updateColumnSelects(state.mergedHeaders);
         
         state.isMergedView = true;
         elements.mergeViewModal.classList.remove('hidden');
@@ -1423,7 +1430,7 @@ const ExcelViewer = (() => {
             cacheElements();
             await loadFundConfig();
             bindEvents();
-            console.log("✅ ExcelViewer 初始化成功！極速處理模式已啟動。");
+            console.log("✅ ExcelViewer 初始化成功！雙軌操作模式已啟動。");
         } catch (error) {
             console.error("❌ 初始化過程中發生錯誤：", error);
         }
