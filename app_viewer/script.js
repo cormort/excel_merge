@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 極速秒開版 (包含複合篩選動態收合與防呆)
+ * ExcelViewer — 終極效能修復版 (包含合併視圖條件收合)
  */
 
 const ExcelViewer = (() => {
@@ -135,15 +135,12 @@ const ExcelViewer = (() => {
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
             
-            // 主畫面專屬進階功能 
             mainColumnOperationsBtn: 'main-column-operations-btn',
             mainSmartDedupBtn: 'main-smart-dedup-btn', mainEditDataBtn: 'main-edit-data-btn',
             mainSaveEditsBtn: 'main-save-edits-btn', mainCopyRowsBtn: 'main-copy-rows-btn',
             
-            // 🌟 條件選單收合相關
             toggleMainConditionBtn: 'toggle-main-condition-btn',
             mainCondition2Wrapper: 'main-condition-2-wrapper',
-            
             mainColSelect1: 'main-col-select-1', mainColSelect2: 'main-col-select-2',
             mainInputCriteria1: 'main-input-criteria-1', mainInputCriteria2: 'main-input-criteria-2',
             mainExecuteFilterBtn: 'main-execute-filter-btn',
@@ -159,7 +156,12 @@ const ExcelViewer = (() => {
             searchInputMerged: 'search-input-merged', selectKeywordInputMerged: 'select-keyword-input-merged',
             selectKeywordRegexMerged: 'select-keyword-regex-merged', executeFilterSelectionBtn: 'execute-filter-selection-btn',
             unselectMergedRowsBtn: 'unselect-merged-rows-btn', invertSelectionMergedBtn: 'invert-selection-merged-btn',
+            
+            // 🌟 合併視圖的新增收合按鈕與元素
+            toggleMergeConditionBtn: 'toggle-merge-condition-btn',
+            mergeCondition2Wrapper: 'merge-condition-2-wrapper',
             colSelect1: 'col-select-1', colSelect2: 'col-select-2', inputCriteria1: 'input-criteria-1', inputCriteria2: 'input-criteria-2',
+            
             editDataBtn: 'edit-data-btn', saveEditsBtn: 'save-edits-btn', cancelEditsBtn: 'cancel-edits-btn', addNewRowBtn: 'add-new-row-btn',
             copySelectedRowsBtn: 'copy-selected-rows-btn', deleteMergedRowsBtn: 'delete-merged-rows-btn', toggleTotalRowBtn: 'toggle-total-row-btn',
             toggleSourceColBtn: 'toggle-source-col-btn', exportCurrentMergedXlsxBtn: 'export-current-merged-xlsx-btn',
@@ -553,11 +555,8 @@ const ExcelViewer = (() => {
         state.originalHtmlString = elements.displayArea.innerHTML;
     }
 
-    // 🌟 主畫面複合篩選：加入條件二防呆機制
     function executeMainComplexFilter() {
         const col1 = elements.mainColSelect1?.value;
-        
-        // 防呆：如果條件二被收起來了，就強迫忽略它
         let col2 = elements.mainColSelect2?.value;
         if (elements.mainCondition2Wrapper && elements.mainCondition2Wrapper.classList.contains('hidden')) {
             col2 = ''; 
@@ -587,12 +586,9 @@ const ExcelViewer = (() => {
                 if (colIdx === -1) return null;
                 return row.children[colIdx + 1] ? row.children[colIdx + 1].textContent : '';
             };
-            
-            let cMatch = false;
             const r1 = col1 ? checkValue(getCellText(col1) ?? '', criteria1, inputVal1) : null;
             const r2 = col2 ? checkValue(getCellText(col2) ?? '', criteria2, inputVal2) : null;
-            
-            cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
+            const cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
             if (cMatch) { checkbox.checked = true; count++; }
         });
         alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
@@ -732,6 +728,13 @@ const ExcelViewer = (() => {
     function closeMergeView() {
         if (!elements.mergeViewModal) return;
         if (state.isEditing && !confirm('確定要放棄目前的編輯狀態？')) return;
+        
+        // 關閉時重置合併檢視的條件二狀態
+        if (elements.mergeCondition2Wrapper) {
+            elements.mergeCondition2Wrapper.classList.add('hidden');
+            if (elements.toggleMergeConditionBtn) elements.toggleMergeConditionBtn.textContent = '+ 新增第二條件';
+        }
+
         elements.mergeViewModal.classList.add('hidden');
         document.body.classList.remove('no-scroll');
         state.isMergedView = false;
@@ -942,101 +945,112 @@ const ExcelViewer = (() => {
         syncCheckboxesInScope();
     }
 
-    function updateDropAreaDisplay() {
-        const hasFiles = state.loadedTables > 0;
-        if(elements.dropArea) elements.dropArea.classList.toggle('compact', hasFiles);
-        if(elements.dropAreaInitial) elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
-        if(elements.dropAreaLoaded) elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
-        if(elements.importOptionsContainer) elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
-        if (hasFiles && elements.fileCount && elements.fileNames) {
-            elements.fileCount.textContent = state.loadedTables;
-            elements.fileNames.textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
+    // 🌟 合併畫面複合篩選：加入條件二防呆機制
+    function executeCombinedSelection() {
+        if (!state.isMergedView || !elements.mergeViewContent) return;
+        
+        const col1 = elements.colSelect1?.value;
+        let col2 = elements.colSelect2?.value;
+        if (elements.mergeCondition2Wrapper && elements.mergeCondition2Wrapper.classList.contains('hidden')) {
+            col2 = ''; 
+        }
+        
+        const criteria1 = document.querySelector('input[name="criteria-1"]:checked')?.value;
+        const criteria2 = document.querySelector('input[name="criteria-2"]:checked')?.value;
+        const logicOp = document.querySelector('input[name="logic-op"]:checked')?.value ?? 'and';
+        const inputVal1 = elements.inputCriteria1?.value;
+        const inputVal2 = elements.inputCriteria2?.value;
+
+        if (!col1 && !col2) { alert('請輸入至少一個條件'); return; }
+        const checkValue = (cellVal, cr, val) => {
+            const s = String(cellVal).trim(), v = String(val).trim();
+            return cr === 'empty' ? s === '' : cr === 'zero' ? s === '0' : cr === 'value' ? s !== '' : cr === 'exact' ? s === v : cr === 'includes' ? v !== '' && s.toLowerCase().includes(v.toLowerCase()) : false;
+        };
+
+        let count = 0;
+        elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
+            const checkbox = row.querySelector('.row-checkbox');
+            if (!checkbox) return;
+            const kMatch = false; 
+            let cMatch = false;
+            if (col1 || col2) {
+                const r1 = col1 ? checkValue(row.querySelector(`td[data-col-header="${col1}"]`)?.textContent ?? '', criteria1, inputVal1) : null;
+                const r2 = col2 ? checkValue(row.querySelector(`td[data-col-header="${col2}"]`)?.textContent ?? '', criteria2, inputVal2) : null;
+                cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
+            }
+            if (kMatch || cMatch) { checkbox.checked = true; count++; }
+        });
+        alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
+    }
+
+    function toggleEditMode(startEditing) {
+        state.isEditing = startEditing;
+        if(elements.editDataBtn) elements.editDataBtn.classList.toggle('hidden', startEditing);
+        if(elements.saveEditsBtn) elements.saveEditsBtn.classList.toggle('hidden', !startEditing);
+        if(elements.cancelEditsBtn) elements.cancelEditsBtn.classList.toggle('hidden', !startEditing);
+        
+        ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged', 'unselectMergedRowsBtn', 'smartDedupBtn'].forEach(id => { if (elements[id]) elements[id].disabled = startEditing; });
+        ['inputCriteria1', 'inputCriteria2'].forEach(id => { if (elements[id]) elements[id].disabled = true; });
+        document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => r.disabled = startEditing);
+        renderMergedTable();
+    }
+  
+    function saveEdits() {
+        const backupData = [...state.mergedData];
+        const newData = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr')).map(tr => {
+            const row = {};
+            const origIdx = parseInt(tr.dataset.rowIndex, 10);
+            row._sourceFile = state.showSourceColumn ? tr.querySelector('.source-col').textContent : (state.mergedData[origIdx]?._sourceFile || '(修改)');
+            tr.querySelectorAll('td[data-col-header]').forEach(cell => row[cell.dataset.colHeader] = cell.textContent);
+            return row;
+        });
+        undoManager.push('儲存編輯', () => { state.mergedData = backupData; if (state.isMergedView) renderMergedTable(); });
+        state.mergedData = newData;
+        toggleEditMode(false);
+    }
+
+    function addNewRow() {
+        const newRow = { _isNew: true, _sourceFile: '(新增資料列)' };
+        state.mergedHeaders.forEach(h => newRow[h] = '');
+        state.mergedData.unshift(newRow);
+        toggleEditMode(true);
+    }
+
+    function copySelectedRows() {
+        const selected = elements.mergeViewContent.querySelectorAll('.row-checkbox:checked');
+        if (!selected.length) { alert('請先勾選要複製的資料列。'); return; }
+        const copies = Array.from(selected).map(cb => {
+            const idx = parseInt(cb.closest('tr').dataset.rowIndex, 10);
+            if (isNaN(idx) || !state.mergedData[idx]) return null;
+            const copy = JSON.parse(JSON.stringify(state.mergedData[idx]));
+            copy._isNew = true; copy._sourceFile += ' (複製)';
+            return copy;
+        }).filter(Boolean);
+        state.mergedData.unshift(...copies);
+        toggleEditMode(true);
+    }
+
+    function toggleSourceColumn() {
+        if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
+        state.showSourceColumn = !state.showSourceColumn;
+        renderMergedTable();
+        if(elements.toggleSourceColBtn){
+            elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
+            elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
         }
     }
 
-    function showControls(hiddenCount) { 
-        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden'); 
-        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); 
-        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.toggle('hidden', hiddenCount === 0);
-    }
-
-    function updateSelectionInfo() {
-        if(!elements.displayArea) return;
-        const selected = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
-        if(elements.selectedTablesList) elements.selectedTablesList.textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
-        if(elements.selectedTablesInfo) elements.selectedTablesInfo.classList.toggle('hidden', selected.length === 0);
-    }
-
-    function detectHiddenElements() { return elements.displayArea ? elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length : 0; }
-
-    function updateFileStateAfterDeletion() {
-        if(!elements.displayArea) return;
-        state.loadedTables = elements.displayArea.querySelectorAll('.table-wrapper').length;
-        if (!state.loadedTables) clearAllFiles(true); else { updateDropAreaDisplay(); updateSelectionInfo(); }
-    }
-
-    function clearAllFiles(silent = false) {
-        if (!silent && !confirm('確定清除所有檔案？')) return;
-        if (state.isMergedView) closeMergeView();
-        state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
-        if(elements.displayArea) elements.displayArea.innerHTML = ''; 
-        if (elements.fileInput) elements.fileInput.value = '';
-        updateDropAreaDisplay(); resetControls(); setViewMode('list');
-    }
-
-    function setViewMode(mode) {
-        const isGrid = mode === 'grid';
-        if(elements.displayArea) { elements.displayArea.classList.toggle('grid-view', isGrid); elements.displayArea.classList.toggle('list-view', !isGrid); }
-        if(elements.gridViewBtn) elements.gridViewBtn.classList.toggle('active', isGrid);
-        if(elements.listViewBtn) elements.listViewBtn.classList.toggle('active', !isGrid);
-        if(elements.gridScaleControl) elements.gridScaleControl.classList.toggle('hidden', !isGrid);
-    }
-
-    function updateGridScale() { if(elements.displayArea && elements.gridScaleSlider) elements.displayArea.style.setProperty('--grid-columns', elements.gridScaleSlider.value); }
-
-    function showAllHiddenElements() {
-        if(!elements.displayArea) return;
-        const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
-        if (!hidden.length) return;
-        hidden.forEach(el => el.style.display = '');
-        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.add('hidden');
-        if(elements.loadStatusMessage) elements.loadStatusMessage.classList.add('hidden');
-    }
-
-    function toggleToolbar() { if(elements.collapsibleToolbar) { const collapsed = elements.collapsibleToolbar.classList.toggle('collapsed'); if (elements.toggleToolbarBtn) elements.toggleToolbarBtn.textContent = collapsed ? '展開工具列' : '收合工具列'; } }
-    function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
-    function handleScroll() { if(elements.backToTopBtn) elements.backToTopBtn.classList.toggle('visible', window.scrollY > window.innerHeight / 2); }
-
-    function openPreview(card) {
-        if (state.zoomedCard) return;
-        card.classList.add('is-zoomed'); state.zoomedCard = card; document.body.classList.add('no-scroll');
-    }
-
-    function closePreview() {
-        if (!state.zoomedCard) return;
-        state.zoomedCard.classList.remove('is-zoomed'); state.zoomedCard = null; document.body.classList.remove('no-scroll');
-    }
-
-    function resetView() {
-        if (state.isMergedView) closeMergeView();
-        if (!state.originalHtmlString || !elements.displayArea) return;
-        elements.displayArea.innerHTML = state.originalHtmlString;
-        injectCheckboxes(elements.displayArea);
-        ['searchInput', 'selectKeywordInput'].forEach(id => { if(elements[id]) elements[id].value = ''; });
-        if(elements.selectKeywordRegex) elements.selectKeywordRegex.checked = false;
-        filterTable(); updateSelectionInfo(); setViewMode('list');
-    }
-
-    function handleCriteriaChange(e) {
-        const radio = e.target;
-        if (radio.type !== 'radio') return;
-        const group = radio.closest('.radio-group');
-        if (!group) return;
-        const target = elements[group.dataset.target];
-        if (!target) return;
-        const needsInput = radio.value === 'exact' || radio.value === 'includes';
-        target.disabled = !needsInput;
-        if (needsInput) { target.focus(); } else { target.value = ''; }
+    function calculateTotals() {
+        const totals = {};
+        state.mergedHeaders.forEach(header => {
+            const sum = state.mergedData.reduce((acc, row) => {
+                const n = parseFloat(String(row[header] || '').replace(/,/g, ''));
+                return acc + (isNaN(n) ? 0 : n);
+            }, 0);
+            const hasAnyNumber = state.mergedData.some(row => !isNaN(parseFloat(String(row[header] || '').replace(/,/g, ''))));
+            if (sum !== 0 || hasAnyNumber) totals[header] = sum;
+        });
+        return totals;
     }
 
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
@@ -1290,13 +1304,10 @@ const ExcelViewer = (() => {
         if(elements.mainCopyRowsBtn) elements.mainCopyRowsBtn.addEventListener('click', copyMainSelectedRows);
         if(elements.mainExecuteFilterBtn) elements.mainExecuteFilterBtn.addEventListener('click', executeMainComplexFilter);
 
-        // 🌟 主畫面條件二收合按鈕事件
         if(elements.toggleMainConditionBtn) {
             elements.toggleMainConditionBtn.addEventListener('click', () => {
                 const isHidden = elements.mainCondition2Wrapper.classList.toggle('hidden');
                 elements.toggleMainConditionBtn.textContent = isHidden ? '+ 新增第二條件' : '- 移除第二條件';
-                
-                // 收合時，清空條件二的設定，確保不會干擾篩選
                 if (isHidden) {
                     if (elements.mainColSelect2) elements.mainColSelect2.value = '';
                     if (elements.mainInputCriteria2) {
@@ -1304,6 +1315,23 @@ const ExcelViewer = (() => {
                         elements.mainInputCriteria2.disabled = true;
                     }
                     const emptyRadio = document.querySelector('input[name="main-criteria-2"][value="empty"]');
+                    if (emptyRadio) emptyRadio.checked = true;
+                }
+            });
+        }
+        
+        // 🌟 合併畫面的收合按鈕事件
+        if(elements.toggleMergeConditionBtn) {
+            elements.toggleMergeConditionBtn.addEventListener('click', () => {
+                const isHidden = elements.mergeCondition2Wrapper.classList.toggle('hidden');
+                elements.toggleMergeConditionBtn.textContent = isHidden ? '+ 新增第二條件' : '- 移除第二條件';
+                if (isHidden) {
+                    if (elements.colSelect2) elements.colSelect2.value = '';
+                    if (elements.inputCriteria2) {
+                        elements.inputCriteria2.value = '';
+                        elements.inputCriteria2.disabled = true;
+                    }
+                    const emptyRadio = document.querySelector('input[name="criteria-2"][value="empty"]');
                     if (emptyRadio) emptyRadio.checked = true;
                 }
             });
