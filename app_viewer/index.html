@@ -162,8 +162,13 @@
                         </div>
 
                         <div id="main-complex-filter" class="complex-filter-box" style="margin-top: 10px; padding: 12px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <h5 style="margin-bottom: 8px; color: #4a5568; font-size: 0.95rem; font-weight: 600;">🧮 依欄位條件篩選勾選</h5>
-                            <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <h5 style="margin: 0; color: #4a5568; font-size: 0.95rem; font-weight: 600;">🧮 依欄位條件篩選勾選</h5>
+                                <button id="toggle-main-condition-btn" class="btn btn-secondary" style="height: 22px !important; padding: 0 8px !important; font-size: 11px !important; line-height: 1;">+ 新增第二條件</button>
+                            </div>
+
+                            <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 5px;">
                                 <select id="main-col-select-1" class="filter-select" style="min-width: 150px;"><option value="">-- 選擇欄位 1 --</option></select>
                                 <div class="radio-group" data-target="main-input-criteria-1" style="display: flex; gap: 8px; font-size: 0.9rem;">
                                     <label><input type="radio" name="main-criteria-1" value="empty" checked> 空值</label>
@@ -174,22 +179,26 @@
                                 </div>
                                 <input type="text" id="main-input-criteria-1" class="filter-input" placeholder="輸入比對值" disabled style="padding: 4px 8px;">
                             </div>
-                            <div class="filter-row" style="margin-bottom: 10px; font-size: 0.9rem; color: #4a5568; font-weight: bold;">
-                                <label style="margin-right: 15px;"><input type="radio" name="main-logic-op" value="and" checked> AND (且)</label>
-                                <label><input type="radio" name="main-logic-op" value="or"> OR (或)</label>
-                            </div>
-                            <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
-                                <select id="main-col-select-2" class="filter-select" style="min-width: 150px;"><option value="">-- 選擇欄位 2 (選填) --</option></select>
-                                <div class="radio-group" data-target="main-input-criteria-2" style="display: flex; gap: 8px; font-size: 0.9rem;">
-                                    <label><input type="radio" name="main-criteria-2" value="empty" checked> 空值</label>
-                                    <label><input type="radio" name="main-criteria-2" value="zero"> 為零</label>
-                                    <label><input type="radio" name="main-criteria-2" value="value"> 有值</label>
-                                    <label><input type="radio" name="main-criteria-2" value="exact"> 等於</label>
-                                    <label><input type="radio" name="main-criteria-2" value="includes"> 包含</label>
+                            
+                            <div id="main-condition-2-wrapper" class="hidden" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #cbd5e1;">
+                                <div class="filter-row" style="margin-bottom: 8px; font-size: 0.9rem; color: #4a5568; font-weight: bold;">
+                                    <label style="margin-right: 15px;"><input type="radio" name="main-logic-op" value="and" checked> AND (且)</label>
+                                    <label><input type="radio" name="main-logic-op" value="or"> OR (或)</label>
                                 </div>
-                                <input type="text" id="main-input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled style="padding: 4px 8px;">
+                                <div class="filter-row" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                                    <select id="main-col-select-2" class="filter-select" style="min-width: 150px;"><option value="">-- 選擇欄位 2 (選填) --</option></select>
+                                    <div class="radio-group" data-target="main-input-criteria-2" style="display: flex; gap: 8px; font-size: 0.9rem;">
+                                        <label><input type="radio" name="main-criteria-2" value="empty" checked> 空值</label>
+                                        <label><input type="radio" name="main-criteria-2" value="zero"> 為零</label>
+                                        <label><input type="radio" name="main-criteria-2" value="value"> 有值</label>
+                                        <label><input type="radio" name="main-criteria-2" value="exact"> 等於</label>
+                                        <label><input type="radio" name="main-criteria-2" value="includes"> 包含</label>
+                                    </div>
+                                    <input type="text" id="main-input-criteria-2" class="filter-input" placeholder="輸入比對值" disabled style="padding: 4px 8px;">
+                                </div>
                             </div>
-                            <div style="text-align: right;">
+
+                            <div style="text-align: right; margin-top: 8px;">
                                 <button id="main-execute-filter-btn" class="btn btn-primary btn-sm">🚀 執行進階篩選勾選</button>
                             </div>
                         </div>
@@ -353,6 +362,7 @@
     
 </body>
 </html>
+
 
 
 
