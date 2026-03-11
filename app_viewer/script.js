@@ -1263,23 +1263,49 @@ const ExcelViewer = (() => {
   // ─────────────────────────────────────────────
 
   function bindEvents() {
-    // ── 上傳 ──
-    const dropArea = el.get('dropArea');['dragenter', 'dragover'].forEach(e => dropArea.addEventListener(e, ev => { ev.preventDefault(); dropArea.classList.add('highlight'); }));
-    ['dragleave', 'drop'].forEach(e => dropArea.addEventListener(e, ev => { ev.preventDefault(); dropArea.classList.remove('highlight'); }));
-    dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
-    dropArea.addEventListener('click', () => el.get('fileInput').click());
-    el.get('fileInput').addEventListener('change', e => processFiles(e.target.files));
-    el.get('clearFilesBtn').addEventListener('click', () => clearAllFiles(false));
+    const dropArea = el.get('dropArea');
+    const fileInput = el.get('fileInput');
 
-    // ── 匯入設定 ──
-    el.get('importOptionsContainer').addEventListener('change', e => {
+    // ── 1. 上傳與拖曳事件 (增加防呆與錯誤檢查) ──
+    if (dropArea && fileInput) {
+      ['dragenter', 'dragover'].forEach(e => dropArea.addEventListener(e, ev => { 
+        ev.preventDefault(); 
+        dropArea.classList.add('highlight'); 
+      }));
+      
+      ['dragleave', 'drop'].forEach(e => dropArea.addEventListener(e, ev => { 
+        ev.preventDefault(); 
+        dropArea.classList.remove('highlight'); 
+      }));
+      
+      dropArea.addEventListener('drop', e => processFiles(e.dataTransfer.files));
+      
+      // 確保點擊外框或按鈕時能正確觸發 input，並防止無限迴圈
+      dropArea.addEventListener('click', (e) => {
+        if (e.target !== fileInput) {
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', e => {
+        processFiles(e.target.files);
+        e.target.value = ''; // 清空 value，確保重複上傳同一個檔案也能觸發
+      });
+    } else {
+      console.error("❌ 找不到上傳區塊 (dropArea) 或檔案輸入框 (fileInput)！");
+    }
+
+    el.get('clearFilesBtn')?.addEventListener('click', () => clearAllFiles(false));
+
+    // ── 2. 匯入設定 ──
+    el.get('importOptionsContainer')?.addEventListener('change', e => {
       if (e.target.name !== 'import-mode') return;
       const mode = e.target.value;
       el.get('specificSheetNameGroup').classList.toggle('hidden', mode !== 'specific');
       el.get('specificSheetPositionGroup').classList.toggle('hidden', mode !== 'position');
     });
 
-    // ── 預處理開關與重新套用 [A1] ──['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
+    // ── 3. 預處理開關與重新套用 [A1] ──['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
       el.get(id)?.addEventListener('change', markSettingsDirty);
       el.get(id)?.addEventListener('input', utils.debounce(markSettingsDirty, 500));
     });
@@ -1287,62 +1313,62 @@ const ExcelViewer = (() => {
     el.get('removeKeywordRowsCheckbox')?.addEventListener('change', e => el.get('removeKeywordRowsInput').disabled = !e.target.checked);
     el.get('reapplySettingsBtn')?.addEventListener('click', reapplyPreprocessing);
 
-    // ── 視圖切換 ──
-    el.get('listViewBtn').addEventListener('click', () => setViewMode('list'));
-    el.get('gridViewBtn').addEventListener('click', () => setViewMode('grid'));
-    el.get('gridScaleSlider').addEventListener('input', updateGridScale);
+    // ── 4. 視圖切換 ──
+    el.get('listViewBtn')?.addEventListener('click', () => setViewMode('list'));
+    el.get('gridViewBtn')?.addEventListener('click', () => setViewMode('grid'));
+    el.get('gridScaleSlider')?.addEventListener('input', updateGridScale);
 
-    // ── 表格層級 ──
-    el.get('selectAllTablesBtn').addEventListener('click', () => { el.get('displayArea').querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = true); updateSelectionInfo(); });
-    el.get('unselectAllTablesBtn').addEventListener('click', () => { el.get('displayArea').querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = false); updateSelectionInfo(); });
-    el.get('deleteSelectedTablesBtn').addEventListener('click', () => deleteSelectedTables());
-    el.get('sortByNameBtn').addEventListener('click', sortTablesByFundName);
+    // ── 5. 表格層級 ──
+    el.get('selectAllTablesBtn')?.addEventListener('click', () => { el.get('displayArea').querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = true); updateSelectionInfo(); });
+    el.get('unselectAllTablesBtn')?.addEventListener('click', () => { el.get('displayArea').querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = false); updateSelectionInfo(); });
+    el.get('deleteSelectedTablesBtn')?.addEventListener('click', () => deleteSelectedTables());
+    el.get('sortByNameBtn')?.addEventListener('click', sortTablesByFundName);
 
-    // ── 列層級操作（主表） ──
-    el.get('selectAllBtn').addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
-    el.get('invertSelectionBtn').addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-    el.get('selectEmptyBtn').addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
-    el.get('selectByKeywordBtn').addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
-    el.get('deleteSelectedBtn').addEventListener('click', () => deleteSelectedRows());
-    el.get('searchInput').addEventListener('input', utils.debounce(filterTable, 300));
+    // ── 6. 列層級操作（主表） ──
+    el.get('selectAllBtn')?.addEventListener('click', () => { selectAllRows(); syncCheckboxesInScope(); });
+    el.get('invertSelectionBtn')?.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+    el.get('selectEmptyBtn')?.addEventListener('click', () => { selectEmptyRows(); syncCheckboxesInScope(); });
+    el.get('selectByKeywordBtn')?.addEventListener('click', () => { selectByKeyword(); syncCheckboxesInScope(); });
+    el.get('deleteSelectedBtn')?.addEventListener('click', () => deleteSelectedRows());
+    el.get('searchInput')?.addEventListener('input', utils.debounce(filterTable, 300));
 
-    // ── 全域工具 ──
-    el.get('resetViewBtn').addEventListener('click', resetView);
-    el.get('showHiddenBtn').addEventListener('click', showAllHiddenElements);
-    el.get('exportMergedXlsxBtn').addEventListener('click', exportMergedXlsx);
+    // ── 7. 全域工具 ──
+    el.get('resetViewBtn')?.addEventListener('click', resetView);
+    el.get('showHiddenBtn')?.addEventListener('click', showAllHiddenElements);
+    el.get('exportMergedXlsxBtn')?.addEventListener('click', exportMergedXlsx);
 
-    // ── 合併視圖開啟 ──
-    el.get('mergeViewBtn').addEventListener('click', () => createMergedView('all'));
-    el.get('viewCheckedCombinedBtn').addEventListener('click', () => createMergedView('checked'));
-    el.get('closeMergeViewBtn').addEventListener('click', closeMergeView);
+    // ── 8. 合併視圖開啟 ──
+    el.get('mergeViewBtn')?.addEventListener('click', () => createMergedView('all'));
+    el.get('viewCheckedCombinedBtn')?.addEventListener('click', () => createMergedView('checked'));
+    el.get('closeMergeViewBtn')?.addEventListener('click', closeMergeView);
 
-    // ── 合併視圖工具列 ──
-    el.get('searchInputMerged').addEventListener('input', utils.debounce(filterTable, 300));
+    // ── 9. 合併視圖工具列 ──
+    el.get('searchInputMerged')?.addEventListener('input', utils.debounce(filterTable, 300));
     el.get('executeFilterSelectionBtn')?.addEventListener('click', () => { executeCombinedSelection(); syncCheckboxesInScope(); });
-    el.get('invertSelectionMergedBtn').addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
-    el.get('unselectMergedRowsBtn').addEventListener('click', unselectAllMergedRows);
-    el.get('toggleToolbarBtn').addEventListener('click', toggleToolbar);
+    el.get('invertSelectionMergedBtn')?.addEventListener('click', () => { invertSelection(); syncCheckboxesInScope(); });
+    el.get('unselectMergedRowsBtn')?.addEventListener('click', unselectAllMergedRows);
+    el.get('toggleToolbarBtn')?.addEventListener('click', toggleToolbar);
 
-    // ── 合併視圖操作 ──
-    el.get('editDataBtn').addEventListener('click', () => toggleEditMode(true));
-    el.get('saveEditsBtn').addEventListener('click', saveEdits);
-    el.get('cancelEditsBtn').addEventListener('click', () => toggleEditMode(false));
-    el.get('addNewRowBtn').addEventListener('click', addNewRow);
-    el.get('copySelectedRowsBtn').addEventListener('click', copySelectedRows);
-    el.get('deleteMergedRowsBtn').addEventListener('click', () => deleteSelectedRows());
-    el.get('toggleTotalRowBtn').addEventListener('click', () => { state.showTotalRow = !state.showTotalRow; renderMergedTable(); });
-    el.get('toggleSourceColBtn').addEventListener('click', toggleSourceColumn);
-    el.get('exportCurrentMergedXlsxBtn').addEventListener('click', exportCurrentMergedXlsx);
-    el.get('sortMergedByNameBtn').addEventListener('click', sortMergedTableByFundName);
+    // ── 10. 合併視圖操作 ──
+    el.get('editDataBtn')?.addEventListener('click', () => toggleEditMode(true));
+    el.get('saveEditsBtn')?.addEventListener('click', saveEdits);
+    el.get('cancelEditsBtn')?.addEventListener('click', () => toggleEditMode(false));
+    el.get('addNewRowBtn')?.addEventListener('click', addNewRow);
+    el.get('copySelectedRowsBtn')?.addEventListener('click', copySelectedRows);
+    el.get('deleteMergedRowsBtn')?.addEventListener('click', () => deleteSelectedRows());
+    el.get('toggleTotalRowBtn')?.addEventListener('click', () => { state.showTotalRow = !state.showTotalRow; renderMergedTable(); });
+    el.get('toggleSourceColBtn')?.addEventListener('click', toggleSourceColumn);
+    el.get('exportCurrentMergedXlsxBtn')?.addEventListener('click', exportCurrentMergedXlsx);
+    el.get('sortMergedByNameBtn')?.addEventListener('click', sortMergedTableByFundName);
 
-    // ── 欄位 Modal ──
-    el.get('columnOperationsBtn').addEventListener('click', () => toggleColumnModal(true));
-    el.get('closeColumnModalBtn').addEventListener('click', () => toggleColumnModal(false));
-    el.get('applyColumnChangesBtn').addEventListener('click', () => { applyColumnChanges(); toggleColumnModal(false); });
-    el.get('modalCheckAll').addEventListener('click', () => { el.get('columnChecklist').querySelectorAll('input').forEach(i => i.checked = true); });
-    el.get('modalUncheckAll').addEventListener('click', () => { el.get('columnChecklist').querySelectorAll('input').forEach(i => i.checked = false); });
+    // ── 11. 欄位 Modal ──
+    el.get('columnOperationsBtn')?.addEventListener('click', () => toggleColumnModal(true));
+    el.get('closeColumnModalBtn')?.addEventListener('click', () => toggleColumnModal(false));
+    el.get('applyColumnChangesBtn')?.addEventListener('click', () => { applyColumnChanges(); toggleColumnModal(false); });
+    el.get('modalCheckAll')?.addEventListener('click', () => { el.get('columnChecklist').querySelectorAll('input').forEach(i => i.checked = true); });
+    el.get('modalUncheckAll')?.addEventListener('click', () => { el.get('columnChecklist').querySelectorAll('input').forEach(i => i.checked = false); });
 
-    // ── 智慧去重 [B3] ──
+    // ── 12. 智慧去重 [B3] ──
     el.get('smartDedupBtn')?.addEventListener('click', () => { el.get('dedupColSelect').innerHTML = state.mergedHeaders.map(h=>`<option>${h}</option>`).join(''); el.get('dedupModal').classList.remove('hidden'); });
     el.get('closeDedupModalBtn')?.addEventListener('click', () => el.get('dedupModal').classList.add('hidden'));
     el.get('cancelDedupBtn')?.addEventListener('click', () => el.get('dedupModal').classList.add('hidden'));
@@ -1350,38 +1376,30 @@ const ExcelViewer = (() => {
     el.get('clearDedupMarksBtn')?.addEventListener('click', clearDedupMarks);
     el.get('deleteDedupMarksBtn')?.addEventListener('click', () => deleteSelectedRows());
 
-    // ── 合併視圖表頭點擊（排序 / 刪欄） ──
-    el.get('mergeViewContent').addEventListener('click', e => {
+    // ── 13. 合併視圖表頭點擊（排序 / 刪欄） ──
+    el.get('mergeViewContent')?.addEventListener('click', e => {
       const th = e.target.closest('th:not(.checkbox-cell)');
       const delBtn = e.target.closest('.delete-col-btn');
       if (delBtn && th) { e.stopPropagation(); deleteColumn(delBtn.dataset.header); }
       else if (th) { handleMergedHeaderClick(th); }
     });
 
-    // ── 條件篩選 radio 連動 ──
-    el.get('mergeViewModal').addEventListener('change', e => {
+    // ── 14. 條件篩選 radio 連動 ──
+    el.get('mergeViewModal')?.addEventListener('change', e => {
       if (e.target.name === 'criteria-1' || e.target.name === 'criteria-2') handleCriteriaChange(e);
     });
 
-    // ── 主顯示區委派事件 ──
-    el.get('displayArea').addEventListener('change', e => {
-      if (e.target.matches('.table-select-checkbox, [id^="select-all-cb"], .row-checkbox')) syncCheckboxesInScope();
+    // ── 15. 主顯示區委派事件 ──
+    el.get('displayArea')?.addEventListener('change', e => {
+      if (e.target.matches('.table-select-checkbox,[id^="select-all-cb"], .row-checkbox')) syncCheckboxesInScope();
     });
-    el.get('displayArea').addEventListener('click', e => {
+    el.get('displayArea')?.addEventListener('click', e => {
       const card = e.target.closest('.table-wrapper');
       if (!card) return;
 
       if (e.target.classList.contains('close-zoom')) { closePreview(); return; }
-
-      if (e.target.classList.contains('delete-rows-btn')) {
-        deleteSelectedRows(card);
-        return;
-      }
-
-      if (e.target.classList.contains('delete-table-btn')) {
-        deleteSelectedTables(card);
-        return;
-      }
+      if (e.target.classList.contains('delete-rows-btn')) { deleteSelectedRows(card); return; }
+      if (e.target.classList.contains('delete-table-btn')) { deleteSelectedTables(card); return; }
 
       const isGridView = el.get('displayArea').classList.contains('grid-view');
       if (isGridView && !card.classList.contains('is-zoomed') && !e.target.matches('input, a, button, .btn')) {
@@ -1389,20 +1407,20 @@ const ExcelViewer = (() => {
       }
     });
 
-    // ── Enter 快捷鍵（關鍵字輸入框） ──
+    // ── 16. Enter 快捷鍵（關鍵字輸入框） ──
     const onKeywordEnter = e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       state.isMergedView ? el.get('executeFilterSelectionBtn').click() : el.get('selectByKeywordBtn').click();
     };
-    el.get('selectKeywordInput').addEventListener('keydown', onKeywordEnter);
-    el.get('selectKeywordInputMerged').addEventListener('keydown', onKeywordEnter);
+    el.get('selectKeywordInput')?.addEventListener('keydown', onKeywordEnter);
+    el.get('selectKeywordInputMerged')?.addEventListener('keydown', onKeywordEnter);
 
-    // ── 捲動 / 返回頂端 ──
-    el.get('backToTopBtn').addEventListener('click', scrollToTop);
+    // ── 17. 捲動 / 返回頂端 ──
+    el.get('backToTopBtn')?.addEventListener('click', scrollToTop);
     window.addEventListener('scroll', handleScroll);
 
-    // ── Undo 快捷鍵與 ESC 關閉 Modal [A4] ──
+    // ── 18. Undo 快捷鍵與 ESC 關閉 Modal [A4] ──
     document.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoManager.undoLast(); }
       if (e.key === 'Escape') {
@@ -1420,14 +1438,22 @@ const ExcelViewer = (() => {
   // ─────────────────────────────────────────────
 
   async function init() {
-    el.init();
-    await loadFundConfig();
-    bindEvents();
+    try {
+      el.init();
+      await loadFundConfig();
+      bindEvents();
+      console.log("✅ ExcelViewer 初始化成功，事件已綁定！");
+    } catch (error) {
+      console.error("❌ 初始化過程中發生錯誤：", error);
+    }
   }
 
   return { init };
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+// 確保在各種載入情況下（包含 GitHub Pages 延遲載入）都能正確執行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', ExcelViewer.init);
+} else {
   ExcelViewer.init();
-});
+}
