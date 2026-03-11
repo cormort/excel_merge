@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極效能修復版 (修復合併檢視下拉選單與釘選問題)
+ * ExcelViewer — 極速秒開版 (包含複合篩選動態收合與防呆)
  */
 
 const ExcelViewer = (() => {
@@ -135,9 +135,15 @@ const ExcelViewer = (() => {
             listViewBtn: 'list-view-btn', gridViewBtn: 'grid-view-btn', backToTopBtn: 'back-to-top-btn',
             gridScaleControl: 'grid-scale-control', gridScaleSlider: 'grid-scale-slider',
             
+            // 主畫面專屬進階功能 
             mainColumnOperationsBtn: 'main-column-operations-btn',
             mainSmartDedupBtn: 'main-smart-dedup-btn', mainEditDataBtn: 'main-edit-data-btn',
             mainSaveEditsBtn: 'main-save-edits-btn', mainCopyRowsBtn: 'main-copy-rows-btn',
+            
+            // 🌟 條件選單收合相關
+            toggleMainConditionBtn: 'toggle-main-condition-btn',
+            mainCondition2Wrapper: 'main-condition-2-wrapper',
+            
             mainColSelect1: 'main-col-select-1', mainColSelect2: 'main-col-select-2',
             mainInputCriteria1: 'main-input-criteria-1', mainInputCriteria2: 'main-input-criteria-2',
             mainExecuteFilterBtn: 'main-execute-filter-btn',
@@ -214,7 +220,6 @@ const ExcelViewer = (() => {
         });
     }
 
-// 🌟 核心引擎修復：自動加入 (欄位 X) 編號標籤
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -228,7 +233,6 @@ const ExcelViewer = (() => {
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
 
-        // 動態抓取真實寬度
         let maxDataColIdx = -1;
         jsonData.forEach(row => {
             if (row && row.length > 0) {
@@ -247,7 +251,7 @@ const ExcelViewer = (() => {
         const usedNames = new Set(); 
 
         if (jsonData.length > discardCount) {
-            const headerRow = visibleCols.map((colRelativeIdx, index) => { // 🌟 抓取 index
+            const headerRow = visibleCols.map((colRelativeIdx, index) => { 
                 const actualColIdx = startCol + colRelativeIdx;
                 const headerParts = [];
                 
@@ -262,12 +266,8 @@ const ExcelViewer = (() => {
                 }
                 
                 const uniqueParts = [...new Set(headerParts)];
-                
-                // 🌟 【魔法關鍵】：在最前方安插 (欄位 X)
                 const colLabel = `(欄位 ${index + 1})`;
                 const partsString = uniqueParts.join('\n');
-                
-                // 如果下面有實際文字，就用換行符號接起來；如果沒有，就只顯示 (欄位 X)
                 let baseName = partsString ? `${colLabel}\n${partsString}` : colLabel;
                 
                 let uniqueName = baseName;
@@ -456,10 +456,7 @@ const ExcelViewer = (() => {
                             const th = document.createElement('th');
                             td.innerHTML = td.innerHTML.replace(/<br\s*[\/]?>/gi, '___NEWLINE___');
                             th.textContent = td.textContent.replace(/___NEWLINE___/g, '\n').trim();
-                            
-                            // 保留 Excel 原本的行內樣式 (如背景色)
                             th.style.cssText = td.style.cssText;
-                            
                             td.replaceWith(th);
                         });
                         table.insertBefore(thead, tbody);
@@ -556,9 +553,16 @@ const ExcelViewer = (() => {
         state.originalHtmlString = elements.displayArea.innerHTML;
     }
 
+    // 🌟 主畫面複合篩選：加入條件二防呆機制
     function executeMainComplexFilter() {
         const col1 = elements.mainColSelect1?.value;
-        const col2 = elements.mainColSelect2?.value;
+        
+        // 防呆：如果條件二被收起來了，就強迫忽略它
+        let col2 = elements.mainColSelect2?.value;
+        if (elements.mainCondition2Wrapper && elements.mainCondition2Wrapper.classList.contains('hidden')) {
+            col2 = ''; 
+        }
+        
         const criteria1 = document.querySelector('input[name="main-criteria-1"]:checked')?.value;
         const criteria2 = document.querySelector('input[name="main-criteria-2"]:checked')?.value;
         const logicOp = document.querySelector('input[name="main-logic-op"]:checked')?.value ?? 'and';
@@ -583,9 +587,12 @@ const ExcelViewer = (() => {
                 if (colIdx === -1) return null;
                 return row.children[colIdx + 1] ? row.children[colIdx + 1].textContent : '';
             };
+            
+            let cMatch = false;
             const r1 = col1 ? checkValue(getCellText(col1) ?? '', criteria1, inputVal1) : null;
             const r2 = col2 ? checkValue(getCellText(col2) ?? '', criteria2, inputVal2) : null;
-            const cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
+            
+            cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
             if (cMatch) { checkbox.checked = true; count++; }
         });
         alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
@@ -715,8 +722,6 @@ const ExcelViewer = (() => {
         state.mergedHeaders = Array.from(allHeaders);
         state.mergedData = tableData;
         renderMergedTable();
-        
-        // 🌟 補回漏掉的這行，確保下拉選單能抓到合併後的欄位！
         updateColumnSelects(state.mergedHeaders);
         
         state.isMergedView = true;
@@ -1285,6 +1290,25 @@ const ExcelViewer = (() => {
         if(elements.mainCopyRowsBtn) elements.mainCopyRowsBtn.addEventListener('click', copyMainSelectedRows);
         if(elements.mainExecuteFilterBtn) elements.mainExecuteFilterBtn.addEventListener('click', executeMainComplexFilter);
 
+        // 🌟 主畫面條件二收合按鈕事件
+        if(elements.toggleMainConditionBtn) {
+            elements.toggleMainConditionBtn.addEventListener('click', () => {
+                const isHidden = elements.mainCondition2Wrapper.classList.toggle('hidden');
+                elements.toggleMainConditionBtn.textContent = isHidden ? '+ 新增第二條件' : '- 移除第二條件';
+                
+                // 收合時，清空條件二的設定，確保不會干擾篩選
+                if (isHidden) {
+                    if (elements.mainColSelect2) elements.mainColSelect2.value = '';
+                    if (elements.mainInputCriteria2) {
+                        elements.mainInputCriteria2.value = '';
+                        elements.mainInputCriteria2.disabled = true;
+                    }
+                    const emptyRadio = document.querySelector('input[name="main-criteria-2"][value="empty"]');
+                    if (emptyRadio) emptyRadio.checked = true;
+                }
+            });
+        }
+
         if(elements.selectAllTablesBtn) elements.selectAllTablesBtn.addEventListener('click', () => { if(elements.displayArea) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = true); updateSelectionInfo(); } });
         if(elements.unselectAllTablesBtn) elements.unselectAllTablesBtn.addEventListener('click', () => { if(elements.displayArea) { elements.displayArea.querySelectorAll('.table-select-checkbox').forEach(cb => cb.checked = false); updateSelectionInfo(); } });
         if(elements.deleteSelectedTablesBtn) elements.deleteSelectedTablesBtn.addEventListener('click', () => deleteSelectedTables());
@@ -1430,7 +1454,7 @@ const ExcelViewer = (() => {
             cacheElements();
             await loadFundConfig();
             bindEvents();
-            console.log("✅ ExcelViewer 初始化成功！雙軌操作模式已啟動。");
+            console.log("✅ ExcelViewer 初始化成功！");
         } catch (error) {
             console.error("❌ 初始化過程中發生錯誤：", error);
         }
