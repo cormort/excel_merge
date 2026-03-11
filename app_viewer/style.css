@@ -723,4 +723,85 @@ table tbody tr:hover {
     text-align: center;
 }
 
+/* =========================================
+   優化 Sprint 1 新增樣式 (A1, A3, A4, B3)
+   ========================================= */
+
+/* A1: 重新套用設定 Banner */
+.reapply-banner {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 10px 15px;
+    border: 1px solid #ffeeba;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.reapply-banner button {
+    background-color: #ffc107;
+    color: #212529;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.reapply-banner button:hover { background-color: #e0a800; }
+
+/* A4: Undo 復原吐司通知 */
+.undo-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background-color: #343a40;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 9999;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.undo-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+.undo-toast button {
+    background-color: #17a2b8;
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.undo-toast button:hover { background-color: #138496; }
+
+/* B3: 智慧去重標記列 */
+tr.dedup-marked td {
+    background-color: #ffe8e8 !important;
+}
+tr.dedup-marked td:first-child {
+    border-left: 4px solid #ff9800 !important;
+}
+
+/* B3: 去重結果面板 */
+.dedup-result-panel {
+    background-color: #e8f4f8;
+    border: 1px solid #b8daff;
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
