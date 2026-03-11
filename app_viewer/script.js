@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 終極效能修復版 (解決卡死問題、保留雙軌全功能)
+ * ExcelViewer — 極速秒開版 (修正 Sparse Array 效能陷阱、包含雙軌全功能)
  */
 
 const ExcelViewer = (() => {
@@ -214,7 +214,7 @@ const ExcelViewer = (() => {
         });
     }
 
-    // 🌟 核心引擎修復：O(1) 效能升級與防呆邊界判定
+    // 🚀 【核心修正】: 全面改回 forEach，避開 100 萬列空白陷阱，找回秒開速度
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -228,18 +228,14 @@ const ExcelViewer = (() => {
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
 
-        // 【極限安全閥 1】: 找出真正有資料的最右側欄位，拋棄 Excel 的無限空白格式 (可達 16384 欄)
+        // 避免檢查到 16384 個空白欄位，動態抓取真實寬度
         let maxDataColIdx = -1;
-        for (let i = Math.max(0, discardCount); i < jsonData.length; i++) {
-            if (jsonData[i]) {
-                for (let j = jsonData[i].length - 1; j > maxDataColIdx; j--) {
-                    if (jsonData[i][j] !== undefined && jsonData[i][j] !== null && String(jsonData[i][j]).trim() !== '') {
-                        maxDataColIdx = j;
-                        break;
-                    }
-                }
+        jsonData.forEach(row => {
+            if (row && row.length > 0) {
+                const maxKey = row.length - 1;
+                if (maxKey > maxDataColIdx) maxDataColIdx = maxKey;
             }
-        }
+        });
         const effectiveEndCol = Math.min(endCol, startCol + Math.max(maxDataColIdx, 0));
 
         const visibleCols = [];
@@ -248,8 +244,7 @@ const ExcelViewer = (() => {
         }
 
         const result = [];
-        // 【極限安全閥 2】: 使用 Map 進行 O(1) 的超高速防重複命名 (解決卡死的核心)
-        const nameCounts = new Map();
+        const usedNames = new Set(); 
 
         if (jsonData.length > discardCount) {
             const headerRow = visibleCols.map(colRelativeIdx => {
@@ -269,43 +264,41 @@ const ExcelViewer = (() => {
                 const uniqueParts = [...new Set(headerParts)];
                 let baseName = uniqueParts.join('\n') || `(空白欄位)`;
                 
-                // O(1) 的防重複命名魔法
                 let uniqueName = baseName;
-                if (nameCounts.has(baseName)) {
-                    let count = nameCounts.get(baseName) + 1;
-                    uniqueName = `${baseName}_${count}`;
-                    nameCounts.set(baseName, count);
-                } else {
-                    nameCounts.set(baseName, 1);
+                let counter = 2;
+                while (usedNames.has(uniqueName)) {
+                    uniqueName = `${baseName}_${counter}`;
+                    counter++;
                 }
+                usedNames.add(uniqueName);
                 return uniqueName;
             });
             result.push(headerRow);
         }
 
-        const dataStartIndex = Math.max(totalSkipCount, 1);
-        for (let idx = dataStartIndex; idx < jsonData.length; idx++) {
-            const row = jsonData[idx];
-            if (!row) continue;
+        // 🚀【速度爆發點】: 還原原始版本的 forEach，自動跳過 100 萬列空白虛擬格式
+        jsonData.forEach((row, idx) => {
+            if (idx < totalSkipCount) return; 
+            if (!row) return;
 
             const absRow = startRow + idx;
-            if (rowProps[absRow]?.hidden) continue; 
+            if (rowProps[absRow]?.hidden) return; 
 
-            // 還原原始版本的取值寫法，確保速度最快
             const newRow = visibleCols.map(i => (row[i] !== undefined ? row[i] : ''));
             const isEmpty = newRow.every(c => String(c).trim() === '');
-            if (removeEmpty && isEmpty) continue; 
+            if (removeEmpty && isEmpty) return; 
 
             if (keywords.length > 0 && !isEmpty) {
                 const content = newRow.join(' ').toLowerCase();
-                if (keywords.some(k => content.includes(k))) continue; 
+                if (keywords.some(k => content.includes(k))) return; 
             }
             
-            // 還原原始版本的空白列剔除機制
+            // 剔除全空陣列，還原原本的保險機制
             if (newRow.some(cell => String(cell).trim() !== '')) {
                 result.push(newRow);
             }
-        }
+        });
+        
         return result;
     }
 
@@ -320,7 +313,7 @@ const ExcelViewer = (() => {
         const sheetCriteria = { name: elements.specificSheetNameInput?.value.trim() || '', position: elements.specificSheetPositionInput?.value.trim() || '' };
 
         state.isProcessing = true;
-        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">讀取中... </div>';
+        if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">高速讀取中...</div>';
         resetControls(true);
         state.rawSheetsCache = []; state.loadedFiles = [];
         const tablesToRender = [];
@@ -328,7 +321,7 @@ const ExcelViewer = (() => {
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if(elements.displayArea) elements.displayArea.innerHTML = `<div class="loading">讀取中... (${i + 1}/${files.length})</div>`;
+                if(elements.displayArea) elements.displayArea.innerHTML = `<div class="loading">高速讀取中... (${i + 1}/${files.length})</div>`;
 
                 const binary = await utils.readFileAsBinary(file);
                 const workbook = XLSX.read(binary, { type: 'binary', cellStyles: true });
@@ -343,14 +336,15 @@ const ExcelViewer = (() => {
 
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
 
-                    // 還原原始版本的合併填滿邏輯，確保相容性
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
                             const startR = merge.s.r - startRow, startC = merge.s.c - startCol;
                             const endR = merge.e.r - startRow, endC = merge.e.c - startCol;
                             if (startR >= 0 && startC >= 0 && jsonData[startR]) {
                                 const primaryValue = jsonData[startR][startC];
-                                for (let r = startR; r <= endR; r++) {
+                                // 極限安全閥：避免有人在整欄套用合併格式卡死 CPU
+                                const maxR = Math.min(endR, jsonData.length - 1);
+                                for (let r = startR; r <= maxR; r++) {
                                     if (jsonData[r]) {
                                         for (let c = startC; c <= endC; c++) {
                                             jsonData[r][c] = primaryValue;
@@ -362,7 +356,6 @@ const ExcelViewer = (() => {
                     }
 
                     const label = `${file.name} (${sheetName})`;
-                    // 快取時不再做深拷貝，大幅節省記憶體
                     state.rawSheetsCache.push({ label, startRow, startCol, endCol, sheet, jsonData: jsonData });
 
                     const filtered = applyPreprocessing(jsonData, sheet, startRow, startCol, endCol);
@@ -1038,6 +1031,103 @@ const ExcelViewer = (() => {
         return totals;
     }
 
+    function updateDropAreaDisplay() {
+        const hasFiles = state.loadedTables > 0;
+        if(elements.dropArea) elements.dropArea.classList.toggle('compact', hasFiles);
+        if(elements.dropAreaInitial) elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
+        if(elements.dropAreaLoaded) elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
+        if(elements.importOptionsContainer) elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
+        if (hasFiles && elements.fileCount && elements.fileNames) {
+            elements.fileCount.textContent = state.loadedTables;
+            elements.fileNames.textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
+        }
+    }
+
+    function showControls(hiddenCount) { 
+        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden'); 
+        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); 
+        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.toggle('hidden', hiddenCount === 0);
+    }
+
+    function updateSelectionInfo() {
+        if(!elements.displayArea) return;
+        const selected = elements.displayArea.querySelectorAll('.table-select-checkbox:checked, .table-select-checkbox:indeterminate');
+        if(elements.selectedTablesList) elements.selectedTablesList.textContent = Array.from(selected).map(cb => cb.closest('.table-header').querySelector('h4').textContent).join('; ');
+        if(elements.selectedTablesInfo) elements.selectedTablesInfo.classList.toggle('hidden', selected.length === 0);
+    }
+
+    function detectHiddenElements() { return elements.displayArea ? elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]').length : 0; }
+
+    function updateFileStateAfterDeletion() {
+        if(!elements.displayArea) return;
+        state.loadedTables = elements.displayArea.querySelectorAll('.table-wrapper').length;
+        if (!state.loadedTables) clearAllFiles(true); else { updateDropAreaDisplay(); updateSelectionInfo(); }
+    }
+
+    function clearAllFiles(silent = false) {
+        if (!silent && !confirm('確定清除所有檔案？')) return;
+        if (state.isMergedView) closeMergeView();
+        state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
+        if(elements.displayArea) elements.displayArea.innerHTML = ''; 
+        if (elements.fileInput) elements.fileInput.value = '';
+        updateDropAreaDisplay(); resetControls(); setViewMode('list');
+    }
+
+    function setViewMode(mode) {
+        const isGrid = mode === 'grid';
+        if(elements.displayArea) { elements.displayArea.classList.toggle('grid-view', isGrid); elements.displayArea.classList.toggle('list-view', !isGrid); }
+        if(elements.gridViewBtn) elements.gridViewBtn.classList.toggle('active', isGrid);
+        if(elements.listViewBtn) elements.listViewBtn.classList.toggle('active', !isGrid);
+        if(elements.gridScaleControl) elements.gridScaleControl.classList.toggle('hidden', !isGrid);
+    }
+
+    function updateGridScale() { if(elements.displayArea && elements.gridScaleSlider) elements.displayArea.style.setProperty('--grid-columns', elements.gridScaleSlider.value); }
+
+    function showAllHiddenElements() {
+        if(!elements.displayArea) return;
+        const hidden = elements.displayArea.querySelectorAll('tr[style*="display: none"], td[style*="display: none"], th[style*="display: none"]');
+        if (!hidden.length) return;
+        hidden.forEach(el => el.style.display = '');
+        if(elements.showHiddenBtn) elements.showHiddenBtn.classList.add('hidden');
+        if(elements.loadStatusMessage) elements.loadStatusMessage.classList.add('hidden');
+    }
+
+    function toggleToolbar() { if(elements.collapsibleToolbar) { const collapsed = elements.collapsibleToolbar.classList.toggle('collapsed'); if (elements.toggleToolbarBtn) elements.toggleToolbarBtn.textContent = collapsed ? '展開工具列' : '收合工具列'; } }
+    function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    function handleScroll() { if(elements.backToTopBtn) elements.backToTopBtn.classList.toggle('visible', window.scrollY > window.innerHeight / 2); }
+
+    function openPreview(card) {
+        if (state.zoomedCard) return;
+        card.classList.add('is-zoomed'); state.zoomedCard = card; document.body.classList.add('no-scroll');
+    }
+
+    function closePreview() {
+        if (!state.zoomedCard) return;
+        state.zoomedCard.classList.remove('is-zoomed'); state.zoomedCard = null; document.body.classList.remove('no-scroll');
+    }
+
+    function resetView() {
+        if (state.isMergedView) closeMergeView();
+        if (!state.originalHtmlString || !elements.displayArea) return;
+        elements.displayArea.innerHTML = state.originalHtmlString;
+        injectCheckboxes(elements.displayArea);
+        ['searchInput', 'selectKeywordInput'].forEach(id => { if(elements[id]) elements[id].value = ''; });
+        if(elements.selectKeywordRegex) elements.selectKeywordRegex.checked = false;
+        filterTable(); updateSelectionInfo(); setViewMode('list');
+    }
+
+    function handleCriteriaChange(e) {
+        const radio = e.target;
+        if (radio.type !== 'radio') return;
+        const group = radio.closest('.radio-group');
+        if (!group) return;
+        const target = elements[group.dataset.target];
+        if (!target) return;
+        const needsInput = radio.value === 'exact' || radio.value === 'includes';
+        target.disabled = !needsInput;
+        if (needsInput) { target.focus(); } else { target.value = ''; }
+    }
+
     function extractTableData(table, { onlySelected = false, includeFilename = false } = {}) {
         const data = [];
         const headerRow = table.querySelector('thead tr');
@@ -1434,7 +1524,7 @@ const ExcelViewer = (() => {
             cacheElements();
             await loadFundConfig();
             bindEvents();
-            console.log("✅ ExcelViewer 初始化成功！雙軌操作模式已啟動。");
+            console.log("✅ ExcelViewer 初始化成功！極速處理模式已啟動。");
         } catch (error) {
             console.error("❌ 初始化過程中發生錯誤：", error);
         }
