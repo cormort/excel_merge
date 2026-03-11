@@ -1,5 +1,5 @@
 /**
- * ExcelViewer — 極速秒開版 (修正 Sparse Array 效能陷阱、包含雙軌全功能)
+ * ExcelViewer — 終極效能修復版 (防堵百萬列幽靈範圍卡死、雙軌全功能)
  */
 
 const ExcelViewer = (() => {
@@ -214,7 +214,6 @@ const ExcelViewer = (() => {
         });
     }
 
-    // 🚀 【核心修正】: 全面改回 forEach，避開 100 萬列空白陷阱，找回秒開速度
     function applyPreprocessing(jsonData, sheet, startRow, startCol, endCol) {
         const useHeaderCompression = elements.skipTopRowsCheckbox && elements.skipTopRowsCheckbox.checked;
         const discardCount = useHeaderCompression && elements.discardRowsInput ? parseInt(elements.discardRowsInput.value, 10) || 0 : 0;
@@ -228,7 +227,7 @@ const ExcelViewer = (() => {
         const colProps = sheet['!cols'] || [];
         const rowProps = sheet['!rows'] || [];
 
-        // 避免檢查到 16384 個空白欄位，動態抓取真實寬度
+        // 動態抓取真實寬度，忽略無限延伸的空白欄位
         let maxDataColIdx = -1;
         jsonData.forEach(row => {
             if (row && row.length > 0) {
@@ -276,7 +275,7 @@ const ExcelViewer = (() => {
             result.push(headerRow);
         }
 
-        // 🚀【速度爆發點】: 還原原始版本的 forEach，自動跳過 100 萬列空白虛擬格式
+        // 使用 forEach 迴圈跳過空行
         jsonData.forEach((row, idx) => {
             if (idx < totalSkipCount) return; 
             if (!row) return;
@@ -293,7 +292,6 @@ const ExcelViewer = (() => {
                 if (keywords.some(k => content.includes(k))) return; 
             }
             
-            // 剔除全空陣列，還原原本的保險機制
             if (newRow.some(cell => String(cell).trim() !== '')) {
                 result.push(newRow);
             }
@@ -331,24 +329,33 @@ const ExcelViewer = (() => {
                     const sheet = workbook.Sheets[sheetName];
                     const ref = sheet['!ref'];
                     const range = ref ? XLSX.utils.decode_range(ref) : { s: { r: 0, c: 0 }, e: { c: 0 } };
-                    const { r: startRow, c: startCol } = range.s;
-                    const endCol = range.e.c;
+                    
+                    // 🚀🚀🚀 【極限安全閥】：強制切斷幽靈資料範圍！🚀🚀🚀
+                    // 防止政府報表因整欄套色導致範圍高達 100萬列 x 1萬欄
+                    // 限制最大讀取範圍：向下 8000 列、向右 150 欄 (已超過一般報表極限)
+                    range.e.r = Math.min(range.e.r, range.s.r + 8000); 
+                    range.e.c = Math.min(range.e.c, range.s.c + 150);
 
-                    let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+                    // 移除 defval: '' 的設定，讓陣列維持稀疏 (Sparse Array)，不再消耗大量記憶體
+                    let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, range: range, raw: false });
 
                     if (sheet['!merges']) {
                         sheet['!merges'].forEach(merge => {
-                            const startR = merge.s.r - startRow, startC = merge.s.c - startCol;
-                            const endR = merge.e.r - startRow, endC = merge.e.c - startCol;
+                            const startR = merge.s.r - range.s.r, startC = merge.s.c - range.s.c;
+                            const endR = merge.e.r - range.s.r, endC = merge.e.c - range.s.c;
+                            
                             if (startR >= 0 && startC >= 0 && jsonData[startR]) {
                                 const primaryValue = jsonData[startR][startC];
-                                // 極限安全閥：避免有人在整欄套用合併格式卡死 CPU
+                                if (primaryValue === undefined || primaryValue === null || String(primaryValue).trim() === '') return;
+
+                                // 限制合併填滿的迴圈次數，避免卡死
                                 const maxR = Math.min(endR, jsonData.length - 1);
+                                const maxC = Math.min(endC, 150);
+                                
                                 for (let r = startR; r <= maxR; r++) {
-                                    if (jsonData[r]) {
-                                        for (let c = startC; c <= endC; c++) {
-                                            jsonData[r][c] = primaryValue;
-                                        }
+                                    if (!jsonData[r]) jsonData[r] = [];
+                                    for (let c = startC; c <= maxC; c++) {
+                                        jsonData[r][c] = primaryValue;
                                     }
                                 }
                             }
@@ -356,9 +363,10 @@ const ExcelViewer = (() => {
                     }
 
                     const label = `${file.name} (${sheetName})`;
-                    state.rawSheetsCache.push({ label, startRow, startCol, endCol, sheet, jsonData: jsonData });
+                    // 直接傳址快取，不再做深拷貝，大幅提升速度
+                    state.rawSheetsCache.push({ label, startRow: range.s.r, startCol: range.s.c, endCol: range.e.c, sheet, jsonData: jsonData });
 
-                    const filtered = applyPreprocessing(jsonData, sheet, startRow, startCol, endCol);
+                    const filtered = applyPreprocessing(jsonData, sheet, range.s.r, range.s.c, range.e.c);
                     if (filtered.length > 0) {
                         const cleanSheet = XLSX.utils.aoa_to_sheet(filtered);
                         tablesToRender.push({ html: XLSX.utils.sheet_to_html(cleanSheet), filename: label });
@@ -372,7 +380,7 @@ const ExcelViewer = (() => {
             markSettingsClean();
         } catch (err) {
             console.error("處理檔案發生錯誤:", err);
-            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red;">處理檔案錯誤：${err.message}</p>`;
+            if(elements.displayArea) elements.displayArea.innerHTML = `<p style="color:red; font-weight:bold;">❌ 處理檔案錯誤：<br>${err.message}</p>`;
         } finally {
             state.isProcessing = false;
             if (elements.fileInput) elements.fileInput.value = '';
@@ -920,115 +928,6 @@ const ExcelViewer = (() => {
             });
         }
         syncCheckboxesInScope();
-    }
-
-    function executeCombinedSelection() {
-        if (!state.isMergedView || !elements.mergeViewContent) return;
-        const keyword = elements.selectKeywordInputMerged ? elements.selectKeywordInputMerged.value.trim() : '';
-        const isRegex = elements.selectKeywordRegexMerged?.checked || false;
-        let keywordMatcher = null;
-        if (keyword) {
-            try { keywordMatcher = utils.buildKeywordMatcher(keyword, isRegex); } catch (e) { alert('Regex 錯誤'); return; }
-        }
-
-        const col1 = elements.colSelect1 ? elements.colSelect1.value : '';
-        const col2 = elements.colSelect2 ? elements.colSelect2.value : '';
-        const criteria1 = document.querySelector('input[name="criteria-1"]:checked')?.value;
-        const criteria2 = document.querySelector('input[name="criteria-2"]:checked')?.value;
-        const logicOp = document.querySelector('input[name="logic-op"]:checked')?.value ?? 'and';
-        const inputVal1 = elements.inputCriteria1 ? elements.inputCriteria1.value : '';
-        const inputVal2 = elements.inputCriteria2 ? elements.inputCriteria2.value : '';
-
-        if (!keyword && !col1 && !col2) { alert('請輸入至少一個條件'); return; }
-        const checkValue = (cellVal, cr, val) => {
-            const s = String(cellVal).trim(), v = String(val).trim();
-            return cr === 'empty' ? s === '' : cr === 'zero' ? s === '0' : cr === 'value' ? s !== '' : cr === 'exact' ? s === v : cr === 'includes' ? v !== '' && s.toLowerCase().includes(v.toLowerCase()) : false;
-        };
-
-        let count = 0;
-        elements.mergeViewContent.querySelectorAll('tbody tr:not(.row-hidden-search)').forEach(row => {
-            const checkbox = row.querySelector('.row-checkbox');
-            if (!checkbox) return;
-            const kMatch = keywordMatcher ? keywordMatcher(Array.from(row.querySelectorAll('td:not(.checkbox-cell)')).map(c => c.textContent).join(' ')) : false;
-            let cMatch = false;
-            if (col1 || col2) {
-                const r1 = col1 ? checkValue(row.querySelector(`td[data-col-header="${col1}"]`)?.textContent ?? '', criteria1, inputVal1) : null;
-                const r2 = col2 ? checkValue(row.querySelector(`td[data-col-header="${col2}"]`)?.textContent ?? '', criteria2, inputVal2) : null;
-                cMatch = col1 && col2 ? (logicOp === 'and' ? r1 && r2 : r1 || r2) : (col1 ? r1 : r2);
-            }
-            if (kMatch || cMatch) { checkbox.checked = true; count++; }
-        });
-        alert(count > 0 ? `已勾選 ${count} 筆` : '未找到符合條件的資料');
-    }
-
-    function toggleEditMode(startEditing) {
-        state.isEditing = startEditing;
-        if(elements.editDataBtn) elements.editDataBtn.classList.toggle('hidden', startEditing);
-        if(elements.saveEditsBtn) elements.saveEditsBtn.classList.toggle('hidden', !startEditing);
-        if(elements.cancelEditsBtn) elements.cancelEditsBtn.classList.toggle('hidden', !startEditing);
-        
-        ['addNewRowBtn', 'copySelectedRowsBtn', 'deleteMergedRowsBtn', 'columnOperationsBtn', 'toggleTotalRowBtn', 'toggleSourceColBtn', 'invertSelectionMergedBtn', 'exportCurrentMergedXlsxBtn', 'sortMergedByNameBtn', 'colSelect1', 'colSelect2', 'executeFilterSelectionBtn', 'searchInputMerged', 'selectKeywordInputMerged', 'selectKeywordRegexMerged', 'unselectMergedRowsBtn', 'smartDedupBtn'].forEach(id => { if (elements[id]) elements[id].disabled = startEditing; });
-        ['inputCriteria1', 'inputCriteria2'].forEach(id => { if (elements[id]) elements[id].disabled = true; });
-        document.querySelectorAll('input[name="criteria-1"], input[name="criteria-2"], input[name="logic-op"]').forEach(r => r.disabled = startEditing);
-        renderMergedTable();
-    }
-  
-    function saveEdits() {
-        const backupData = [...state.mergedData];
-        const newData = Array.from(elements.mergeViewContent.querySelectorAll('tbody tr')).map(tr => {
-            const row = {};
-            const origIdx = parseInt(tr.dataset.rowIndex, 10);
-            row._sourceFile = state.showSourceColumn ? tr.querySelector('.source-col').textContent : (state.mergedData[origIdx]?._sourceFile || '(修改)');
-            tr.querySelectorAll('td[data-col-header]').forEach(cell => row[cell.dataset.colHeader] = cell.textContent);
-            return row;
-        });
-        undoManager.push('儲存編輯', () => { state.mergedData = backupData; if (state.isMergedView) renderMergedTable(); });
-        state.mergedData = newData;
-        toggleEditMode(false);
-    }
-
-    function addNewRow() {
-        const newRow = { _isNew: true, _sourceFile: '(新增資料列)' };
-        state.mergedHeaders.forEach(h => newRow[h] = '');
-        state.mergedData.unshift(newRow);
-        toggleEditMode(true);
-    }
-
-    function copySelectedRows() {
-        const selected = elements.mergeViewContent.querySelectorAll('.row-checkbox:checked');
-        if (!selected.length) { alert('請先勾選要複製的資料列。'); return; }
-        const copies = Array.from(selected).map(cb => {
-            const idx = parseInt(cb.closest('tr').dataset.rowIndex, 10);
-            if (isNaN(idx) || !state.mergedData[idx]) return null;
-            const copy = JSON.parse(JSON.stringify(state.mergedData[idx]));
-            copy._isNew = true; copy._sourceFile += ' (複製)';
-            return copy;
-        }).filter(Boolean);
-        state.mergedData.unshift(...copies);
-        toggleEditMode(true);
-    }
-
-    function toggleSourceColumn() {
-        if (state.isEditing) { alert('請先儲存或取消編輯。'); return; }
-        state.showSourceColumn = !state.showSourceColumn;
-        renderMergedTable();
-        if(elements.toggleSourceColBtn){
-            elements.toggleSourceColBtn.textContent = state.showSourceColumn ? '移除來源欄位' : '新增來源欄位';
-            elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
-        }
-    }
-
-    function calculateTotals() {
-        const totals = {};
-        state.mergedHeaders.forEach(header => {
-            const sum = state.mergedData.reduce((acc, row) => {
-                const n = parseFloat(String(row[header] || '').replace(/,/g, ''));
-                return acc + (isNaN(n) ? 0 : n);
-            }, 0);
-            const hasAnyNumber = state.mergedData.some(row => !isNaN(parseFloat(String(row[header] || '').replace(/,/g, ''))));
-            if (sum !== 0 || hasAnyNumber) totals[header] = sum;
-        });
-        return totals;
     }
 
     function updateDropAreaDisplay() {
