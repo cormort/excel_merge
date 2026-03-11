@@ -783,7 +783,8 @@ const ExcelViewer = (() => {
     el.get('fileInput').addEventListener('change', e => processFiles(e.target.files));
     el.get('clearFilesBtn').addEventListener('click', () => clearAllFiles(false));
 
-    // [A1] 清洗設定變更偵測['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
+    // [A1] 清洗設定變更偵測
+    ['skipTopRowsCheckbox', 'skipTopRowsInput', 'removeEmptyRowsCheckbox', 'removeKeywordRowsCheckbox', 'removeKeywordRowsInput'].forEach(id => {
       el.get(id)?.addEventListener('change', markSettingsDirty);
       el.get(id)?.addEventListener('input', utils.debounce(markSettingsDirty, 500));
     });
@@ -859,4 +860,7 @@ const ExcelViewer = (() => {
   return { init };
 })();
 
-ExcelViewer.init();
+document.addEventListener('DOMContentLoaded', () => {
+  ExcelViewer.init();
+});
+
