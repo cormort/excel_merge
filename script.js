@@ -374,11 +374,13 @@ const ExcelViewer = (() => {
             <th>來源檔案</th>
             <th>第一欄（基金名稱）</th>
             <th>第二欄</th>
+            <th>資訊</th>
         </tr>`;
 
         const html = state.aggregatedRows.map((row, idx) => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
+            const info = row.needsReview ? '<span style="color:#f59e0b;">⚠️ 需確認</span>' : '<span style="color:#10b981;">✓ 匹配</span>';
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
@@ -386,6 +388,7 @@ const ExcelViewer = (() => {
                 <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
                 <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(row.firstCellText)}</td>
                 <td>${escHtml(row.secondCellText || '')}</td>
+                <td>${info}</td>
             </tr>`;
         }).join('');
         elements.aggregateTbody.innerHTML = html;
@@ -454,6 +457,22 @@ const ExcelViewer = (() => {
         });
 
         const ws = XLSX.utils.aoa_to_sheet(exportData);
+        
+        // 設定數值格式
+        const cellRefs = XLSX.utils.decode_range(ws['!ref']);
+        for (let C = 0; C <= cellRefs.e.c; C++) {
+            for (let R = 1; R <= cellRefs.e.r; R++) {
+                const cellAddr = XLSX.utils.encode_cell({ r: R, c: C });
+                const cell = ws[cellAddr];
+                if (!cell) continue;
+                const val = cell.v;
+                if (val !== '' && !isNaN(Number(val)) && String(val).match(/^[\d,.-]+$/)) {
+                    cell.t = 'n';
+                    cell.v = Number(String(val).replace(/,/g, ''));
+                }
+            }
+        }
+        
         ws['!cols'] = utils.calculateColumnWidths(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '基金彙整結果');
