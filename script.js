@@ -37,6 +37,7 @@ const ExcelViewer = (() => {
         // 基金對照 & 彙整
         fileInfos: [],          // 每個檔案的辨識結果 [{filename, detectedFunds, headers, rows}]
         aggregatedRows: [],     // 彙整後的逐列資料
+        matchColumn: '1',       // 比對基金名稱的欄位（1=第一欄, 2=第二欄）
     };
 
     const elements = {};
@@ -185,6 +186,7 @@ const ExcelViewer = (() => {
             aggStatTotal: 'agg-stat-total', aggStatReview: 'agg-stat-review', aggStatChecked: 'agg-stat-checked',
             aggCheckReviewBtn: 'agg-check-review-btn', aggUncheckAllBtn: 'agg-uncheck-all-btn',
             aggDeleteCheckedBtn: 'agg-delete-checked-btn', aggExportBtn: 'agg-export-btn',
+            matchColSelect: 'match-col-select',
             toggleImportSettings: 'toggle-import-settings', importSettingsPanel: 'import-settings-panel',
             topBarActions: 'top-bar-actions', statTableCount: 'stat-table-count', statRowCount: 'stat-row-count',
             clearAllBtn: 'clear-all-btn'
@@ -338,19 +340,23 @@ const ExcelViewer = (() => {
                     const firstCellText = (cells[0] || '').trim();
                     const secondCellText = (cells[1] || '').trim();
                     const lastCellText = cells.length > 1 ? (cells[cells.length - 1] || '').trim() : '';
-                    const needsReview = !cellMatchesFund(firstCellText, standardFund);
+                    const matchColIdx = parseInt(state.matchColumn, 10) - 1;
+                    const matchCellText = (cells[matchColIdx] || '').trim();
+                    const needsReview = !cellMatchesFund(matchCellText, standardFund);
                     if (needsReview) reviewCount++;
                     aggregated.push({
                         standardFund,
                         sourceFile: info.filename,
                         sourceRowIdx: rowIdx,
                         headers: info.headers,
-                        cells,               // 完整資料（匯出時用）
-                        firstCellText,       // 第一欄（審核用）
-                        secondCellText,      // 第二欄（輔助判斷用）
-                        lastCellText,        // 最後一欄
+                        cells,
+                        firstCellText,
+                        secondCellText,
+                        lastCellText,
+                        matchCellText,
+                        matchColumn: state.matchColumn,
                         needsReview,
-                        checked: needsReview, // 可疑列預設勾選為刪除候選
+                        checked: needsReview,
                     });
                 });
             }
@@ -369,31 +375,82 @@ const ExcelViewer = (() => {
         }
         elements.aggregatePanel.classList.remove('hidden');
 
+        const matchCol = state.matchColumn || '1';
+        const matchColLabel = matchCol === '1' ? '第一欄（基金名稱）' : '第二欄（基金名稱）';
         elements.aggregateThead.innerHTML = `<tr>
             <th style="width:40px;"><input type="checkbox" id="agg-check-all-cb"></th>
             <th>#</th>
             <th>標準基金</th>
             <th>來源檔案</th>
-            <th>第一欄（基金名稱）</th>
-            <th>第二欄</th>
+            <th>${matchColLabel}</th>
+            <th>${matchCol === '1' ? '第二欄' : '第一欄'}</th>
             <th>最後一欄</th>
         </tr>`;
 
         const html = state.aggregatedRows.map((row, idx) => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
+            const matchText = row.matchCellText || '';
+            const otherText = matchCol === '1' ? row.secondCellText : row.firstCellText;
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
                 <td>${escHtml(row.standardFund)}</td>
                 <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
-                <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(row.firstCellText)}</td>
-                <td>${escHtml(row.secondCellText || '')}</td>
+                <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(matchText)}</td>
+                <td>${escHtml(otherText || '')}</td>
                 <td>${escHtml(row.lastCellText || '')}</td>
             </tr>`;
         }).join('');
         elements.aggregateTbody.innerHTML = html;
         updateAggregationCounts();
+    }
+
+    function rebuildAggregationWithNewMatchColumn() {
+        const selectedIdxs = [];
+        if (elements.mappingTbody) {
+            elements.mappingTbody.querySelectorAll('.map-row-check:checked').forEach(cb => {
+                selectedIdxs.push(parseInt(cb.dataset.index, 10));
+            });
+        }
+        if (selectedIdxs.length === 0) return;
+
+        const aggregated = [];
+        let reviewCount = 0;
+
+        for (const standardFund of state.fundSortOrder) {
+            for (const idx of selectedIdxs) {
+                const info = state.fileInfos[idx];
+                if (!info || !info.detectedFunds.includes(standardFund)) continue;
+
+                info.rows.forEach((cells, rowIdx) => {
+                    const firstCellText = (cells[0] || '').trim();
+                    const secondCellText = (cells[1] || '').trim();
+                    const lastCellText = cells.length > 1 ? (cells[cells.length - 1] || '').trim() : '';
+                    const matchColIdx = parseInt(state.matchColumn, 10) - 1;
+                    const matchCellText = (cells[matchColIdx] || '').trim();
+                    const needsReview = !cellMatchesFund(matchCellText, standardFund);
+                    if (needsReview) reviewCount++;
+                    aggregated.push({
+                        standardFund,
+                        sourceFile: info.filename,
+                        sourceRowIdx: rowIdx,
+                        headers: info.headers,
+                        cells,
+                        firstCellText,
+                        secondCellText,
+                        lastCellText,
+                        matchCellText,
+                        matchColumn: state.matchColumn,
+                        needsReview,
+                        checked: needsReview,
+                    });
+                });
+            }
+        }
+
+        state.aggregatedRows = aggregated;
+        renderAggregationPanel();
     }
 
     function updateAggregationCounts() {
@@ -1873,6 +1930,13 @@ const ExcelViewer = (() => {
         });
         if(elements.aggDeleteCheckedBtn) elements.aggDeleteCheckedBtn.addEventListener('click', deleteCheckedAggregatedRows);
         if(elements.aggExportBtn) elements.aggExportBtn.addEventListener('click', exportAggregatedRows);
+
+        if(elements.matchColSelect) elements.matchColSelect.addEventListener('change', () => {
+            state.matchColumn = elements.matchColSelect.value;
+            const colLabel = state.matchColumn === '1' ? '第一欄' : '第二欄';
+            document.querySelectorAll('#match-col-label, #match-col-label2').forEach(el => el.textContent = colLabel);
+            rebuildAggregationWithNewMatchColumn();
+        });
 
         if(elements.aggregatePanel) {
             elements.aggregatePanel.addEventListener('change', e => {

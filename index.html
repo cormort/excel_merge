@@ -150,10 +150,17 @@
                             <h3>📦 彙整資料預覽</h3>
                             <p class="aggregate-hint">
                                 已展開 <strong id="agg-stat-total">0</strong> 列；
-                                其中 <strong id="agg-stat-review" class="stat-warn">0</strong> 列第一欄與標準基金不符（預設勾選為刪除候選）；
+                                其中 <strong id="agg-stat-review" class="stat-warn">0</strong> 列<span id="match-col-label">第一欄</span>與標準基金不符（預設勾選為刪除候選）；
                                 目前勾選 <strong id="agg-stat-checked">0</strong> 列。
-                                請先確認「標準基金 / 來源檔案 / 第一欄」是否正確，再按匯出取得完整欄位。
+                                請先確認「標準基金 / 來源檔案 / <span id="match-col-label2">第一欄</span>」是否正確，再按匯出取得完整欄位。
                             </p>
+                            <div class="match-col-selector">
+                                <label for="match-col-select">比對欄位：</label>
+                                <select id="match-col-select" class="match-col-select">
+                                    <option value="1">第一欄</option>
+                                    <option value="2">第二欄</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="aggregate-actions">
                             <button class="btn-outline btn-sm" id="agg-check-review-btn">⚠️ 勾選所有可疑列</button>
