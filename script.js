@@ -339,6 +339,7 @@ const ExcelViewer = (() => {
                 info.rows.forEach((cells, rowIdx) => {
                     const firstCellText = (cells[0] || '').trim();
                     const secondCellText = (cells[1] || '').trim();
+                    const thirdCellText = (cells[2] || '').trim();
                     const lastCellText = cells.length > 1 ? (cells[cells.length - 1] || '').trim() : '';
                     const matchColIdx = parseInt(state.matchColumn, 10) - 1;
                     const matchCellText = (cells[matchColIdx] || '').trim();
@@ -352,6 +353,7 @@ const ExcelViewer = (() => {
                         cells,
                         firstCellText,
                         secondCellText,
+                        thirdCellText,
                         lastCellText,
                         matchCellText,
                         matchColumn: state.matchColumn,
@@ -376,30 +378,35 @@ const ExcelViewer = (() => {
         elements.aggregatePanel.classList.remove('hidden');
 
         const matchCol = state.matchColumn || '1';
-        const matchColLabel = matchCol === '1' ? '第一欄（基金名稱）' : '第二欄（基金名稱）';
+        const matchColLabel = matchCol === '1' ? '第一欄（基金名稱）' : matchCol === '2' ? '第二欄（基金名稱）' : '第三欄（基金名稱）';
+        const getOtherCol = (mc) => {
+            if (mc === '1') return [row.secondCellText, row.thirdCellText];
+            if (mc === '2') return [row.firstCellText, row.thirdCellText];
+            return [row.firstCellText, row.secondCellText];
+        };
         elements.aggregateThead.innerHTML = `<tr>
             <th style="width:40px;"><input type="checkbox" id="agg-check-all-cb"></th>
             <th>#</th>
             <th>標準基金</th>
             <th>來源檔案</th>
             <th>${matchColLabel}</th>
-            <th>${matchCol === '1' ? '第二欄' : '第一欄'}</th>
-            <th>最後一欄</th>
+            <th>其他欄位</th>
+            <th>第三欄</th>
         </tr>`;
 
         const html = state.aggregatedRows.map((row, idx) => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
             const matchText = row.matchCellText || '';
-            const otherText = matchCol === '1' ? row.secondCellText : row.firstCellText;
+            const [other1, other2] = getOtherCol(matchCol);
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
                 <td>${escHtml(row.standardFund)}</td>
                 <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
                 <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(matchText)}</td>
-                <td>${escHtml(otherText || '')}</td>
-                <td>${escHtml(row.lastCellText || '')}</td>
+                <td>${escHtml(other1 || '')}</td>
+                <td>${escHtml(row.thirdCellText || '')}</td>
             </tr>`;
         }).join('');
         elements.aggregateTbody.innerHTML = html;
@@ -426,6 +433,7 @@ const ExcelViewer = (() => {
                 info.rows.forEach((cells, rowIdx) => {
                     const firstCellText = (cells[0] || '').trim();
                     const secondCellText = (cells[1] || '').trim();
+                    const thirdCellText = (cells[2] || '').trim();
                     const lastCellText = cells.length > 1 ? (cells[cells.length - 1] || '').trim() : '';
                     const matchColIdx = parseInt(state.matchColumn, 10) - 1;
                     const matchCellText = (cells[matchColIdx] || '').trim();
@@ -439,6 +447,7 @@ const ExcelViewer = (() => {
                         cells,
                         firstCellText,
                         secondCellText,
+                        thirdCellText,
                         lastCellText,
                         matchCellText,
                         matchColumn: state.matchColumn,
