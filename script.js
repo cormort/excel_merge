@@ -255,12 +255,21 @@ const ExcelViewer = (() => {
         return state.fundSortOrder.filter(f => found.has(f));
     }
 
-    // 判斷儲存格文字是否屬於某標準基金（前4字相同 + 字數相同）
+    // 判斷儲存格文字是否屬於某標準基金（別名匹配 或 前4字相同 + 字數相同）
     function cellMatchesFund(cellText, standardFund) {
         if (!cellText || !standardFund) return false;
         const cellTextTrimmed = cellText.trim();
         const fundTextTrimmed = standardFund.trim();
         if (cellTextTrimmed === fundTextTrimmed) return true;
+        
+        // 檢查別名是否匹配
+        const aliasKeys = Object.keys(state.fundAliasMap);
+        for (const alias of aliasKeys) {
+            if (cellTextTrimmed === alias && state.fundAliasMap[alias] === standardFund) {
+                return true;
+            }
+        }
+
         const cellChars = Array.from(cellTextTrimmed);
         const fundChars = Array.from(fundTextTrimmed);
         if (cellChars.length < 4 || fundChars.length < 4) return false;
