@@ -1608,8 +1608,9 @@ const ExcelViewer = (() => {
 
         if(elements.clearFilesBtn) elements.clearFilesBtn.addEventListener('click', () => clearAllFiles(false));
 
-        if(elements.importOptionsContainer) {
-            elements.importOptionsContainer.addEventListener('change', e => {
+        const importSettingsPanel = document.getElementById('import-settings-panel');
+        if(importSettingsPanel) {
+            importSettingsPanel.addEventListener('change', e => {
                 if (e.target.name !== 'import-mode') return;
                 const mode = e.target.value;
                 if(elements.specificSheetNameGroup) elements.specificSheetNameGroup.classList.toggle('hidden', mode !== 'specific');
