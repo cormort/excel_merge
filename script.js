@@ -337,6 +337,7 @@ const ExcelViewer = (() => {
                 info.rows.forEach((cells, rowIdx) => {
                     const firstCellText = (cells[0] || '').trim();
                     const secondCellText = (cells[1] || '').trim();
+                    const lastCellText = cells.length > 1 ? (cells[cells.length - 1] || '').trim() : '';
                     const needsReview = !cellMatchesFund(firstCellText, standardFund);
                     if (needsReview) reviewCount++;
                     aggregated.push({
@@ -347,6 +348,7 @@ const ExcelViewer = (() => {
                         cells,               // 完整資料（匯出時用）
                         firstCellText,       // 第一欄（審核用）
                         secondCellText,      // 第二欄（輔助判斷用）
+                        lastCellText,        // 最後一欄
                         needsReview,
                         checked: needsReview, // 可疑列預設勾選為刪除候選
                     });
@@ -374,13 +376,12 @@ const ExcelViewer = (() => {
             <th>來源檔案</th>
             <th>第一欄（基金名稱）</th>
             <th>第二欄</th>
-            <th>資訊</th>
+            <th>最後一欄</th>
         </tr>`;
 
         const html = state.aggregatedRows.map((row, idx) => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
-            const info = row.needsReview ? '<span style="color:#f59e0b;">⚠️ 需確認</span>' : '<span style="color:#10b981;">✓ 匹配</span>';
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
@@ -388,7 +389,7 @@ const ExcelViewer = (() => {
                 <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
                 <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(row.firstCellText)}</td>
                 <td>${escHtml(row.secondCellText || '')}</td>
-                <td>${info}</td>
+                <td>${escHtml(row.lastCellText || '')}</td>
             </tr>`;
         }).join('');
         elements.aggregateTbody.innerHTML = html;
