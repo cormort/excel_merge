@@ -5,7 +5,7 @@
 const ExcelViewer = (() => {
     'use strict';
 
-    const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx'] };
+    const CONSTANTS = { VALID_FILE_EXTENSIONS: ['.xls', '.xlsx', '.ods'] };
 
     const state = {
         originalHtmlString: '',
@@ -33,6 +33,10 @@ const ExcelViewer = (() => {
         fundSortOrder: [],
         fundAliasMap: {},
         fundAliasKeys: [],
+
+        // 基金對照 & 彙整
+        fileInfos: [],          // 每個檔案的辨識結果 [{filename, detectedFunds, headers, rows}]
+        aggregatedRows: [],     // 彙整後的逐列資料
     };
 
     const elements = {};
@@ -170,7 +174,20 @@ const ExcelViewer = (() => {
             dedupModal: 'dedup-modal', closeDedupModalBtn: 'close-dedup-modal-btn', cancelDedupBtn: 'cancel-dedup-btn', executeDedupBtn: 'execute-dedup-btn',
             dedupColSelect: 'dedup-col-select', dedupResultPanel: 'dedup-result-panel', dedupResultText: 'dedup-result-text', 
             clearDedupMarksBtn: 'clear-dedup-marks-btn', deleteDedupMarksBtn: 'delete-dedup-marks-btn',
-            undoToast: 'undo-toast', undoText: 'undo-text', undoBtn: 'undo-btn'
+            undoToast: 'undo-toast', undoText: 'undo-text', undoBtn: 'undo-btn',
+
+            // Step 2: 基金對照 & 彙整
+            stepMapping: 'step-mapping', stepData: 'step-data', stepExport: 'step-export',
+            mappingTbody: 'mapping-tbody', mapCheckAll: 'map-check-all',
+            mapSelectAllBtn: 'map-select-all-btn', mapDeselectAllBtn: 'map-deselect-all-btn', mapInvertBtn: 'map-invert-btn',
+            executeMatchBtn: 'execute-match-btn', exportMatchedBtn: 'export-matched-btn',
+            aggregatePanel: 'aggregate-panel', aggregateThead: 'aggregate-thead', aggregateTbody: 'aggregate-tbody',
+            aggStatTotal: 'agg-stat-total', aggStatReview: 'agg-stat-review', aggStatChecked: 'agg-stat-checked',
+            aggCheckReviewBtn: 'agg-check-review-btn', aggUncheckAllBtn: 'agg-uncheck-all-btn',
+            aggDeleteCheckedBtn: 'agg-delete-checked-btn', aggExportBtn: 'agg-export-btn',
+            toggleImportSettings: 'toggle-import-settings', importSettingsPanel: 'import-settings-panel',
+            topBarActions: 'top-bar-actions', statTableCount: 'stat-table-count', statRowCount: 'stat-row-count',
+            clearAllBtn: 'clear-all-btn'
         };
 
         Object.keys(mapping).forEach(key => { elements[key] = document.getElementById(mapping[key]); });
@@ -199,6 +216,239 @@ const ExcelViewer = (() => {
                 state.fundAliasKeys = Object.keys(config.aliasMap).sort((a, b) => b.length - a.length);
             }
         } catch (err) { console.warn('設定檔讀取失敗', err); }
+    }
+
+    // --- 基金辨識引擎 ---
+    let _fundSearchKeysCache = null;
+    function getFundSearchKeys() {
+        if (_fundSearchKeysCache) return _fundSearchKeysCache;
+        const items = [];
+        const seen = new Set();
+        const add = (key, fund) => { if (!key || seen.has(key)) return; items.push({ key, fund }); seen.add(key); };
+
+        state.fundAliasKeys.forEach(alias => add(alias, state.fundAliasMap[alias]));
+        const suffixes = ['作業基金', '校務基金', '基金'];
+        state.fundSortOrder.forEach(fund => {
+            add(fund, fund);
+            for (const sfx of suffixes) {
+                if (fund.endsWith(sfx) && fund.length > sfx.length + 2) { add(fund.slice(0, -sfx.length), fund); break; }
+            }
+        });
+        items.sort((a, b) => b.key.length - a.key.length);
+        _fundSearchKeysCache = items;
+        return items;
+    }
+
+    function detectFundsInText(text) {
+        if (!text) return [];
+        let scan = text.toLowerCase();
+        const found = new Set();
+        for (const { key, fund } of getFundSearchKeys()) {
+            const k = key.toLowerCase();
+            let idx = scan.indexOf(k);
+            while (idx !== -1) {
+                found.add(fund);
+                scan = scan.slice(0, idx) + '\u0000'.repeat(k.length) + scan.slice(idx + k.length);
+                idx = scan.indexOf(k);
+            }
+        }
+        return state.fundSortOrder.filter(f => found.has(f));
+    }
+
+    // 判斷儲存格文字是否屬於某標準基金（前4字相同 + 字數相同）
+    function cellMatchesFund(cellText, standardFund) {
+        if (!cellText || !standardFund) return false;
+        const cellTextTrimmed = cellText.trim();
+        const fundTextTrimmed = standardFund.trim();
+        if (cellTextTrimmed === fundTextTrimmed) return true;
+        const cellChars = Array.from(cellTextTrimmed);
+        const fundChars = Array.from(fundTextTrimmed);
+        if (cellChars.length < 4 || fundChars.length < 4) return false;
+        return cellChars.length === fundChars.length && 
+               cellChars[0] === fundChars[0] && 
+               cellChars[1] === fundChars[1] &&
+               cellChars[2] === fundChars[2] &&
+               cellChars[3] === fundChars[3];
+    }
+
+    // --- Stage 1: 基金對照總覽 (mapping table) ---
+    // 從 state.fileInfos 渲染對照表：檔名 | 對應標準基金（可能多個）| 資料列數
+    function buildMappingTable() {
+        if (!elements.mappingTbody || !state.fileInfos.length) return;
+
+        const html = state.fileInfos.map((info, idx) => {
+            const fundNames = info.detectedFunds.length > 0
+                ? info.detectedFunds.map(f => `<span style="color:#10b981;">${escHtml(f)}</span>`).join('、')
+                : '<span style="color:#f59e0b;">未辨識</span>';
+            return `<tr>
+                <td class="map-col-check"><input type="checkbox" class="map-row-check" data-index="${idx}" ${info.detectedFunds.length > 0 ? 'checked' : ''}></td>
+                <td class="map-col-num">${idx + 1}</td>
+                <td class="map-col-file" title="${escHtml(info.filename)}">${escHtml(info.filename)}</td>
+                <td class="map-col-fund">${fundNames}</td>
+                <td class="map-col-rows">${info.rows.length}</td>
+            </tr>`;
+        }).join('');
+        elements.mappingTbody.innerHTML = html;
+
+        // 顯示 Step 2
+        if (elements.stepMapping) elements.stepMapping.classList.remove('hidden');
+
+        // 更新頂部統計
+        if (elements.topBarActions) elements.topBarActions.classList.remove('hidden');
+        if (elements.statTableCount) elements.statTableCount.textContent = state.fileInfos.length;
+        if (elements.statRowCount) elements.statRowCount.textContent = state.fileInfos.reduce((s, f) => s + f.rows.length, 0);
+    }
+
+    function escHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // --- Stage 2: 彙整面板 (Aggregation) ---
+    // 依標準基金順序，把勾選的檔案的所有資料列貼入（一個檔案對應多個基金就貼多次）
+    function buildAggregation() {
+        const selectedIdxs = [];
+        if (elements.mappingTbody) {
+            elements.mappingTbody.querySelectorAll('.map-row-check:checked').forEach(cb => {
+                selectedIdxs.push(parseInt(cb.dataset.index, 10));
+            });
+        }
+        if (selectedIdxs.length === 0) { alert('請先勾選要彙整的檔案。'); return; }
+
+        const aggregated = [];
+        let reviewCount = 0;
+
+        // 依標準基金順序巡覽
+        for (const standardFund of state.fundSortOrder) {
+            // 對每個勾選的檔案，檢查是否對應到此基金
+            for (const idx of selectedIdxs) {
+                const info = state.fileInfos[idx];
+                if (!info || !info.detectedFunds.includes(standardFund)) continue;
+
+                // 把該檔案的全部資料列貼入此基金底下
+                info.rows.forEach((cells, rowIdx) => {
+                    const firstCellText = (cells[0] || '').trim();
+                    const secondCellText = (cells[1] || '').trim();
+                    const needsReview = !cellMatchesFund(firstCellText, standardFund);
+                    if (needsReview) reviewCount++;
+                    aggregated.push({
+                        standardFund,
+                        sourceFile: info.filename,
+                        sourceRowIdx: rowIdx,
+                        headers: info.headers,
+                        cells,               // 完整資料（匯出時用）
+                        firstCellText,       // 第一欄（審核用）
+                        secondCellText,      // 第二欄（輔助判斷用）
+                        needsReview,
+                        checked: needsReview, // 可疑列預設勾選為刪除候選
+                    });
+                });
+            }
+        }
+
+        state.aggregatedRows = aggregated;
+        renderAggregationPanel();
+    }
+
+    // 渲染彙整面板：只顯示「標準基金 | 來源檔名 | 第一欄」+ 勾選框
+    function renderAggregationPanel() {
+        if (!elements.aggregatePanel || !elements.aggregateTbody || !elements.aggregateThead) return;
+        if (!state.aggregatedRows.length) {
+            elements.aggregatePanel.classList.add('hidden');
+            return;
+        }
+        elements.aggregatePanel.classList.remove('hidden');
+
+        elements.aggregateThead.innerHTML = `<tr>
+            <th style="width:40px;"><input type="checkbox" id="agg-check-all-cb"></th>
+            <th>#</th>
+            <th>標準基金</th>
+            <th>來源檔案</th>
+            <th>第一欄（基金名稱）</th>
+            <th>第二欄</th>
+        </tr>`;
+
+        const html = state.aggregatedRows.map((row, idx) => {
+            const cls = row.needsReview ? 'row-needs-review' : '';
+            const checkedCls = row.checked ? 'row-checked-delete' : '';
+            return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
+                <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
+                <td>${idx + 1}</td>
+                <td>${escHtml(row.standardFund)}</td>
+                <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
+                <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(row.firstCellText)}</td>
+                <td>${escHtml(row.secondCellText || '')}</td>
+            </tr>`;
+        }).join('');
+        elements.aggregateTbody.innerHTML = html;
+        updateAggregationCounts();
+    }
+
+    function updateAggregationCounts() {
+        const total = state.aggregatedRows.length;
+        const review = state.aggregatedRows.filter(r => r.needsReview).length;
+        const checked = state.aggregatedRows.filter(r => r.checked).length;
+        if (elements.aggStatTotal) elements.aggStatTotal.textContent = total;
+        if (elements.aggStatReview) elements.aggStatReview.textContent = review;
+        if (elements.aggStatChecked) elements.aggStatChecked.textContent = checked;
+    }
+
+    function deleteCheckedAggregatedRows() {
+        const before = state.aggregatedRows.length;
+        state.aggregatedRows = state.aggregatedRows.filter(r => !r.checked);
+        const removed = before - state.aggregatedRows.length;
+        if (removed === 0) { alert('沒有勾選任何列。'); return; }
+        renderAggregationPanel();
+        undoManager.showToast(`刪除 ${removed} 筆彙整資料`);
+    }
+
+    // --- Checklist 匯出 ---
+    function exportAggregatedRows() {
+        const validRows = state.aggregatedRows.filter(r => !r.checked);
+
+        // 收集所有表頭聯集
+        const headerSet = new Set();
+        validRows.forEach(r => r.headers.forEach(h => headerSet.add(h)));
+        const unionHeaders = Array.from(headerSet);
+
+        // 建立匯出資料（加入繳交狀態欄位）
+        const exportData = [['標準基金', '繳交狀態', '來源檔案', ...unionHeaders]];
+
+        // 將有效資料依基金分組
+        const dataByFund = {};
+        validRows.forEach(row => {
+            if (!dataByFund[row.standardFund]) dataByFund[row.standardFund] = [];
+            dataByFund[row.standardFund].push(row);
+        });
+
+        // ⭐ Checklist 核心：巡覽 fund-config.json 裡全部標準基金
+        state.fundSortOrder.forEach(standardFund => {
+            const fundRows = dataByFund[standardFund];
+            if (fundRows && fundRows.length > 0) {
+                fundRows.forEach(row => {
+                    const cellMap = {};
+                    row.headers.forEach((h, i) => { cellMap[h] = row.cells[i] ?? ''; });
+                    exportData.push([
+                        standardFund,
+                        '✅ 已回傳',
+                        row.sourceFile,
+                        ...unionHeaders.map(h => cellMap[h] ?? '')
+                    ]);
+                });
+            } else {
+                exportData.push([
+                    standardFund,
+                    '❌ 未回傳/無資料',
+                    '-',
+                    ...unionHeaders.map(() => '')
+                ]);
+            }
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(exportData);
+        ws['!cols'] = utils.calculateColumnWidths(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '基金彙整結果');
+        XLSX.writeFile(wb, `基金資料_Checklist_${new Date().toISOString().slice(0, 10)}.xlsx`);
     }
 
     function setupDragAndDrop() {
@@ -326,15 +576,13 @@ const ExcelViewer = (() => {
 
         state.isProcessing = true;
         if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">正在準備解析...</div>';
-        resetControls(true);
+        state.fileInfos = []; state.aggregatedRows = [];
         state.rawSheetsCache = []; state.loadedFiles = [];
-        const tablesToRender = [];
 
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                
-                // 🚀 UI 非同步釋放：讓瀏覽器有時間畫出載入畫面，不會卡死成全白
+
                 if(elements.displayArea) elements.displayArea.innerHTML = `<div class="loading">高速讀取中... 檔案 (${i + 1}/${files.length}) : ${file.name}</div>`;
                 await new Promise(r => setTimeout(r, 20));
 
@@ -347,14 +595,10 @@ const ExcelViewer = (() => {
                     const ref = sheet['!ref'];
                     if (!ref) continue;
                     const range = XLSX.utils.decode_range(ref);
-                    
-                    // 🚀 極限安全閥：無情切斷超過 10000 列的幽靈格式，防止記憶體崩潰
-                    range.e.r = Math.min(range.e.r, range.s.r + 10000); 
-                    
-                    // 取出為 Sparse Array (沒有 defval)，大幅節省記憶體
+                    range.e.r = Math.min(range.e.r, range.s.r + 10000);
+
                     let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, range: range, raw: false });
 
-                    // 找出實際最寬的欄位，防止合併儲存格的無窮迴圈
                     let maxCol = 0;
                     for(let r=0; r<jsonData.length; r++) {
                         if(jsonData[r] && jsonData[r].length > maxCol) maxCol = jsonData[r].length;
@@ -364,19 +608,14 @@ const ExcelViewer = (() => {
                         sheet['!merges'].forEach(merge => {
                             const startR = merge.s.r - range.s.r, startC = merge.s.c - range.s.c;
                             const endR = merge.e.r - range.s.r, endC = merge.e.c - range.s.c;
-                            
                             if (startR >= 0 && startC >= 0 && jsonData[startR] && jsonData[startR][startC] !== undefined) {
                                 const val = jsonData[startR][startC];
                                 if (String(val).trim() === '') return;
-                                
                                 const maxR = Math.min(endR, jsonData.length - 1);
-                                const maxC = Math.min(endC, maxCol); // 限制橫向填滿
-                                
+                                const maxC = Math.min(endC, maxCol);
                                 for (let r = startR; r <= maxR; r++) {
                                     if (!jsonData[r]) jsonData[r] = [];
-                                    for (let c = startC; c <= maxC; c++) {
-                                        jsonData[r][c] = val;
-                                    }
+                                    for (let c = startC; c <= maxC; c++) { jsonData[r][c] = val; }
                                 }
                             }
                         });
@@ -385,20 +624,25 @@ const ExcelViewer = (() => {
                     const label = `${file.name} (${sheetName})`;
                     state.rawSheetsCache.push({ label, startRow: range.s.r, startCol: range.s.c, endCol: range.e.c, sheet, jsonData: jsonData });
 
+                    // 預處理：清洗資料（拋棄列、壓縮表頭、移除空白列等）
                     const filtered = applyPreprocessing(jsonData, sheet, range.s.r, range.s.c, range.e.c);
                     if (filtered.length > 0) {
-                        const cleanSheet = XLSX.utils.aoa_to_sheet(filtered);
-                        tablesToRender.push({ html: XLSX.utils.sheet_to_html(cleanSheet), filename: label });
+                        // 直接存入 fileInfos（不渲染到 HTML）
+                        const headers = filtered[0].map((h, idx) => String(h).trim() || `(欄位 ${idx + 1})`);
+                        const rows = filtered.slice(1); // 資料列（不含表頭）
+                        const detectedFunds = detectFundsInText(file.name);
+
+                        state.fileInfos.push({ filename: label, detectedFunds, headers, rows });
                         state.loadedFiles.push(label);
                     }
                 }
             }
-            
-            if(elements.displayArea) elements.displayArea.innerHTML = '<div class="loading">正在渲染表格畫面...</div>';
-            await new Promise(r => setTimeout(r, 20));
 
-            state.loadedTables = tablesToRender.length;
-            renderTables(tablesToRender);
+            state.loadedTables = state.fileInfos.length;
+            if(elements.displayArea) elements.displayArea.innerHTML = '';
+
+            // 直接顯示 Stage 1 對照表
+            buildMappingTable();
             updateDropAreaDisplay();
             markSettingsClean();
         } catch (err) {
@@ -825,6 +1069,77 @@ const ExcelViewer = (() => {
         if (selectAllCb) selectAllCb.addEventListener('change', e => { elements.mergeViewContent.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked); });
     }
 
+    function toggleEditMode(startEditing) {
+        state.isEditing = startEditing;
+        if(elements.editDataBtn) elements.editDataBtn.classList.toggle('hidden', startEditing);
+        if(elements.saveEditsBtn) elements.saveEditsBtn.classList.toggle('hidden', !startEditing);
+        if(elements.cancelEditsBtn) elements.cancelEditsBtn.classList.toggle('hidden', !startEditing);
+        if(elements.mergeViewContent) {
+            const cells = elements.mergeViewContent.querySelectorAll('td:not(.checkbox-cell):not(.source-col)');
+            cells.forEach(td => { td.contentEditable = startEditing; td.style.backgroundColor = startEditing ? '#fffbeb' : ''; });
+        }
+    }
+
+    function saveEdits() {
+        if(elements.mergeViewContent) {
+            const rows = elements.mergeViewContent.querySelectorAll('tbody tr');
+            state.mergedData = [];
+            rows.forEach(tr => {
+                const rowData = { _sourceFile: tr.dataset.sourceFile || '', _id: tr.dataset.rowIndex || Date.now() + Math.random() };
+                Array.from(tr.querySelectorAll('td:not(.checkbox-cell):not(.source-col)')).forEach((td, i) => {
+                    if (state.mergedHeaders[i]) rowData[state.mergedHeaders[i]] = td.textContent;
+                });
+                state.mergedData.push(rowData);
+            });
+        }
+        toggleEditMode(false);
+        undoManager.showToast('儲存編輯');
+    }
+
+    function addNewRow() {
+        if (!state.isMergedView) return;
+        const newRow = { _sourceFile: '', _id: Date.now() + Math.random() };
+        state.mergedHeaders.forEach(h => newRow[h] = '');
+        state.mergedData.push(newRow);
+        renderMergedTable();
+    }
+
+    function copySelectedRows() {
+        if (!state.isMergedView) {
+            if(elements.displayArea) {
+                const selected = elements.displayArea.querySelectorAll('tbody .row-checkbox:checked');
+                if (!selected.length) { alert('請先勾選要複製的列'); return; }
+                selected.forEach(cb => {
+                    const tr = cb.closest('tr');
+                    const clone = tr.cloneNode(true);
+                    clone.querySelector('.row-checkbox').checked = false;
+                    clone.classList.add('new-row-highlight');
+                    tr.parentNode.insertBefore(clone, tr.nextSibling);
+                });
+                syncCheckboxesInScope();
+                state.originalHtmlString = elements.displayArea.innerHTML;
+            }
+            return;
+        }
+        const selected = elements.mergeViewContent?.querySelectorAll('tbody .row-checkbox:checked');
+        if (!selected?.length) { alert('請先勾選要複製的列'); return; }
+        selected.forEach(cb => {
+            const idx = parseInt(cb.closest('tr').dataset.rowIndex, 10);
+            const row = state.mergedData[idx];
+            if (row) {
+                const copy = { ...row, _id: Date.now() + Math.random() };
+                state.mergedData.splice(idx + 1, 0, copy);
+            }
+        });
+        renderMergedTable();
+    }
+
+    function toggleSourceColumn() {
+        state.showSourceColumn = !state.showSourceColumn;
+        if(elements.toggleSourceColBtn) elements.toggleSourceColBtn.classList.toggle('active', state.showSourceColumn);
+        renderMergedTable();
+    }
+
     function deleteSelectedRows(specificScope = null) {
         const scope = specificScope || getActiveScope();
         if(!scope) return;
@@ -968,6 +1283,7 @@ const ExcelViewer = (() => {
     function updateDropAreaDisplay() {
         const hasFiles = state.loadedTables > 0;
         if(elements.dropArea) elements.dropArea.classList.toggle('compact', hasFiles);
+        // 支援舊版 HTML 結構
         if(elements.dropAreaInitial) elements.dropAreaInitial.classList.toggle('hidden', hasFiles);
         if(elements.dropAreaLoaded) elements.dropAreaLoaded.classList.toggle('hidden', !hasFiles);
         if(elements.importOptionsContainer) elements.importOptionsContainer.classList.toggle('hidden', hasFiles);
@@ -975,11 +1291,20 @@ const ExcelViewer = (() => {
             elements.fileCount.textContent = state.loadedTables;
             elements.fileNames.textContent = state.loadedFiles.slice(0, 3).join(', ') + (state.loadedFiles.length > 3 ? '...' : '');
         }
+        // 新版 HTML: 簡化 drop area 內容
+        const dropContent = document.getElementById('drop-area-content');
+        if (dropContent) {
+            if (hasFiles) {
+                dropContent.innerHTML = `<h3>📊 已載入 ${state.loadedTables} 張表</h3><p>拖放更多檔案或點擊上傳</p>`;
+            }
+        }
     }
 
-    function showControls(hiddenCount) { 
-        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden'); 
-        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1); 
+    function showControls(hiddenCount) {
+        if(elements.controlPanel) elements.controlPanel.classList.remove('hidden');
+        if(elements.stepData) elements.stepData.classList.remove('hidden');
+        if(elements.stepExport) elements.stepExport.classList.remove('hidden');
+        if(elements.mergeViewBtn) elements.mergeViewBtn.classList.toggle('hidden', state.loadedTables <= 1);
         if(elements.showHiddenBtn) elements.showHiddenBtn.classList.toggle('hidden', hiddenCount === 0);
     }
 
@@ -1002,8 +1327,14 @@ const ExcelViewer = (() => {
         if (!silent && !confirm('確定清除所有檔案？')) return;
         if (state.isMergedView) closeMergeView();
         state.originalHtmlString = ''; state.loadedFiles = []; state.loadedTables = 0; state.rawSheetsCache = [];
-        if(elements.displayArea) elements.displayArea.innerHTML = ''; 
+        state.fileInfos = []; state.aggregatedRows = [];
+        if(elements.displayArea) elements.displayArea.innerHTML = '';
         if (elements.fileInput) elements.fileInput.value = '';
+        if(elements.stepMapping) elements.stepMapping.classList.add('hidden');
+        if(elements.stepData) elements.stepData.classList.add('hidden');
+        if(elements.stepExport) elements.stepExport.classList.add('hidden');
+        if(elements.aggregatePanel) elements.aggregatePanel.classList.add('hidden');
+        if(elements.topBarActions) elements.topBarActions.classList.add('hidden');
         updateDropAreaDisplay(); resetControls(); setViewMode('list');
     }
 
@@ -1483,6 +1814,93 @@ const ExcelViewer = (() => {
             }
         });
         if(elements.undoBtn) elements.undoBtn.addEventListener('click', () => undoManager.undoLast());
+
+        // --- Step 2: 基金對照 & 彙整 事件 ---
+        if(elements.executeMatchBtn) elements.executeMatchBtn.addEventListener('click', handleAutoMatch);
+        if(elements.exportMatchedBtn) elements.exportMatchedBtn.addEventListener('click', handleExportMatched);
+
+        if(elements.mapCheckAll) elements.mapCheckAll.addEventListener('change', e => {
+            if(elements.mappingTbody) elements.mappingTbody.querySelectorAll('.map-row-check').forEach(cb => cb.checked = e.target.checked);
+        });
+        if(elements.mapSelectAllBtn) elements.mapSelectAllBtn.addEventListener('click', () => {
+            if(elements.mappingTbody) elements.mappingTbody.querySelectorAll('.map-row-check').forEach(cb => cb.checked = true);
+        });
+        if(elements.mapDeselectAllBtn) elements.mapDeselectAllBtn.addEventListener('click', () => {
+            if(elements.mappingTbody) elements.mappingTbody.querySelectorAll('.map-row-check').forEach(cb => cb.checked = false);
+        });
+        if(elements.mapInvertBtn) elements.mapInvertBtn.addEventListener('click', () => {
+            if(elements.mappingTbody) elements.mappingTbody.querySelectorAll('.map-row-check').forEach(cb => cb.checked = !cb.checked);
+        });
+
+        // 彙整面板事件
+        if(elements.aggCheckReviewBtn) elements.aggCheckReviewBtn.addEventListener('click', () => {
+            state.aggregatedRows.forEach(r => { if (r.needsReview) r.checked = true; });
+            renderAggregationPanel();
+        });
+        if(elements.aggUncheckAllBtn) elements.aggUncheckAllBtn.addEventListener('click', () => {
+            state.aggregatedRows.forEach(r => r.checked = false);
+            renderAggregationPanel();
+        });
+        if(elements.aggDeleteCheckedBtn) elements.aggDeleteCheckedBtn.addEventListener('click', deleteCheckedAggregatedRows);
+        if(elements.aggExportBtn) elements.aggExportBtn.addEventListener('click', exportAggregatedRows);
+
+        if(elements.aggregatePanel) {
+            elements.aggregatePanel.addEventListener('change', e => {
+                if (e.target.classList.contains('agg-row-check')) {
+                    const tr = e.target.closest('tr');
+                    const idx = parseInt(tr.dataset.aggIndex, 10);
+                    state.aggregatedRows[idx].checked = e.target.checked;
+                    tr.classList.toggle('row-checked-delete', e.target.checked);
+                    updateAggregationCounts();
+                }
+                if (e.target.id === 'agg-check-all-cb') {
+                    const isChecked = e.target.checked;
+                    state.aggregatedRows.forEach(r => r.checked = isChecked);
+                    renderAggregationPanel();
+                }
+            });
+        }
+
+        // 進階設定折疊
+        if(elements.toggleImportSettings) {
+            elements.toggleImportSettings.addEventListener('click', () => {
+                if(elements.importSettingsPanel) elements.importSettingsPanel.classList.toggle('collapsed');
+            });
+        }
+
+        // 清除所有
+        if(elements.clearAllBtn) elements.clearAllBtn.addEventListener('click', () => clearAllFiles(false));
+    }
+
+    // --- 全域 handler ---
+    function handleAutoMatch() {
+        console.log('🔍 handleAutoMatch called');
+        console.log('  fileInfos:', state.fileInfos.length);
+        console.log('  fundSortOrder:', state.fundSortOrder.length);
+        console.log('  mappingTbody:', !!elements.mappingTbody);
+        if (elements.mappingTbody) {
+            const checked = elements.mappingTbody.querySelectorAll('.map-row-check:checked');
+            console.log('  checked files:', checked.length);
+        }
+        buildAggregation();
+        console.log('  aggregatedRows:', state.aggregatedRows.length);
+        
+        // 滾動到彙整資料預覽
+        if (elements.aggregatePanel && !elements.aggregatePanel.classList.contains('hidden')) {
+            elements.aggregatePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function handleExportMatched() {
+        if (state.aggregatedRows.length > 0) {
+            exportAggregatedRows();
+        } else {
+            // 如果還沒有彙整資料，先執行彙整再匯出
+            buildMappingTable();
+            buildAggregation();
+            if (state.aggregatedRows.length > 0) exportAggregatedRows();
+            else alert('沒有找到可匯出的資料。');
+        }
     }
 
     async function init() {
