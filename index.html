@@ -379,9 +379,19 @@
     <button id="back-to-top-btn">↑</button>
 
     <div class="app-version">
-        <span>最近更新：2026-04-17</span>
+        <span id="version-date">最近更新：載入中...</span>
     </div>
 
+    <script>
+        (function() {
+            var d = new Date();
+            var y = d.getFullYear();
+            var m = ('0'+(d.getMonth()+1)).slice(-2);
+            var day = ('0'+d.getDate()).slice(-2);
+            var el = document.getElementById('version-date');
+            if(el) el.textContent = '最近更新：'+y+'-'+m+'-'+day;
+        })();
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
