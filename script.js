@@ -379,11 +379,13 @@ const ExcelViewer = (() => {
 
         const matchCol = state.matchColumn || '1';
         const matchColLabel = matchCol === '1' ? '第一欄（基金名稱）' : matchCol === '2' ? '第二欄（基金名稱）' : '第三欄（基金名稱）';
-        const getOtherCol = (mc) => {
-            if (mc === '1') return [row.secondCellText, row.thirdCellText];
-            if (mc === '2') return [row.firstCellText, row.thirdCellText];
-            return [row.firstCellText, row.secondCellText];
+        
+        const getOtherCol = (r, mc) => {
+            if (mc === '1') return [r.secondCellText, r.thirdCellText];
+            if (mc === '2') return [r.firstCellText, r.thirdCellText];
+            return [r.firstCellText, r.secondCellText];
         };
+        
         elements.aggregateThead.innerHTML = `<tr>
             <th style="width:40px;"><input type="checkbox" id="agg-check-all-cb"></th>
             <th>#</th>
@@ -398,7 +400,7 @@ const ExcelViewer = (() => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
             const matchText = row.matchCellText || '';
-            const [other1, other2] = getOtherCol(matchCol);
+            const [other1, other2] = getOtherCol(row, matchCol);
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
