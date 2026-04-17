@@ -1691,3 +1691,11 @@ tr.dedup-marked td:first-child {
 .source-col {
     background: var(--bg-elevated);
 }
+
+/* App version */
+.app-version {
+    text-align: center;
+    padding: 12px;
+    font-size: 11px;
+    color: var(--text-muted, #64748b);
+}
