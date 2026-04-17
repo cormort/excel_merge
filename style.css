@@ -997,6 +997,10 @@ button {
     color: #fbbf24;
     font-weight: 500;
 }
+.aggregate-table td.match-col {
+    background: rgba(59, 130, 246, 0.15);
+    font-weight: 600;
+}
 
 /* 已勾選（預備刪除）列 */
 .aggregate-table tbody tr.row-checked-delete {

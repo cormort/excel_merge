@@ -378,37 +378,29 @@ const ExcelViewer = (() => {
         elements.aggregatePanel.classList.remove('hidden');
 
         const matchCol = state.matchColumn || '1';
-        const matchColLabel = matchCol === '1' ? '第一欄（基金名稱）' : matchCol === '2' ? '第二欄（基金名稱）' : '第三欄（基金名稱）';
-        
-        const getOtherCol = (r, mc) => {
-            if (mc === '1') return [r.secondCellText, r.thirdCellText];
-            if (mc === '2') return [r.firstCellText, r.thirdCellText];
-            return [r.firstCellText, r.secondCellText];
-        };
         
         elements.aggregateThead.innerHTML = `<tr>
             <th style="width:40px;"><input type="checkbox" id="agg-check-all-cb"></th>
             <th>#</th>
             <th>標準基金</th>
             <th>來源檔案</th>
-            <th>${matchColLabel}</th>
-            <th>其他欄位</th>
+            <th>第一欄</th>
+            <th>第二欄</th>
             <th>第三欄</th>
         </tr>`;
 
         const html = state.aggregatedRows.map((row, idx) => {
             const cls = row.needsReview ? 'row-needs-review' : '';
             const checkedCls = row.checked ? 'row-checked-delete' : '';
-            const matchText = row.matchCellText || '';
-            const [other1, other2] = getOtherCol(row, matchCol);
+            const isMatchCol = (c) => matchCol === c;
             return `<tr data-agg-index="${idx}" class="${cls} ${checkedCls}">
                 <td><input type="checkbox" class="agg-row-check" ${row.checked ? 'checked' : ''}></td>
                 <td>${idx + 1}</td>
                 <td>${escHtml(row.standardFund)}</td>
                 <td title="${escHtml(row.sourceFile)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.sourceFile)}</td>
-                <td class="${row.needsReview ? 'first-col-mismatch' : ''}">${escHtml(matchText)}</td>
-                <td>${escHtml(other1 || '')}</td>
-                <td>${escHtml(row.thirdCellText || '')}</td>
+                <td class="${isMatchCol('1') ? 'match-col' : ''}">${escHtml(row.firstCellText)}</td>
+                <td class="${isMatchCol('2') ? 'match-col' : ''}">${escHtml(row.secondCellText || '')}</td>
+                <td class="${isMatchCol('3') ? 'match-col' : ''}">${escHtml(row.thirdCellText || '')}</td>
             </tr>`;
         }).join('');
         elements.aggregateTbody.innerHTML = html;
@@ -1944,8 +1936,6 @@ const ExcelViewer = (() => {
 
         if(elements.matchColSelect) elements.matchColSelect.addEventListener('change', () => {
             state.matchColumn = elements.matchColSelect.value;
-            const colLabel = state.matchColumn === '1' ? '第一欄' : state.matchColumn === '2' ? '第二欄' : '第三欄';
-            document.querySelectorAll('#match-col-label, #match-col-label2').forEach(el => el.textContent = colLabel);
             rebuildAggregationWithNewMatchColumn();
         });
 
