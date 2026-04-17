@@ -1942,10 +1942,18 @@ const ExcelViewer = (() => {
 
         if(elements.matchColSelect) elements.matchColSelect.addEventListener('change', () => {
             state.matchColumn = elements.matchColSelect.value;
-            const colLabel = state.matchColumn === '1' ? '第一欄' : '第二欄';
+            const colLabel = state.matchColumn === '1' ? '第一欄' : state.matchColumn === '2' ? '第二欄' : '第三欄';
             document.querySelectorAll('#match-col-label, #match-col-label2').forEach(el => el.textContent = colLabel);
             rebuildAggregationWithNewMatchColumn();
         });
+
+        if(elements.matchColSelect) {
+            console.log('matchColSelect value:', elements.matchColSelect.value);
+        }
+
+        if(elements.executeMatchBtn) {
+            console.log('executeMatchBtn found');
+        }
 
         if(elements.aggregatePanel) {
             elements.aggregatePanel.addEventListener('change', e => {
@@ -1980,10 +1988,14 @@ const ExcelViewer = (() => {
         console.log('🔍 handleAutoMatch called');
         console.log('  fileInfos:', state.fileInfos.length);
         console.log('  fundSortOrder:', state.fundSortOrder.length);
-        console.log('  mappingTbody:', !!elements.mappingTbody);
+        console.log('  matchColumn:', state.matchColumn);
+        console.log('  selected files in UI:');
         if (elements.mappingTbody) {
             const checked = elements.mappingTbody.querySelectorAll('.map-row-check:checked');
             console.log('  checked files:', checked.length);
+            checked.forEach((cb, i) => {
+                console.log(`    [${i}]`, cb.dataset.index, cb.closest('tr')?.textContent?.slice(0, 50));
+            });
         }
         buildAggregation();
         console.log('  aggregatedRows:', state.aggregatedRows.length);
