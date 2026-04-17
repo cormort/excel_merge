@@ -388,8 +388,10 @@
             var y = d.getFullYear();
             var m = ('0'+(d.getMonth()+1)).slice(-2);
             var day = ('0'+d.getDate()).slice(-2);
+            var h = ('0'+d.getHours()).slice(-2);
+            var min = ('0'+d.getMinutes()).slice(-2);
             var el = document.getElementById('version-date');
-            if(el) el.textContent = '最近更新：'+y+'-'+m+'-'+day;
+            if(el) el.textContent = '最近更新：'+y+'-'+m+'-'+day+' '+h+':'+min;
         })();
     </script>
     <script src="script.js"></script>
