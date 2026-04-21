@@ -37,7 +37,35 @@
 
         <!-- ===== 主內容區 ===== -->
         <main class="main-content">
-            
+
+            <!-- ===== 比對模式 Tab ===== -->
+            <div class="mode-tab-bar">
+                <button class="mode-tab active" id="tab-standard" data-mode="standard">
+                    📋 標準比對 <span class="tab-sub">fund-config.json</span>
+                </button>
+                <button class="mode-tab" id="tab-custom" data-mode="custom">
+                    ✏️ 自訂比對
+                </button>
+            </div>
+
+            <!-- 自訂比對區塊（預設隱藏） -->
+            <div class="custom-list-panel hidden" id="custom-list-panel">
+                <div class="custom-list-header">
+                    <span class="custom-list-title">自訂比對清單</span>
+                    <span class="custom-list-count hidden" id="custom-list-count">已載入 <strong id="custom-list-num">0</strong> 個名稱</span>
+                </div>
+                <textarea
+                    id="custom-list-textarea"
+                    class="custom-list-textarea"
+                    placeholder="每行輸入一個名稱，例如：&#10;台灣糖業股份有限公司&#10;中央銀行&#10;國立臺灣大學"
+                    spellcheck="false"
+                ></textarea>
+                <div class="custom-list-actions">
+                    <button class="btn-primary" id="apply-custom-list-btn">套用清單</button>
+                    <button class="btn-ghost" id="clear-custom-list-btn">清除</button>
+                </div>
+            </div>
+
             <!-- ===== STEP 1: 上傳區域 ===== -->
             <section class="step-section" id="step-upload">
                 <div class="step-header">

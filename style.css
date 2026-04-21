@@ -1699,3 +1699,113 @@ tr.dedup-marked td:first-child {
     font-size: 11px;
     color: var(--text-muted, #64748b);
 }
+
+/* --- 21. 比對模式 Tab Bar --- */
+.mode-tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--border-default);
+    padding-bottom: 0;
+}
+
+.mode-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.mode-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.mode-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.tab-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.mode-tab.active .tab-sub {
+    color: var(--accent);
+    opacity: 0.75;
+}
+
+/* --- 22. 自訂比對面板 --- */
+.custom-list-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+}
+
+.custom-list-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.custom-list-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.custom-list-count {
+    font-size: 13px;
+    color: var(--success);
+    background: var(--success-subtle);
+    padding: 2px 10px;
+    border-radius: 20px;
+}
+
+.custom-list-textarea {
+    width: 100%;
+    min-height: 160px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: 'Noto Sans TC', 'Inter', sans-serif;
+    line-height: 1.7;
+    padding: 12px 14px;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+    outline: none;
+}
+
+.custom-list-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.custom-list-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.custom-list-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}

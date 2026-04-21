@@ -38,6 +38,10 @@ const ExcelViewer = (() => {
         fileInfos: [],          // 每個檔案的辨識結果 [{filename, detectedFunds, headers, rows}]
         aggregatedRows: [],     // 彙整後的逐列資料
         matchColumn: '1',       // 比對基金名稱的欄位（1=第一欄, 2=第二欄）
+
+        // 自訂比對模式
+        compareMode: 'standard',   // 'standard' | 'custom'
+        customFundList: [],        // 使用者貼入的自訂名稱清單
     };
 
     const elements = {};
@@ -189,7 +193,16 @@ const ExcelViewer = (() => {
             matchColSelect: 'match-col-select',
             toggleImportSettings: 'toggle-import-settings', importSettingsPanel: 'import-settings-panel',
             topBarActions: 'top-bar-actions', statTableCount: 'stat-table-count', statRowCount: 'stat-row-count',
-            clearAllBtn: 'clear-all-btn'
+            clearAllBtn: 'clear-all-btn',
+
+            // 自訂比對
+            tabStandard: 'tab-standard', tabCustom: 'tab-custom',
+            customListPanel: 'custom-list-panel',
+            customListTextarea: 'custom-list-textarea',
+            applyCustomListBtn: 'apply-custom-list-btn',
+            clearCustomListBtn: 'clear-custom-list-btn',
+            customListCount: 'custom-list-count',
+            customListNum: 'custom-list-num'
         };
 
         Object.keys(mapping).forEach(key => { elements[key] = document.getElementById(mapping[key]); });
@@ -205,6 +218,38 @@ const ExcelViewer = (() => {
         if (elements.selectKeywordRegex) elements.selectKeywordRegex.checked = false;
         if (elements.controlPanel) elements.controlPanel.classList.add('hidden');
         updateSelectionInfo();
+    }
+
+    // ===== 自訂比對：模式切換 =====
+    function switchCompareMode(mode) {
+        state.compareMode = mode;
+
+        // Tab 高亮
+        if (elements.tabStandard) elements.tabStandard.classList.toggle('active', mode === 'standard');
+        if (elements.tabCustom) elements.tabCustom.classList.toggle('active', mode === 'custom');
+
+        // 自訂面板顯示/隱藏
+        if (elements.customListPanel) elements.customListPanel.classList.toggle('hidden', mode !== 'custom');
+
+        // 切換 standard 模式時還原 fundSortOrder（若曾被覆蓋）
+        // 自訂模式不動 fundSortOrder，改用 state.customFundList
+    }
+
+    // ===== 自訂比對：套用清單 =====
+    function applyCustomList() {
+        const raw = elements.customListTextarea ? elements.customListTextarea.value : '';
+        const list = raw
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        state.customFundList = list;
+
+        // 更新計數顯示
+        if (elements.customListNum) elements.customListNum.textContent = list.length;
+        if (elements.customListCount) {
+            elements.customListCount.classList.toggle('hidden', list.length === 0);
+        }
     }
 
     async function loadFundConfig() {
@@ -243,6 +288,14 @@ const ExcelViewer = (() => {
 
     function detectFundsInText(text) {
         if (!text) return [];
+
+        // 自訂模式：從 customFundList 中精確比對（逐一查找檔名是否包含該名稱）
+        if (state.compareMode === 'custom') {
+            const lower = text.toLowerCase();
+            return state.customFundList.filter(name => lower.includes(name.toLowerCase()));
+        }
+
+        // 標準模式：原有邏輯
         let scan = text.toLowerCase();
         const found = new Set();
         for (const { key, fund } of getFundSearchKeys()) {
@@ -257,13 +310,18 @@ const ExcelViewer = (() => {
         return state.fundSortOrder.filter(f => found.has(f));
     }
 
-    // 判斷儲存格文字是否屬於某標準基金（別名匹配 或 前4字相同 + 字數相同）
+    // 判斷儲存格文字是否屬於某標準基金
+    // 自訂模式：僅精確比對（trim）
+    // 標準模式：精確比對 → 別名比對 → 前4字模糊比對
     function cellMatchesFund(cellText, standardFund) {
         if (!cellText || !standardFund) return false;
         const cellTextTrimmed = cellText.trim();
         const fundTextTrimmed = standardFund.trim();
         if (cellTextTrimmed === fundTextTrimmed) return true;
-        
+
+        // 自訂模式只做精確比對，到此就結束
+        if (state.compareMode === 'custom') return false;
+
         // 檢查別名是否匹配
         const aliasKeys = Object.keys(state.fundAliasMap);
         for (const alias of aliasKeys) {
@@ -275,8 +333,8 @@ const ExcelViewer = (() => {
         const cellChars = Array.from(cellTextTrimmed);
         const fundChars = Array.from(fundTextTrimmed);
         if (cellChars.length < 4 || fundChars.length < 4) return false;
-        return cellChars.length === fundChars.length && 
-               cellChars[0] === fundChars[0] && 
+        return cellChars.length === fundChars.length &&
+               cellChars[0] === fundChars[0] &&
                cellChars[1] === fundChars[1] &&
                cellChars[2] === fundChars[2] &&
                cellChars[3] === fundChars[3];
@@ -314,6 +372,12 @@ const ExcelViewer = (() => {
         return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
+    // 取得當前模式下的有效基金清單（標準模式用 fundSortOrder；自訂模式用 customFundList）
+    function getActiveFundList() {
+        if (state.compareMode === 'custom') return state.customFundList;
+        return state.fundSortOrder;
+    }
+
     // --- Stage 2: 彙整面板 (Aggregation) ---
     // 依標準基金順序，把勾選的檔案的所有資料列貼入（一個檔案對應多個基金就貼多次）
     function buildAggregation() {
@@ -325,11 +389,17 @@ const ExcelViewer = (() => {
         }
         if (selectedIdxs.length === 0) { alert('請先勾選要彙整的檔案。'); return; }
 
+        // 自訂模式下確認清單已套用
+        if (state.compareMode === 'custom' && state.customFundList.length === 0) {
+            alert('自訂比對模式：請先在上方貼入名稱清單並點擊「套用清單」。');
+            return;
+        }
+
         const aggregated = [];
         let reviewCount = 0;
 
-        // 依標準基金順序巡覽
-        for (const standardFund of state.fundSortOrder) {
+        // 依有效基金清單巡覽（標準模式：fundSortOrder；自訂模式：customFundList）
+        for (const standardFund of getActiveFundList()) {
             // 對每個勾選的檔案，檢查是否對應到此基金
             for (const idx of selectedIdxs) {
                 const info = state.fileInfos[idx];
@@ -493,8 +563,8 @@ const ExcelViewer = (() => {
             dataByFund[row.standardFund].push(row);
         });
 
-        // ⭐ Checklist 核心：巡覽 fund-config.json 裡全部標準基金
-        state.fundSortOrder.forEach(standardFund => {
+        // ⭐ Checklist 核心：巡覽有效基金清單（標準模式：fund-config.json；自訂模式：customFundList）
+        getActiveFundList().forEach(standardFund => {
             const fundRows = dataByFund[standardFund];
             if (fundRows && fundRows.length > 0) {
                 fundRows.forEach(row => {
@@ -1973,6 +2043,28 @@ const ExcelViewer = (() => {
 
         // 清除所有
         if(elements.clearAllBtn) elements.clearAllBtn.addEventListener('click', () => clearAllFiles(false));
+
+        // ===== 自訂比對 Tab 切換 =====
+        if (elements.tabStandard) {
+            elements.tabStandard.addEventListener('click', () => switchCompareMode('standard'));
+        }
+        if (elements.tabCustom) {
+            elements.tabCustom.addEventListener('click', () => switchCompareMode('custom'));
+        }
+
+        // 套用自訂清單
+        if (elements.applyCustomListBtn) {
+            elements.applyCustomListBtn.addEventListener('click', applyCustomList);
+        }
+
+        // 清除自訂清單
+        if (elements.clearCustomListBtn) {
+            elements.clearCustomListBtn.addEventListener('click', () => {
+                if (elements.customListTextarea) elements.customListTextarea.value = '';
+                state.customFundList = [];
+                if (elements.customListCount) elements.customListCount.classList.add('hidden');
+            });
+        }
     }
 
     // --- 全域 handler ---
