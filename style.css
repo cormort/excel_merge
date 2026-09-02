@@ -4,48 +4,51 @@
 
 /* --- 0. Design Tokens --- */
 :root {
-    --bg-base: #0f1117;
-    --bg-surface: #1a1d27;
-    --bg-elevated: #232736;
-    --bg-hover: #2c3142;
-    --bg-active: #363c52;
-    
-    --border-subtle: rgba(255,255,255,0.06);
-    --border-default: rgba(255,255,255,0.10);
-    --border-strong: rgba(255,255,255,0.18);
-    
-    --text-primary: #e8eaed;
-    --text-secondary: #9aa0b0;
-    --text-muted: #636b7e;
-    --text-inverse: #0f1117;
-    
-    --accent: #6c8aff;
-    --accent-hover: #8ca3ff;
-    --accent-subtle: rgba(108, 138, 255, 0.12);
-    --accent-glow: rgba(108, 138, 255, 0.25);
-    
-    --success: #4ecb71;
-    --success-subtle: rgba(78, 203, 113, 0.12);
-    --warning: #f0b429;
-    --warning-subtle: rgba(240, 180, 41, 0.12);
-    --danger: #f56565;
-    --danger-subtle: rgba(245, 101, 101, 0.12);
-    --info: #38bdf8;
-    --info-subtle: rgba(56, 189, 248, 0.12);
-    
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+    /* HeroUI dark theme tokens */
+    --bg-base: #000000;
+    --bg-surface: #18181b;   /* content1 */
+    --bg-elevated: #27272a;  /* content2 */
+    --bg-hover: #3f3f46;     /* content3 */
+    --bg-active: #52525b;    /* content4 */
 
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
-    --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
-    --shadow-glow: 0 0 20px var(--accent-glow);
-    
+    --border-subtle: rgba(255,255,255,0.10);
+    --border-default: rgba(255,255,255,0.15);  /* divider */
+    --border-strong: rgba(255,255,255,0.25);
+
+    --text-primary: #ECEDEE;   /* foreground */
+    --text-secondary: #a1a1aa; /* default-400 */
+    --text-muted: #71717a;     /* default-500 */
+    --text-inverse: #000000;
+
+    --accent: #006FEE;         /* primary */
+    --accent-hover: #338EF7;   /* primary-400 */
+    --accent-subtle: rgba(0, 111, 238, 0.20);
+    --accent-glow: rgba(0, 111, 238, 0.35);
+
+    --success: #17C964;
+    --success-subtle: rgba(23, 201, 100, 0.20);
+    --warning: #F5A524;
+    --warning-subtle: rgba(245, 165, 36, 0.20);
+    --danger: #F31260;
+    --danger-subtle: rgba(243, 18, 96, 0.20);
+    --info: #7828C8;
+    --info-subtle: rgba(120, 40, 200, 0.20);
+
+    /* HeroUI radius scale */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 14px;
+    --radius-xl: 14px;
+
+    /* HeroUI dark shadows */
+    --shadow-sm: 0 0 5px 0 rgba(0,0,0,0.05), 0 2px 10px 0 rgba(0,0,0,0.2), inset 0 0 1px 0 rgba(255,255,255,0.15);
+    --shadow-md: 0 0 15px 0 rgba(0,0,0,0.06), 0 2px 30px 0 rgba(0,0,0,0.22), inset 0 0 1px 0 rgba(255,255,255,0.15);
+    --shadow-lg: 0 0 30px 0 rgba(0,0,0,0.07), 0 30px 60px 0 rgba(0,0,0,0.26), inset 0 0 1px 0 rgba(255,255,255,0.15);
+    --shadow-glow: 0 0 0 3px rgba(0, 111, 238, 0.35);
+
     --font-sans: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'SF Mono', 'Fira Code', monospace;
-    
+
     --transition-fast: 150ms ease;
     --transition-normal: 250ms ease;
     --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -1808,4 +1811,200 @@ tr.dedup-marked td:first-child {
     display: flex;
     gap: 8px;
     margin-top: 12px;
+}
+
+/* ===========================================
+   23. HeroUI alignment overrides
+   （對齊 HeroUI 的形狀 / 動效 / 變體語彙）
+   =========================================== */
+
+/* --- Buttons: HeroUI 的 solid / flat / bordered / light 變體 --- */
+.btn, .btn-primary, .btn-success, .btn-danger, .btn-outline,
+.btn-ghost, .btn-text, .btn-accent, .btn-warning-sm, .view-btn, .mode-tab {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    line-height: 1.25;
+    transition: transform 150ms ease, opacity 150ms ease,
+                background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.btn:hover, .btn-primary:hover, .btn-success:hover, .btn-accent:hover,
+.btn-warning-sm:hover {
+    opacity: 0.85;
+    filter: none;
+    transform: none;
+    box-shadow: none;
+}
+.btn:active, .btn-primary:active, .btn-success:active, .btn-danger:active,
+.btn-outline:active, .btn-ghost:active, .btn-text:active, .btn-accent:active,
+.btn-warning-sm:active, .btn-lg:active {
+    transform: scale(0.97);
+}
+button:focus-visible {
+    outline: 2px solid var(--accent-hover);
+    outline-offset: 2px;
+}
+
+.btn-primary, .btn-success, .btn-warning-sm, .btn-lg, .btn, .btn-danger, .btn-outline {
+    border-radius: var(--radius-md);
+}
+.btn-sm { border-radius: var(--radius-sm) !important; }
+
+/* solid */
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-success { background: var(--success); color: var(--text-inverse); }
+/* flat（HeroUI flat = 20% 底色 + 同色文字） */
+.btn-danger {
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border: none;
+}
+.btn-danger:hover { background: var(--danger-subtle); color: var(--danger); opacity: 0.8; }
+/* bordered */
+.btn-outline {
+    border: 2px solid var(--border-default);
+    background: transparent;
+    color: var(--text-primary);
+}
+.btn-outline:hover {
+    background: transparent;
+    border-color: var(--accent);
+    color: var(--accent);
+}
+/* light */
+.btn-ghost:hover { background: var(--danger-subtle); }
+.btn-text:hover { background: var(--accent-subtle); }
+
+/* 主要 CTA：改為 HeroUI solid，不用漸層與光暈 */
+.btn-accent {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: none;
+    border-radius: var(--radius-md);
+}
+.btn-accent:hover { box-shadow: none; }
+
+/* --- Brand / Chip / Badge --- */
+.top-bar h1 {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+.brand-icon { filter: none; }
+.top-bar { background: rgba(0,0,0,0.7); }
+
+.stat-pill {          /* HeroUI Chip (flat, full radius) */
+    background: var(--bg-elevated);
+    border: none;
+    border-radius: 9999px;
+    height: 28px;
+    padding: 0 12px;
+    color: var(--text-secondary);
+}
+.step-badge {         /* HeroUI Chip / Avatar (solid primary) */
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+.custom-list-count { border-radius: 9999px; }
+
+/* --- Card 化：Step section = HeroUI Card --- */
+.step-section, .custom-list-panel, .table-wrapper, .modal-dialog, .advanced-panel {
+    border-radius: var(--radius-lg);
+}
+.step-section {
+    background: var(--bg-surface);
+    border: none;
+    box-shadow: var(--shadow-md);
+}
+.step-header { border-bottom: 1px solid var(--border-subtle); }
+.custom-list-panel { border: none; box-shadow: var(--shadow-md); }
+.modal-dialog { box-shadow: var(--shadow-lg); }
+
+/* --- Tabs：HeroUI 的 track + 滑塊，而非底線 --- */
+.mode-tab-bar {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-elevated);
+    border: none;
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    align-self: flex-start;
+}
+.mode-tab {
+    border: none;
+    border-bottom: none;
+    margin-bottom: 0;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+}
+.mode-tab:hover { background: transparent; color: var(--text-primary); }
+.mode-tab.active {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-bottom-color: transparent;
+    box-shadow: var(--shadow-sm);
+}
+.mode-tab.active .tab-sub { color: var(--text-muted); opacity: 1; }
+
+/* --- Inputs：HeroUI faded/flat 輸入框 --- */
+.search-box,
+.keyword-box input[type="text"],
+.complex-filter-inner input[type="text"],
+.custom-list-textarea,
+.filter-select, .match-col-select, select,
+.sub-input input, .inline-text, .inline-num {
+    background: var(--bg-elevated);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+.search-box:focus-within,
+.keyword-box input[type="text"]:focus,
+.complex-filter-inner input[type="text"]:focus,
+.custom-list-textarea:focus,
+.filter-select:focus, .match-col-select:focus, select:focus,
+.sub-input input:focus, .inline-text:focus, .inline-num:focus {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    box-shadow: none;
+    outline: none;
+}
+.inline-num, .inline-text { border-radius: var(--radius-sm); }
+::placeholder { color: var(--text-muted); }
+
+input[type="checkbox"], input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+/* --- Drop area：HeroUI 虛線卡片 --- */
+#drop-area {
+    border-radius: var(--radius-lg);
+    border-color: var(--border-default);
+}
+#drop-area:hover, #drop-area.dragover {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+/* --- Table：HeroUI Table 的圓角與 hover 底色 --- */
+.table-wrapper { border: 1px solid var(--border-subtle); }
+.mapping-table-wrapper, .aggregate-table-wrapper {
+    border-radius: var(--radius-md);
+    overflow: auto;
+}
+tbody tr:hover { background: var(--bg-elevated); }
+
+/* --- Toast / 回到頂端 --- */
+#undo-toast { border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+#back-to-top-btn { border-radius: 9999px; box-shadow: var(--shadow-md); }
+
+/* 面板內的行內小輸入框需與 content2 面板底色分離 */
+.inline-num, .inline-text, .sub-input input {
+    background: var(--bg-hover);
+    border: 1px solid var(--border-subtle);
 }
