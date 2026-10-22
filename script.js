@@ -19,6 +19,7 @@ const ExcelViewer = (() => {
         // 基金對照 & 彙整
         fileInfos: [],          // 每個檔案的辨識結果 [{filename, detectedFunds, headers, rows}]
         aggregatedRows: [],     // 彙整後的逐列資料
+        aggSourceFiles: [],     // 彙整時勾選的檔名，用來逐檔勾稽保留列數
         matchColumn: '1',       // 比對基金名稱的欄位（1/2/3）
 
         // 自訂比對模式
@@ -109,6 +110,7 @@ const ExcelViewer = (() => {
             executeMatchBtn: 'execute-match-btn', exportMatchedBtn: 'export-matched-btn',
             aggregatePanel: 'aggregate-panel', aggregateThead: 'aggregate-thead', aggregateTbody: 'aggregate-tbody',
             aggStatTotal: 'agg-stat-total', aggStatReview: 'agg-stat-review', aggStatChecked: 'agg-stat-checked',
+            aggReconcile: 'agg-reconcile',
             aggCheckReviewBtn: 'agg-check-review-btn', aggUncheckAllBtn: 'agg-uncheck-all-btn',
             aggDeleteCheckedBtn: 'agg-delete-checked-btn', aggExportBtn: 'agg-export-btn',
             matchColSelect: 'match-col-select',
@@ -296,6 +298,7 @@ const ExcelViewer = (() => {
         }
 
         state.aggregatedRows = aggregated;
+        state.aggSourceFiles = selectedIdxs.map(i => state.fileInfos[i].filename);
         renderAggregationPanel();
     }
 
@@ -337,6 +340,22 @@ const ExcelViewer = (() => {
         if (elements.aggStatTotal) elements.aggStatTotal.textContent = state.aggregatedRows.length;
         if (elements.aggStatReview) elements.aggStatReview.textContent = state.aggregatedRows.filter(r => r.needsReview).length;
         if (elements.aggStatChecked) elements.aggStatChecked.textContent = state.aggregatedRows.filter(r => r.checked).length;
+        renderReconcile();
+    }
+
+    // 逐檔勾稽：每個勾選的檔案最後保留幾列（未勾選刪除的列），0 列的檔案要回頭查
+    function renderReconcile() {
+        if (!elements.aggReconcile) return;
+        const kept = {};
+        state.aggregatedRows.forEach(r => { if (!r.checked) kept[r.sourceFile] = (kept[r.sourceFile] || 0) + 1; });
+        const files = state.aggSourceFiles;
+        const empty = files.filter(f => !kept[f]);
+        const total = Object.values(kept).reduce((a, b) => a + b, 0);
+        elements.aggReconcile.classList.toggle('reconcile-warn', empty.length > 0);
+        elements.aggReconcile.innerHTML = `勾稽：勾選 <strong>${files.length}</strong> 個檔，保留 <strong>${total}</strong> 列。`
+            + (empty.length
+                ? `<br>⚠️ 下列 <strong>${empty.length}</strong> 個檔沒有保留任何列，請確認檔內基金名稱或比對欄位：<br>${empty.map(escHtml).join('<br>')}`
+                : '每個檔都至少保留 1 列。');
     }
 
     function deleteCheckedAggregatedRows() {
